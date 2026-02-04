@@ -79,17 +79,18 @@ ABS_CONFIG = {
         "description": "Wage Price Index (quarterly)",
         "critical": True,
     },
-    # Building approvals: dataflow not found in ABS Data API
-    # TODO: Investigate correct dataflow name or use alternative data source
-    # "building_approvals": {
-    #     "dataflow": "BA",
-    #     "key": "all",
-    #     "params": {"startPeriod": "2020", "detail": "dataonly"},
-    #     "filters": {},
-    #     "output_file": "abs_building_approvals.csv",
-    #     "description": "Building Approvals total dwellings (monthly)",
-    #     "critical": False,
-    # },
+    "building_approvals": {
+        "dataflow": "BA_GCCSA",
+        "key": "all",
+        "params": {"startPeriod": "2014", "detail": "dataonly"},
+        "filters": {
+            "MEASURE": "1",  # Number
+            "REGION": "AUS",  # Australia total
+        },
+        "output_file": "abs_building_approvals.csv",
+        "description": "Building Approvals total dwellings (monthly)",
+        "critical": False,
+    },
 }
 
 # Source metadata for all data sources

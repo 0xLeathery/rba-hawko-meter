@@ -176,13 +176,14 @@ def fetch_wage_price_index() -> pd.DataFrame:
 
 
 def fetch_building_approvals() -> pd.DataFrame:
-    """
-    Fetch Building Approvals for total dwellings (Monthly).
-
-    NOTE: Building approvals dataflow not currently available in ABS Data API.
-    This is a placeholder for future implementation.
-    """
-    raise NotImplementedError("Building approvals dataflow not found in ABS Data API. Needs investigation.")
+    """Fetch Building Approvals for total dwellings (Monthly)."""
+    config = ABS_CONFIG["building_approvals"]
+    return fetch_abs_series(
+        config["dataflow"],
+        config["key"],
+        config.get("params"),
+        config.get("filters")
+    )
 
 
 # Fetcher registry
@@ -191,7 +192,7 @@ FETCHERS = {
     'employment': (fetch_employment, ABS_CONFIG["employment"]["output_file"]),
     'retail_trade': (fetch_retail_trade, ABS_CONFIG["retail_trade"]["output_file"]),
     'wage_price_index': (fetch_wage_price_index, ABS_CONFIG["wage_price_index"]["output_file"]),
-    # 'building_approvals': (fetch_building_approvals, ABS_CONFIG["building_approvals"]["output_file"]),
+    'building_approvals': (fetch_building_approvals, ABS_CONFIG["building_approvals"]["output_file"]),
 }
 
 
