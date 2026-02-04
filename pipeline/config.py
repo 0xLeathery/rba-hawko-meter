@@ -29,44 +29,66 @@ ABS_API_BASE = "https://data.api.abs.gov.au/data"
 ABS_CONFIG = {
     "cpi": {
         "dataflow": "CPI",
-        "key": "1.10001.10.Q",  # Index Number, All groups CPI, Original, Weighted Average of 8 Capital Cities
+        "key": "all",
         "params": {"startPeriod": "2014", "detail": "dataonly"},
+        "filters": {
+            "MEASURE": "1",  # Index numbers
+            "INDEX": "10001",  # All groups CPI
+            "TSEST": "10",  # Original (not seasonally adjusted)
+            "REGION": "50",  # Australia
+        },
         "output_file": "abs_cpi.csv",
-        "description": "Consumer Price Index (quarterly)",
+        "description": "Consumer Price Index (monthly)",
         "critical": True,
     },
     "employment": {
         "dataflow": "LF",
-        "key": "M1.1.AUS",  # Labour Force total employment, Australia
-        "params": {"startPeriod": "2014", "detail": "dataonly"},
+        "key": "all",
+        "params": {"startPeriod": "2020", "detail": "dataonly"},
+        "filters": {
+            # Get any employment data for Australia
+            # Will need refinement to get specific series
+        },
         "output_file": "abs_employment.csv",
         "description": "Labour Force employment (monthly)",
         "critical": True,
     },
     "retail_trade": {
         "dataflow": "RT",
-        "key": "A3348827X",  # Retail Trade total turnover
-        "params": {"startPeriod": "2014", "detail": "dataonly"},
+        "key": "all",
+        "params": {"startPeriod": "2020", "detail": "dataonly"},
+        "filters": {
+            # Get any retail trade data for Australia
+            # Will need refinement to get specific series
+        },
         "output_file": "abs_retail_trade.csv",
         "description": "Retail Trade turnover (monthly)",
         "critical": True,
     },
     "wage_price_index": {
         "dataflow": "WPI",
-        "key": "1.THRPEB.10.Q",  # Total hourly rates of pay excluding bonuses, Original
+        "key": "all",
         "params": {"startPeriod": "2014", "detail": "dataonly"},
+        "filters": {
+            "MEASURE": "1",  # Index numbers
+            "INDEX": "THRPEB",  # Total hourly rates of pay excluding bonuses
+            "TSEST": "10",  # Original
+        },
         "output_file": "abs_wage_price_index.csv",
         "description": "Wage Price Index (quarterly)",
         "critical": True,
     },
-    "building_approvals": {
-        "dataflow": "BA",
-        "key": "1.1.AUS.M",  # Total dwellings, Australia, Monthly
-        "params": {"startPeriod": "2014", "detail": "dataonly"},
-        "output_file": "abs_building_approvals.csv",
-        "description": "Building Approvals total dwellings (monthly)",
-        "critical": True,
-    },
+    # Building approvals: dataflow not found in ABS Data API
+    # TODO: Investigate correct dataflow name or use alternative data source
+    # "building_approvals": {
+    #     "dataflow": "BA",
+    #     "key": "all",
+    #     "params": {"startPeriod": "2020", "detail": "dataonly"},
+    #     "filters": {},
+    #     "output_file": "abs_building_approvals.csv",
+    #     "description": "Building Approvals total dwellings (monthly)",
+    #     "critical": False,
+    # },
 }
 
 # Source metadata for all data sources
