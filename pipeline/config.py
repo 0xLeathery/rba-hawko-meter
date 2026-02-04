@@ -11,6 +11,7 @@ DATA_DIR = Path("data")
 # HTTP client configuration
 DEFAULT_TIMEOUT = 30  # seconds
 USER_AGENT = "RBA-Hawko-Meter/1.0 (Data Pipeline)"
+BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
 # RBA (Reserve Bank of Australia) configuration
 RBA_BASE_URL = "https://www.rba.gov.au/statistics/tables/csv"
