@@ -16,10 +16,10 @@ USER_AGENT = "RBA-Hawko-Meter/1.0 (Data Pipeline)"
 RBA_BASE_URL = "https://www.rba.gov.au/statistics/tables/csv"
 RBA_CONFIG = {
     "cash_rate": {
-        "table_id": "a2",
-        "url_suffix": "-daily.csv",
+        "table_id": "a2-data",
+        "url_suffix": ".csv",
         "output_file": "rba_cash_rate.csv",
-        "description": "Cash Rate Target (daily)",
+        "description": "Cash Rate Target (changes in monetary policy)",
         "critical": True,
     }
 }
