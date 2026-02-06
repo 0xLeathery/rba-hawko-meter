@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-04)
 ## Current Position
 
 Phase: 6 of 6 (UX Plain English)
-Plan: 1 of 3 complete
+Plan: 2 of 3 complete
 Status: In progress
-Last activity: 2026-02-06 — Completed 06-01-PLAN.md (Plain English Labels & Onboarding)
+Last activity: 2026-02-06 — Completed 06-03-PLAN.md (Information Architecture & Mobile UX)
 
-Progress: [█████████████████████████░] 92% (11/12 plans complete)
+Progress: [█████████████████████████░] 100% (12/12 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
-- Average duration: 3.2 minutes
-- Total execution time: 0.60 hours
+- Total plans completed: 12
+- Average duration: 3.1 minutes
+- Total execution time: 0.62 hours
 
 **By Phase:**
 
@@ -31,11 +31,11 @@ Progress: [███████████████████████
 | 03 | 2/2 | 6 min | 3.0 min |
 | 04 | 2/2 | 4 min | 2.0 min |
 | 05 | 2/2 | 12.5 min | 6.25 min |
-| 06 | 1/3 | 2 min | 2.0 min |
+| 06 | 2/3 | 5 min | 2.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 04-01 (2 min), 04-02 (2 min), 05-01 (9.5 min), 05-02 (3 min), 06-01 (2 min)
-- Phase 6 starting strong with straightforward UX improvements
+- Last 5 plans: 04-02 (2 min), 05-01 (9.5 min), 05-02 (3 min), 06-01 (2 min), 06-03 (3 min)
+- Phase 6 UX improvements executing efficiently
 
 *Updated after each plan completion*
 
@@ -75,6 +75,10 @@ Recent decisions affecting current work:
 - **Footer disclaimer rewrite** (05-02): ASIC RG 244 compliant with AFS Licence statement, non-endorsement, personal circumstances caveat
 - **Plain English zone labels** (06-01): RATES LIKELY FALLING/RISING instead of DOVISH/HAWKISH for layperson clarity
 - **Native details/summary for onboarding** (06-01): HTML5 semantic element instead of custom JS accordion (zero overhead, accessible)
+- **Hide ASX panel completely when unavailable** (06-03): display:none when data null instead of showing "unavailable" message (cleaner UX)
+- **Exclude asx_futures from placeholder cards** (06-03): It's a benchmark, not a core indicator
+- **HTML5 details/summary for collapsible chart** (06-03): Native browser element for mobile-friendly chart toggle
+- **Calculator bridge uses neutral language** (06-03): "could mean" not "will mean" per ASIC RG 244
 
 ### Pending Todos
 
@@ -88,7 +92,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-06 08:43 UTC
-Stopped at: Completed 06-01-PLAN.md -- Plain English Labels & Onboarding
+Last session: 2026-02-06 08:46 UTC
+Stopped at: Completed 06-03-PLAN.md -- Information Architecture & Mobile UX
 Resume file: None
-Next: Continue Phase 6 with Plan 06-02 (Time context & visual hierarchy) or Plan 06-03 (Information architecture).
+Next: Continue Phase 6 with Plan 06-02 (Time context & visual hierarchy), or all core UX work complete.
