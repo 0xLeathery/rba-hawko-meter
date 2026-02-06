@@ -15,6 +15,50 @@
   var renderedMetricIds = [];
 
   /**
+   * Render greyed-out placeholder cards for missing indicators.
+   * @param {HTMLElement} container - Grid container element
+   * @param {Array<string>} missingList - Array of missing indicator IDs
+   * @param {Object} weightsObj - Weights object from status.json
+   */
+  function renderMissingIndicatorCards(container, missingList, weightsObj) {
+    if (!Array.isArray(missingList) || missingList.length === 0) return;
+
+    missingList.forEach(function (indicatorId) {
+      // Skip asx_futures since it's a benchmark, not an indicator card
+      if (indicatorId === 'asx_futures') return;
+
+      var weight = weightsObj[indicatorId] || 0;
+
+      var card = document.createElement('div');
+      card.className = 'bg-finance-gray/50 rounded-lg p-4 border border-finance-border/50 opacity-60';
+
+      // Header row: label + weight badge
+      var header = document.createElement('div');
+      header.className = 'flex items-center justify-between mb-2';
+
+      var label = document.createElement('h4');
+      label.className = 'font-semibold text-gray-500';
+      label.textContent = GaugesModule.getDisplayLabel(indicatorId);
+
+      var weightBadge = document.createElement('span');
+      weightBadge.className = 'text-xs text-gray-600';
+      weightBadge.textContent = Math.round(weight * 100) + '% weight';
+
+      header.appendChild(label);
+      header.appendChild(weightBadge);
+      card.appendChild(header);
+
+      // Placeholder text
+      var placeholder = document.createElement('p');
+      placeholder.className = 'text-sm text-gray-600 italic';
+      placeholder.textContent = 'Data coming soon';
+      card.appendChild(placeholder);
+
+      container.appendChild(card);
+    });
+  }
+
+  /**
    * Render individual metric gauge cards into the grid.
    * @param {Object} gaugesData - data.gauges from status.json
    */
@@ -94,6 +138,14 @@
 
         // Render individual metric gauges
         renderMetricGauges(data.gauges);
+
+        // Render placeholder cards for missing indicators
+        if (data.metadata && Array.isArray(data.metadata.indicators_missing)) {
+          var gridContainer = document.getElementById('metric-gauges-grid');
+          if (gridContainer) {
+            renderMissingIndicatorCards(gridContainer, data.metadata.indicators_missing, data.weights || {});
+          }
+        }
       })
       .catch(function (err) {
         console.error('Gauge initialization failed:', err);
