@@ -1,168 +1,171 @@
 """
 ASX RBA Rate Tracker futures scraper.
 CRITICAL source - provides daily market expectations for RBA rate decisions.
+
+Fetches JSON data from ASX DAM public endpoints instead of HTML parsing.
 """
 
 import json
 import logging
-import re
 import traceback
 from datetime import datetime
-from typing import Dict, Union
+from typing import Dict, List, Tuple, Union
 
 import pandas as pd
-from bs4 import BeautifulSoup
 
-from pipeline.config import DATA_DIR, BROWSER_USER_AGENT, DEFAULT_TIMEOUT
-from pipeline.utils.csv_handler import append_to_csv
+from pipeline.config import ASX_FUTURES_URLS, DATA_DIR, BROWSER_USER_AGENT, DEFAULT_TIMEOUT
 from pipeline.utils.http_client import create_session
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def scrape_asx_futures() -> pd.DataFrame:
+def _fetch_json(session, url: str, label: str) -> Dict:
     """
-    Scrape ASX RBA Rate Tracker futures data for market rate expectations.
+    Fetch JSON data from a URL.
+
+    Args:
+        session: requests.Session instance
+        url: URL to fetch
+        label: Label for logging
 
     Returns:
-        DataFrame with columns: [scrape_date, meeting_date, implied_rate,
-                                 probability_hold, probability_cut, probability_hike, source]
+        Parsed JSON response as dict
 
     Raises:
-        ValueError: If page structure doesn't match expectations
-        requests.RequestException: If HTTP request fails
+        requests.RequestException: If request fails
+    """
+    logger.info(f"Fetching {label} from {url}")
+    try:
+        response = session.get(url, timeout=DEFAULT_TIMEOUT)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        logger.error(f"Failed to fetch {label}: {e}")
+        raise
+
+
+def _derive_probabilities(implied_rate: float, current_rate: float) -> Tuple[float, int, int, int]:
+    """
+    Derive rate movement probabilities from implied vs current rate.
+
+    Args:
+        implied_rate: Market-implied rate (percentage, e.g., 4.10)
+        current_rate: Current cash rate (percentage, e.g., 4.35)
+
+    Returns:
+        Tuple of (change_bp, probability_cut, probability_hold, probability_hike)
+        where probabilities are percentages (0-100) that sum to 100
+    """
+    change_bp = round((implied_rate - current_rate) * 100, 1)
+
+    if change_bp < -5:
+        # Implied cut
+        probability_cut = min(100, round(abs(change_bp) / 25 * 100))
+        probability_hold = 100 - probability_cut
+        probability_hike = 0
+    elif change_bp > 5:
+        # Implied hike
+        probability_hike = min(100, round(change_bp / 25 * 100))
+        probability_hold = 100 - probability_hike
+        probability_cut = 0
+    else:
+        # Within +/-5bp deadband - assume hold
+        probability_hold = 100
+        probability_cut = 0
+        probability_hike = 0
+
+    return (change_bp, probability_cut, probability_hold, probability_hike)
+
+
+def scrape_asx_futures() -> pd.DataFrame:
+    """
+    Scrape ASX RBA Rate Tracker futures data from JSON endpoints.
+
+    Returns:
+        DataFrame with columns: [date, meeting_date, implied_rate, change_bp,
+                                probability_cut, probability_hold, probability_hike]
+
+    Raises:
+        Exception: If fetching or parsing fails
     """
     session = create_session(retries=3, backoff_factor=0.5, user_agent=BROWSER_USER_AGENT)
 
-    target_url = "https://www.asx.com.au/markets/trade-our-derivatives-market/futures-market/rba-rate-tracker"
+    # Fetch current cash rate from dynamic text endpoint
+    dynamic_data = _fetch_json(session, ASX_FUTURES_URLS["dynamic_text"], "dynamic text")
+    current_rate = float(dynamic_data["currentCashRate"])
+    logger.info(f"Current cash rate: {current_rate}%")
 
-    logger.info(f"Fetching ASX RBA Rate Tracker data from {target_url}")
+    # Fetch market expectations from main endpoint
+    expectations_data = _fetch_json(session, ASX_FUTURES_URLS["market_expectations"], "market expectations")
 
-    try:
-        response = session.get(target_url, timeout=DEFAULT_TIMEOUT)
-        response.raise_for_status()
+    # Extract meeting expectations array
+    meetings = expectations_data.get("meetings", expectations_data.get("data", []))
+    if not meetings:
+        logger.warning("No meetings array found in expectations data")
+        return pd.DataFrame()
 
-        soup = BeautifulSoup(response.content, 'lxml')
+    # Log structure of first entry for debugging
+    if meetings:
+        logger.debug(f"First meeting entry keys: {list(meetings[0].keys())}")
 
-        # Check if page is JavaScript-rendered (common for modern ASX pages)
-        page_text = soup.get_text(strip=True)
-        if len(page_text) < 500 or "javascript" in page_text.lower()[:1000]:
-            logger.warning("ASX page appears to be JavaScript-rendered. Static scraping may not work.")
+    scrape_date = datetime.now().strftime('%Y-%m-%d')
+    rows = []
 
-            # Look for JSON data in script tags (common pattern for React/Vue apps)
-            script_tags = soup.find_all('script')
-            for script in script_tags:
-                script_content = script.string if script.string else ""
+    for meeting in meetings:
+        # Parse meeting date
+        meeting_date_str = meeting.get("meetingDate") or meeting.get("date")
+        if not meeting_date_str:
+            logger.warning(f"No meeting date in entry: {meeting}")
+            continue
 
-                # Look for API endpoints or embedded data
-                if 'api' in script_content.lower() or 'data' in script_content.lower():
-                    # Try to find JSON-like patterns
-                    json_match = re.search(r'\{["\'].*?rate.*?tracker.*?\}', script_content, re.IGNORECASE | re.DOTALL)
-                    if json_match:
-                        logger.info("Found potential JSON data in script tags")
-                        # Further parsing would go here
+        # Try to parse date - try ISO format first, then day-month-year
+        try:
+            if "-" in str(meeting_date_str) and len(str(meeting_date_str)) == 10:
+                # Already ISO format YYYY-MM-DD
+                meeting_date = str(meeting_date_str)
+            else:
+                # Try parsing "18 Feb 2026" format
+                parsed = datetime.strptime(str(meeting_date_str), "%d %b %Y")
+                meeting_date = parsed.strftime("%Y-%m-%d")
+        except ValueError:
+            logger.warning(f"Could not parse meeting date: {meeting_date_str}")
+            continue
 
-                # Look for fetch/XHR URLs
-                api_match = re.search(r'(https?://[^\s"\'\)]+(?:api|data)[^\s"\'\)]*)', script_content)
-                if api_match:
-                    api_url = api_match.group(1)
-                    logger.info(f"Found potential API endpoint: {api_url}")
-                    # Could try fetching this API directly
+        # Extract implied rate - try multiple possible key names
+        implied_rate = None
+        for key in ["impliedRate", "ExpectedRate", "expectedRate", "rate"]:
+            if key in meeting:
+                try:
+                    implied_rate = float(meeting[key])
+                    break
+                except (ValueError, TypeError):
+                    continue
 
-        # Try to find the rate tracker table/data
-        # ASX typically uses tables or structured divs for this data
-        tables = soup.find_all('table')
+        if implied_rate is None:
+            logger.warning(f"No implied rate found in meeting: {meeting}")
+            continue
 
-        if not tables:
-            logger.warning("No HTML tables found on ASX Rate Tracker page")
-            logger.warning("Page may be JavaScript-rendered or structure has changed")
+        # Validate rate range
+        if not (0 <= implied_rate <= 15):
+            logger.warning(f"Implied rate {implied_rate} outside expected range 0-15%")
 
-            # Check for common React/Vue root elements
-            react_root = soup.find('div', id=re.compile(r'root|app', re.IGNORECASE))
-            if react_root and len(react_root.get_text(strip=True)) < 100:
-                logger.warning("Found React/Vue root element with minimal content - page is JavaScript-rendered")
-                logger.warning("Static scraping with BeautifulSoup will not work")
-                logger.warning("Options: 1) Use Selenium/Playwright, 2) Find API endpoint, 3) Use alternative data source")
+        # Derive probabilities
+        change_bp, prob_cut, prob_hold, prob_hike = _derive_probabilities(implied_rate, current_rate)
 
-            raise ValueError("ASX Rate Tracker page structure not compatible with static scraping")
+        rows.append({
+            "date": scrape_date,
+            "meeting_date": meeting_date,
+            "implied_rate": implied_rate,
+            "change_bp": change_bp,
+            "probability_cut": prob_cut,
+            "probability_hold": prob_hold,
+            "probability_hike": prob_hike,
+        })
 
-        # Look for the rate tracker table
-        # Expected columns: Meeting Date, Implied Rate, Probability (Hold/Cut/Hike)
-        rate_data = []
-        scrape_date = datetime.now().strftime('%Y-%m-%d')
-
-        for table in tables:
-            rows = table.find_all('tr')
-            if not rows:
-                continue
-
-            # Check if this table has rate-related headers
-            header_row = rows[0]
-            headers = [th.get_text(strip=True).lower() for th in header_row.find_all(['th', 'td'])]
-
-            if any('meeting' in h or 'date' in h for h in headers) and any('rate' in h or 'implied' in h for h in headers):
-                logger.info(f"Found rate tracker table with headers: {headers}")
-
-                # Parse data rows
-                for row in rows[1:]:
-                    cells = row.find_all(['td', 'th'])
-                    if len(cells) >= 2:
-                        cell_values = [cell.get_text(strip=True) for cell in cells]
-
-                        # Try to extract meeting date and implied rate
-                        # This is a best-effort parse - exact structure depends on ASX page format
-                        try:
-                            meeting_date = cell_values[0]  # Usually first column
-                            implied_rate_str = cell_values[1]  # Usually second column
-
-                            # Extract numeric rate (remove % sign if present)
-                            implied_rate = float(re.sub(r'[^\d.]', '', implied_rate_str))
-
-                            # Extract probabilities if available (columns 3-5 typically)
-                            prob_hold = prob_cut = prob_hike = None
-                            if len(cell_values) >= 5:
-                                prob_hold = float(re.sub(r'[^\d.]', '', cell_values[2])) if cell_values[2] else None
-                                prob_cut = float(re.sub(r'[^\d.]', '', cell_values[3])) if cell_values[3] else None
-                                prob_hike = float(re.sub(r'[^\d.]', '', cell_values[4])) if cell_values[4] else None
-
-                            rate_data.append({
-                                'scrape_date': scrape_date,
-                                'meeting_date': meeting_date,
-                                'implied_rate': implied_rate,
-                                'probability_hold': prob_hold,
-                                'probability_cut': prob_cut,
-                                'probability_hike': prob_hike,
-                                'source': 'ASX'
-                            })
-
-                        except (ValueError, IndexError) as e:
-                            logger.debug(f"Could not parse row: {cell_values} - {e}")
-                            continue
-
-        if not rate_data:
-            raise ValueError("No rate tracker data extracted from ASX page - table structure may have changed")
-
-        # Validate extracted data
-        df = pd.DataFrame(rate_data)
-
-        # Rates should be between 0-15%
-        if not df['implied_rate'].between(0, 15).all():
-            logger.warning(f"Some implied rates outside expected range 0-15%: {df['implied_rate'].describe()}")
-
-        # Probabilities should sum to ~100% if present
-        if 'probability_hold' in df.columns and df['probability_hold'].notna().any():
-            prob_sums = df[['probability_hold', 'probability_cut', 'probability_hike']].sum(axis=1)
-            if not prob_sums.between(95, 105).all():
-                logger.warning(f"Some probability sums not ~100%: {prob_sums.describe()}")
-
-        logger.info(f"Extracted {len(df)} meeting rate expectations from ASX")
-        return df
-
-    except Exception as e:
-        logger.error(f"Failed to scrape ASX futures: {e}")
-        logger.debug(traceback.format_exc())
-        raise
+    df = pd.DataFrame(rows)
+    logger.info(f"Extracted {len(df)} meeting expectations from ASX")
+    return df
 
 
 def fetch_and_save() -> Dict[str, Union[str, int]]:
@@ -180,19 +183,29 @@ def fetch_and_save() -> Dict[str, Union[str, int]]:
             logger.warning("ASX scraper returned no data")
             return {
                 'status': 'failed',
-                'error': 'No data extracted from ASX Rate Tracker'
+                'error': 'No data extracted from ASX endpoints'
             }
 
+        # Write to CSV with composite-key deduplication
         output_path = DATA_DIR / "asx_futures.csv"
-        row_count = append_to_csv(output_path, df, date_column='scrape_date')
 
-        meeting_count = df['meeting_date'].nunique()
+        if output_path.exists():
+            # Read existing data and merge
+            existing_df = pd.read_csv(output_path)
+            combined_df = pd.concat([existing_df, df], ignore_index=True)
+            # Deduplicate on composite key [date, meeting_date], keeping latest
+            result_df = combined_df.drop_duplicates(subset=['date', 'meeting_date'], keep='last')
+        else:
+            result_df = df
 
-        logger.info(f"ASX futures data saved successfully: {row_count} total rows, {meeting_count} meetings")
+        # Write to CSV
+        result_df.to_csv(output_path, index=False)
+
+        logger.info(f"ASX futures data saved successfully: {len(result_df)} total rows, {len(df)} new meetings")
         return {
             'status': 'success',
-            'rows': row_count,
-            'meetings': meeting_count
+            'rows': len(result_df),
+            'meetings': len(df)
         }
 
     except Exception as e:
