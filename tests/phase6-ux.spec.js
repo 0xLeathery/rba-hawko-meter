@@ -24,15 +24,15 @@ test.describe('Phase 6 — UX & Plain English Overhaul', () => {
   test('12. All gauges show /100 suffix for clarity', async ({ page }) => {
     await page.goto('/');
 
-    // Hero gauge should display "46/100"
+    // Hero gauge should display "48/100" (hawk_score 47.5 rounds to 48)
     const heroPlot = page.locator('#hero-gauge-plot');
     await expect(heroPlot).toBeVisible();
-    await expect(heroPlot).toContainText('46/100', { timeout: 15000 });
+    await expect(heroPlot).toContainText('48/100', { timeout: 15000 });
 
     // At least one bullet gauge in the grid should contain "/100"
     const grid = page.locator('#metric-gauges-grid');
     await expect(grid).toBeVisible();
-    // 3 active cards (bg-finance-gray) + 4 placeholder cards (bg-finance-gray/50) = 7
+    // 5 active cards (bg-finance-gray) + 2 placeholder cards (bg-finance-gray/50) = 7
     const allCards = grid.locator('[class*="bg-finance-gray"]');
     await expect(allCards).toHaveCount(7, { timeout: 15000 });
 
@@ -40,7 +40,7 @@ test.describe('Phase 6 — UX & Plain English Overhaul', () => {
     // Bullet gauges render via Plotly inside SVG — wait for rendering
     await page.waitForTimeout(2000);
     let foundSlash100 = false;
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 5; i++) {
       const cardText = await allCards.nth(i).textContent();
       if (cardText.includes('/100')) {
         foundSlash100 = true;
@@ -109,8 +109,8 @@ test.describe('Phase 6 — UX & Plain English Overhaul', () => {
     // Each active card should have italic why-it-matters text
     const italicTexts = grid.locator('.text-gray-500.italic');
     const count = await italicTexts.count();
-    // Expect at least 3 (one per active indicator)
-    expect(count).toBeGreaterThanOrEqual(3);
+    // Expect at least 5 (one per active indicator)
+    expect(count).toBeGreaterThanOrEqual(5);
   });
 
   test('17. Building approvals data guard prevents -99.9 display', async ({ page }) => {
@@ -120,8 +120,8 @@ test.describe('Phase 6 — UX & Plain English Overhaul', () => {
     const allCards = grid.locator('[class*="bg-finance-gray"]');
     await expect(allCards).toHaveCount(7, { timeout: 15000 });
 
-    // Building approvals is the 3rd active card (index 2)
-    const buildingCard = allCards.nth(2);
+    // Building approvals is the 5th active card (index 4)
+    const buildingCard = allCards.nth(4);
     await expect(buildingCard).toContainText('Building');
 
     // Should NOT contain the invalid -99.9 value
@@ -148,8 +148,8 @@ test.describe('Phase 6 — UX & Plain English Overhaul', () => {
     const inflationCard = allCards.nth(0);
     await expect(inflationCard).toContainText('High importance');
 
-    // Building approvals card (weight=5%) should show "Lower importance"
-    const buildingCard = allCards.nth(2);
+    // Building approvals card (index 4, weight=5%) should show "Lower importance"
+    const buildingCard = allCards.nth(4);
     await expect(buildingCard).toContainText('Lower importance');
 
     // Wages card should contain staleness indicator (220 days > 90 threshold)
@@ -177,10 +177,10 @@ test.describe('Phase 6 — UX & Plain English Overhaul', () => {
     }
     expect(foundAustralianDate).toBe(true);
 
-    // Data coverage notice should indicate 3 of 8 indicators
+    // Data coverage notice should indicate 5 of 8 indicators
     const coverageNotice = page.locator('#data-coverage-notice');
     await expect(coverageNotice).toBeVisible({ timeout: 15000 });
-    await expect(coverageNotice).toContainText('3 of 8 indicators');
+    await expect(coverageNotice).toContainText('5 of 8 indicators');
   });
 
   test('20. Placeholder cards for missing indicators', async ({ page }) => {
@@ -192,7 +192,7 @@ test.describe('Phase 6 — UX & Plain English Overhaul', () => {
 
     // Count cards with "Data coming soon" text — placeholder cards use bg-finance-gray/50
     const placeholderCards = grid.locator('[class*="bg-finance-gray"]:has-text("Data coming soon")');
-    await expect(placeholderCards).toHaveCount(4); // employment, spending, housing, business_confidence
+    await expect(placeholderCards).toHaveCount(2); // housing, business_confidence
 
     // Verify no placeholder card contains "ASX" (futures are benchmark only)
     const placeholderText = await placeholderCards.allTextContents();

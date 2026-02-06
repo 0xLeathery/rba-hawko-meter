@@ -14,8 +14,8 @@ test.describe('Phase 4 — Hawk-O-Meter Gauges', () => {
     const svg = heroPlot.locator('svg.main-svg');
     await expect(svg.first()).toBeVisible({ timeout: 15000 });
 
-    // Hawk score "46/100" should be visible in the rendered gauge
-    await expect(heroPlot).toContainText('46/100');
+    // Hawk score "48/100" should be visible in the rendered gauge (47.5 rounds to 48)
+    await expect(heroPlot).toContainText('48/100');
 
     // Stance label "HOLDING STEADY" should be visible (score 46 falls in 40-60 range)
     await expect(heroPlot).toContainText('HOLDING STEADY');
@@ -28,7 +28,7 @@ test.describe('Phase 4 — Hawk-O-Meter Gauges', () => {
     await expect(grid).toBeVisible();
 
     // Wait for metric cards to render (replaces the "Loading..." placeholder)
-    // 3 active cards (bg-finance-gray) + 4 placeholder cards (bg-finance-gray/50) = 7 total
+    // 5 active cards (bg-finance-gray) + 2 placeholder cards (bg-finance-gray/50) = 7 total
     const allCards = grid.locator('[class*="bg-finance-gray"]');
     await expect(allCards).toHaveCount(7, { timeout: 15000 });
 
@@ -41,8 +41,14 @@ test.describe('Phase 4 — Hawk-O-Meter Gauges', () => {
     // Wages card: "Wages up 1.6" (raw_value 1.56)
     await expect(cards.nth(1)).toContainText('Wages up 1.6');
 
-    // Building approvals card: interpretation text present
-    await expect(cards.nth(2)).toContainText('Building approvals');
+    // Employment card (index 2): job market text
+    await expect(cards.nth(2)).toContainText('job market');
+
+    // Spending card (index 3): consumer spending text
+    await expect(cards.nth(3)).toContainText('Consumer spending');
+
+    // Building approvals card (index 4): interpretation text present
+    await expect(cards.nth(4)).toContainText('Building Approvals');
   });
 
   test('3. Responsive layout — single column at mobile, 3 columns at desktop', async ({ page }) => {
@@ -51,6 +57,7 @@ test.describe('Phase 4 — Hawk-O-Meter Gauges', () => {
     await page.goto('/');
 
     const grid = page.locator('#metric-gauges-grid');
+    // 5 active + 2 placeholder = 7 total
     await expect(grid.locator('[class*="bg-finance-gray"]')).toHaveCount(7, { timeout: 15000 });
 
     // At 375px the grid should be single-column
@@ -89,6 +96,7 @@ test.describe('Phase 4 — Hawk-O-Meter Gauges', () => {
     await page.goto('/');
 
     const grid = page.locator('#metric-gauges-grid');
+    // 5 active + 2 placeholder = 7 total
     await expect(grid.locator('[class*="bg-finance-gray"]')).toHaveCount(7, { timeout: 15000 });
 
     // Wages is the second card (index 1) — staleness_days=220 > 90 threshold

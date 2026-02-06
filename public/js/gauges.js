@@ -200,8 +200,6 @@ var GaugesModule = (function () {
    * @param {Object} metricData - { value, weight, staleness_days, confidence }
    */
   function createBulletGauge(containerId, metricData) {
-    var label = getDisplayLabel(metricData._metricId || '');
-
     var trace = {
       type: 'indicator',
       mode: 'number+gauge',
@@ -210,10 +208,6 @@ var GaugesModule = (function () {
         font: { size: 24, color: '#f3f4f6' },
         valueformat: '.0f',
         suffix: '/100'
-      },
-      title: {
-        text: label,
-        font: { size: 14, color: '#d1d5db' }
       },
       gauge: {
         shape: 'bullet',
@@ -228,12 +222,12 @@ var GaugesModule = (function () {
           value: 50
         }
       },
-      domain: { x: [0.15, 1], y: [0.15, 0.85] }
+      domain: { x: [0.05, 0.95], y: [0.15, 0.85] }
     };
 
     var layout = getDarkLayout({
       height: 80,
-      margin: { t: 0, r: 20, l: 0, b: 0 }
+      margin: { t: 0, r: 40, l: 10, b: 0 }
     });
 
     var config = { responsive: true, displayModeBar: false, staticPlot: true };
@@ -251,6 +245,11 @@ var GaugesModule = (function () {
       type: 'indicator',
       mode: 'number+gauge',
       value: gaugeValue,
+      number: {
+        font: { size: 24, color: '#f3f4f6' },
+        valueformat: '.0f',
+        suffix: '/100'
+      },
       gauge: {
         shape: 'bullet',
         axis: { range: [0, 100], dtick: 20 },
@@ -263,7 +262,8 @@ var GaugesModule = (function () {
           thickness: 0.75,
           value: 50
         }
-      }
+      },
+      domain: { x: [0.05, 0.95], y: [0.15, 0.85] }
     }]);
   }
 

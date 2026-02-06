@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-02-06T05:45:19.971854Z",
+  "generated_at": "2026-02-06T09:50:52.723091Z",
   "pipeline_version": "1.0.0",
   "overall": {
-    "hawk_score": 46.0,
+    "hawk_score": 47.5,
     "zone": "neutral",
     "zone_label": "Balanced",
     "verdict": "Economic indicators are broadly balanced",
-    "confidence": "MEDIUM"
+    "confidence": "HIGH"
   },
   "gauges": {
     "inflation": {
@@ -65,25 +65,88 @@
         46.2
       ]
     },
-    "building_approvals": {
-      "value": 38.7,
+    "employment": {
+      "value": 31.6,
       "zone": "cool",
       "zone_label": "Mild dovish pressure",
-      "z_score": -0.675,
-      "raw_value": -99.91,
+      "z_score": -1.101,
+      "raw_value": 1.14,
+      "raw_unit": "% YoY",
+      "weight": 0.15,
+      "polarity": 1,
+      "data_date": "2025-12-31",
+      "staleness_days": 37,
+      "confidence": "HIGH",
+      "interpretation": "Labour market looser than historical average",
+      "history": [
+        74.5,
+        63.4,
+        60.4,
+        55.2,
+        47.7,
+        47.7,
+        53.0,
+        56.4,
+        43.3,
+        40.6,
+        28.6,
+        31.6
+      ]
+    },
+    "spending": {
+      "value": 68.3,
+      "zone": "warm",
+      "zone_label": "Mild hawkish pressure",
+      "z_score": 1.095,
+      "raw_value": 4.87,
+      "raw_unit": "% YoY",
+      "weight": 0.1,
+      "polarity": 1,
+      "data_date": "2025-06-30",
+      "staleness_days": 221,
+      "confidence": "HIGH",
+      "interpretation": "Consumer spending above trend",
+      "history": [
+        100.0,
+        100.0,
+        73.6,
+        36.6,
+        32.4,
+        24.9,
+        23.3,
+        45.0,
+        40.4,
+        65.3,
+        61.8,
+        68.3
+      ]
+    },
+    "building_approvals": {
+      "value": 57.9,
+      "zone": "neutral",
+      "zone_label": "Balanced",
+      "z_score": 0.472,
+      "raw_value": 3.93,
       "raw_unit": "% YoY",
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2025-12-31",
       "staleness_days": 37,
-      "confidence": "MEDIUM",
-      "interpretation": "Building approvals below trend",
+      "confidence": "HIGH",
+      "interpretation": "Building approvals near trend",
       "history": [
-        38.9,
-        39.4,
-        100.0,
-        48.7,
-        38.7
+        41.1,
+        32.5,
+        32.9,
+        32.0,
+        45.2,
+        46.6,
+        61.8,
+        74.2,
+        74.5,
+        83.2,
+        77.1,
+        57.9
       ]
     }
   },
@@ -105,10 +168,8 @@
     ],
     "mapping": "linear",
     "statistics": "robust (median/MAD)",
-    "indicators_available": 3,
+    "indicators_available": 5,
     "indicators_missing": [
-      "employment",
-      "spending",
       "housing",
       "business_confidence",
       "asx_futures"

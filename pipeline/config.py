@@ -44,26 +44,20 @@ ABS_CONFIG = {
     },
     "employment": {
         "dataflow": "LF",
-        "key": "all",
-        "params": {"startPeriod": "2020", "detail": "dataonly"},
-        "filters": {
-            # Get any employment data for Australia
-            # Will need refinement to get specific series
-        },
+        "key": "M3.3.1599.20.AUS.M",
+        "params": {"startPeriod": "2014", "detail": "dataonly"},
+        "filters": {},
         "output_file": "abs_employment.csv",
-        "description": "Labour Force employment (monthly)",
+        "description": "Total employed persons, Australia, Seasonally Adjusted (monthly, thousands)",
         "critical": True,
     },
     "retail_trade": {
         "dataflow": "RT",
-        "key": "all",
-        "params": {"startPeriod": "2020", "detail": "dataonly"},
-        "filters": {
-            # Get any retail trade data for Australia
-            # Will need refinement to get specific series
-        },
+        "key": "M1.20.20.AUS.M",
+        "params": {"startPeriod": "2014", "detail": "dataonly"},
+        "filters": {},
         "output_file": "abs_retail_trade.csv",
-        "description": "Retail Trade turnover (monthly)",
+        "description": "Retail Trade turnover, Total Australia, Seasonally Adjusted, Current Prices (monthly, $millions)",
         "critical": True,
     },
     "wage_price_index": {
@@ -84,11 +78,16 @@ ABS_CONFIG = {
         "key": "all",
         "params": {"startPeriod": "2014", "detail": "dataonly"},
         "filters": {
-            "MEASURE": "1",  # Number
-            "REGION": "AUS",  # Australia total
+            "MEASURE": "1",           # Number of dwelling units
+            "REGION": "AUS",          # Australia total
+            "BUILDING_TYPE": "100",   # Total Residential
+            "VALUE": "1",             # Total (all value ranges)
+            "WORK_TYPE": "1",         # New work
+            "SECTOR": "9",            # Total Sectors
+            "TSEST": "10",            # Original
         },
         "output_file": "abs_building_approvals.csv",
-        "description": "Building Approvals total dwellings (monthly)",
+        "description": "Building Approvals, total new residential dwellings, Australia (monthly, original)",
         "critical": False,
     },
 }
