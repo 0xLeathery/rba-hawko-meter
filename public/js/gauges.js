@@ -118,7 +118,8 @@ var GaugesModule = (function () {
       },
       number: {
         font: { size: 52, color: '#f3f4f6' },
-        valueformat: '.0f'
+        valueformat: '.0f',
+        suffix: '/100'
       },
       gauge: {
         shape: 'angular',
@@ -163,7 +164,8 @@ var GaugesModule = (function () {
       },
       number: {
         font: { size: 52, color: '#f3f4f6' },
-        valueformat: '.0f'
+        valueformat: '.0f',
+        suffix: '/100'
       },
       gauge: {
         shape: 'angular',
@@ -207,7 +209,7 @@ var GaugesModule = (function () {
       number: {
         font: { size: 24, color: '#f3f4f6' },
         valueformat: '.0f',
-        suffix: ''
+        suffix: '/100'
       },
       title: {
         text: label,
