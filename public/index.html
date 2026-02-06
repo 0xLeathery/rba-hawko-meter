@@ -167,6 +167,89 @@
       </div>
     </section>
 
+    <!-- How We Calculate the Score — Methodology Section -->
+    <section id="methodology" aria-label="How we calculate the score" class="mb-8">
+      <details class="bg-finance-gray border border-finance-border rounded-xl px-6 py-4">
+        <summary class="cursor-pointer text-lg font-semibold text-gray-200 select-none">
+          How We Calculate the Score
+        </summary>
+        <div class="mt-4 space-y-6 text-sm text-gray-400">
+
+          <div>
+            <h3 class="text-base font-semibold text-gray-300 mb-1">Step 1: Gather the data</h3>
+            <p>We pull monthly and quarterly figures from the Australian Bureau of Statistics (ABS) and other public sources. Seven indicators are scored and weighted to reflect how much the RBA typically cares about each factor.</p>
+          </div>
+
+          <div>
+            <h3 class="text-base font-semibold text-gray-300 mb-1">Step 2: Measure the trend</h3>
+            <p>For each indicator we compare the latest value to the same month last year (year-on-year percentage change). This means we&rsquo;re measuring <em>direction</em>, not absolute levels &mdash; so it doesn&rsquo;t matter whether a number is big or small, only whether it&rsquo;s rising or falling.</p>
+          </div>
+
+          <div>
+            <h3 class="text-base font-semibold text-gray-300 mb-1">Step 3: Compare to history</h3>
+            <p>We calculate how unusual the current growth rate is compared to the last 10 years. The method is called a <em>robust z-score</em> (it uses the median and median absolute deviation instead of the mean, so a single extreme quarter like COVID doesn&rsquo;t distort everything). The result is a &minus;3 to +3 range, which we then scale to 0&ndash;100 for the gauge.</p>
+          </div>
+
+          <div>
+            <h3 class="text-base font-semibold text-gray-300 mb-1">Step 4: Combine into one score</h3>
+            <p>Each indicator&rsquo;s 0&ndash;100 gauge reading is multiplied by its weight, then summed. The result is the Hawk Score you see at the top of the page.</p>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead>
+                <tr class="border-b border-finance-border text-gray-300">
+                  <th class="py-2 pr-4">Indicator</th>
+                  <th class="py-2 pr-4">Weight</th>
+                  <th class="py-2">Why it matters</th>
+                </tr>
+              </thead>
+              <tbody class="text-gray-400">
+                <tr class="border-b border-finance-border/50">
+                  <td class="py-2 pr-4">Inflation (CPI)</td>
+                  <td class="py-2 pr-4">25%</td>
+                  <td class="py-2">Primary RBA mandate</td>
+                </tr>
+                <tr class="border-b border-finance-border/50">
+                  <td class="py-2 pr-4">Wages (WPI)</td>
+                  <td class="py-2 pr-4">15%</td>
+                  <td class="py-2">Key input to inflation expectations</td>
+                </tr>
+                <tr class="border-b border-finance-border/50">
+                  <td class="py-2 pr-4">Employment</td>
+                  <td class="py-2 pr-4">15%</td>
+                  <td class="py-2">RBA dual mandate: full employment</td>
+                </tr>
+                <tr class="border-b border-finance-border/50">
+                  <td class="py-2 pr-4">Housing</td>
+                  <td class="py-2 pr-4">15%</td>
+                  <td class="py-2">Financial stability concern</td>
+                </tr>
+                <tr class="border-b border-finance-border/50">
+                  <td class="py-2 pr-4">Household Spending</td>
+                  <td class="py-2 pr-4">10%</td>
+                  <td class="py-2">Consumer demand pressure</td>
+                </tr>
+                <tr class="border-b border-finance-border/50">
+                  <td class="py-2 pr-4">Business Confidence</td>
+                  <td class="py-2 pr-4">5%</td>
+                  <td class="py-2">Forward-looking sentiment</td>
+                </tr>
+                <tr>
+                  <td class="py-2 pr-4">Building Approvals</td>
+                  <td class="py-2 pr-4">5%</td>
+                  <td class="py-2">Leading indicator for construction</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="text-xs text-gray-500 italic">ASX Rate Futures are shown for context but excluded from the score calculation &mdash; they reflect market expectations, not economic fundamentals.</p>
+
+        </div>
+      </details>
+    </section>
+
     <!-- Phase 5: Mortgage Repayment Estimator -->
     <section id="calculator-section" aria-label="Mortgage Repayment Estimator">
       <h2 class="text-xl font-semibold text-gray-200 mb-2">Explore Rate Scenarios</h2>
