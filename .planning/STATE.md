@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-04)
 
 **Core value:** "Data, not opinion." Empowers laypeople to understand interest rate drivers without relying on media sensationalism or biased advice.
-**Current focus:** Phase 5 - Calculator & Compliance (complete)
+**Current focus:** Phase 6 - UX Plain English (in progress)
 
 ## Current Position
 
-Phase: 5 of 5 (Calculator & Compliance)
-Plan: 2 of 2 complete
-Status: Phase complete
-Last activity: 2026-02-06 — Completed 05-02-PLAN.md (ASIC Compliance Audit)
+Phase: 6 of 6 (UX Plain English)
+Plan: 1 of 3 complete
+Status: In progress
+Last activity: 2026-02-06 — Completed 06-01-PLAN.md (Plain English Labels & Onboarding)
 
-Progress: [████████████████████████] 100% (10/10 plans complete, excluding Phase 1 gap closure)
+Progress: [█████████████████████████░] 92% (11/12 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
-- Average duration: 3.5 minutes
-- Total execution time: 0.58 hours
+- Total plans completed: 11
+- Average duration: 3.2 minutes
+- Total execution time: 0.60 hours
 
 **By Phase:**
 
@@ -31,10 +31,11 @@ Progress: [███████████████████████
 | 03 | 2/2 | 6 min | 3.0 min |
 | 04 | 2/2 | 4 min | 2.0 min |
 | 05 | 2/2 | 12.5 min | 6.25 min |
+| 06 | 1/3 | 2 min | 2.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 03-02 (3 min), 04-01 (2 min), 04-02 (2 min), 05-01 (9.5 min), 05-02 (3 min)
-- Phase 5 slower due to parallel coordination wait and comprehensive compliance audit
+- Last 5 plans: 04-01 (2 min), 04-02 (2 min), 05-01 (9.5 min), 05-02 (3 min), 06-01 (2 min)
+- Phase 6 starting strong with straightforward UX improvements
 
 *Updated after each plan completion*
 
@@ -72,6 +73,8 @@ Recent decisions affecting current work:
 - **Half-monthly frequency method** (05-01): Divide monthly by 2/4 for fortnightly/weekly (standard AU mortgage calculator approach)
 - **Decimal.js string conversion** (05-01): Always toString() before new Decimal() to prevent IEEE 754 precision loss
 - **Footer disclaimer rewrite** (05-02): ASIC RG 244 compliant with AFS Licence statement, non-endorsement, personal circumstances caveat
+- **Plain English zone labels** (06-01): RATES LIKELY FALLING/RISING instead of DOVISH/HAWKISH for layperson clarity
+- **Native details/summary for onboarding** (06-01): HTML5 semantic element instead of custom JS accordion (zero overhead, accessible)
 
 ### Pending Todos
 
@@ -85,7 +88,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-06 06:39 UTC
-Stopped at: Completed 05-02-PLAN.md -- ASIC Compliance Audit
+Last session: 2026-02-06 08:43 UTC
+Stopped at: Completed 06-01-PLAN.md -- Plain English Labels & Onboarding
 Resume file: None
-Next: All phases complete. Remaining work: Phase 1 gap closure (Plan 01-05) for ABS filter refinement.
+Next: Continue Phase 6 with Plan 06-02 (Time context & visual hierarchy) or Plan 06-03 (Information architecture).
