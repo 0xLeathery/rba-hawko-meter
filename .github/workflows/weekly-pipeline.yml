@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write              # Required for git-auto-commit-action
 
+concurrency:
+  group: data-pipeline
+  cancel-in-progress: false
+
 jobs:
   ingest:
     runs-on: ubuntu-latest
@@ -31,6 +35,6 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: 'data: weekly pipeline update [skip ci]'
-          file_pattern: 'data/*.csv'
+          file_pattern: 'data/*.csv public/data/status.json'
           commit_user_name: 'github-actions[bot]'
           commit_user_email: 'github-actions[bot]@users.noreply.github.com'

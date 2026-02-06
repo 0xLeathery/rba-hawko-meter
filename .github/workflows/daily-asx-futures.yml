@@ -8,6 +8,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: data-pipeline
+  cancel-in-progress: false
+
 jobs:
   scrape-futures:
     runs-on: ubuntu-latest
@@ -27,10 +31,13 @@ jobs:
       - name: Scrape ASX futures
         run: python -m pipeline.ingest.asx_futures_scraper
 
+      - name: Regenerate status.json
+        run: python -m pipeline.normalize.engine
+
       - name: Commit updated data
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: 'data: daily ASX futures update [skip ci]'
-          file_pattern: 'data/asx_futures.csv'
+          file_pattern: 'data/asx_futures.csv public/data/status.json'
           commit_user_name: 'github-actions[bot]'
           commit_user_email: 'github-actions[bot]@users.noreply.github.com'
