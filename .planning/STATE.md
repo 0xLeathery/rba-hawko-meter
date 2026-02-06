@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-04)
 
 ## Current Position
 
-Phase: 6 of 6 (UX Plain English)
-Plan: 3 of 3 complete
+Phase: 7 of 7 (ASX Futures Integration)
+Plan: 1 of 1 complete
 Status: Phase complete
-Last activity: 2026-02-06 — Completed 06-02-PLAN.md (Plain English Rewrite)
+Last activity: 2026-02-06 — Completed 07-01-PLAN.md (ASX Futures JSON Scraper)
 
-Progress: [██████████████████████████] 100% (13/13 plans complete)
+Progress: [██████████████████████████] 100% (14/14 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 13
-- Average duration: 3.2 minutes
-- Total execution time: 0.69 hours
+- Total plans completed: 14
+- Average duration: 3.1 minutes
+- Total execution time: 0.73 hours
 
 **By Phase:**
 
@@ -32,10 +32,11 @@ Progress: [███████████████████████
 | 04 | 2/2 | 4 min | 2.0 min |
 | 05 | 2/2 | 12.5 min | 6.25 min |
 | 06 | 3/3 | 8.8 min | 2.9 min |
+| 07 | 1/1 | 2 min | 2.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-01 (9.5 min), 05-02 (3 min), 06-01 (2 min), 06-03 (3 min), 06-02 (3.8 min)
-- Phase 6 complete - all UX improvements shipped
+- Last 5 plans: 05-02 (3 min), 06-01 (2 min), 06-03 (3 min), 06-02 (3.8 min), 07-01 (2 min)
+- Phase 7 complete - ASX futures scraper implemented
 
 *Updated after each plan completion*
 
@@ -83,6 +84,9 @@ Recent decisions affecting current work:
 - **Importance labels over percentages** (06-02): High/Medium/Lower mapped from 20%/10% thresholds for layperson clarity
 - **Australian date format** (06-02): Intl.DateTimeFormat with en-AU locale (1 Dec 2025 not 2025-12-01)
 - **Plain verdict from score ranges** (06-02): Map hawk_score to 5 ASIC-compliant verdict texts using "likely to", "may be more likely" language
+- **ASX JSON endpoints** (07-01): Use ASX DAM JSON endpoints (dynamic_text, market_expectations) instead of HTML parsing
+- **Probability derivation algorithm** (07-01): Derive rate movement probabilities from implied vs current rate with 5bp deadband
+- **Composite-key dedup for ASX** (07-01): Deduplicate on [date, meeting_date] instead of date alone for multi-meeting scrapes
 
 ### Pending Todos
 
@@ -93,10 +97,11 @@ None yet.
 - **Building Approvals data source** (RESOLVED 01-04): ABS Data API "BA" dataflow not found -- resolved by using BA_GCCSA dataflow. Building approvals now implemented with 144 rows of historical data.
 - **Web scraper maintenance burden** (01-02): CoreLogic, NAB, ASX scrapers have TODOs for actual implementation. May need PDF parsing, Selenium/Playwright for JS-rendered pages, or alternative data sources. Optional sources pattern means pipeline continues even if these fail.
 - **Mixed ABS series data** (03-02): Employment and retail trade CSVs contain multiple ABS series mixed together (wildcard queries). Produces invalid YoY% values. Need ABS filter refinement in Phase 1 gap closure.
+- **ASX endpoint availability** (07-01): Both ASX DAM JSON endpoints (dynamic_text, market_expectations) return 404 as of Feb 2026. ASX appears to have restructured their Rate Tracker API. Options: monitor for restoration, find alternative endpoints, implement Selenium scraper, or use alternative data source. Graceful degradation pattern means pipeline continues with other indicators.
 
 ## Session Continuity
 
-Last session: 2026-02-06 08:53 UTC
-Stopped at: Completed 06-02-PLAN.md -- Plain English Rewrite
+Last session: 2026-02-06 21:32 UTC
+Stopped at: Completed 07-01-PLAN.md -- ASX Futures JSON Scraper
 Resume file: None
-Next: Phase 6 complete. All planned work complete (13/13 plans). Project ready for deployment.
+Next: Phase 7 complete. ASX futures scraper implemented (endpoints currently unavailable). Project ready for deployment.
