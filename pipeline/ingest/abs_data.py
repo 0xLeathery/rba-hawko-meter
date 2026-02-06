@@ -153,9 +153,9 @@ def fetch_employment() -> pd.DataFrame:
     )
 
 
-def fetch_retail_trade() -> pd.DataFrame:
-    """Fetch Retail Trade turnover (Monthly)."""
-    config = ABS_CONFIG["retail_trade"]
+def fetch_household_spending() -> pd.DataFrame:
+    """Fetch Monthly Household Spending Indicator (Monthly)."""
+    config = ABS_CONFIG["household_spending"]
     return fetch_abs_series(
         config["dataflow"],
         config["key"],
@@ -190,7 +190,7 @@ def fetch_building_approvals() -> pd.DataFrame:
 FETCHERS = {
     'cpi': (fetch_cpi, ABS_CONFIG["cpi"]["output_file"]),
     'employment': (fetch_employment, ABS_CONFIG["employment"]["output_file"]),
-    'retail_trade': (fetch_retail_trade, ABS_CONFIG["retail_trade"]["output_file"]),
+    'household_spending': (fetch_household_spending, ABS_CONFIG["household_spending"]["output_file"]),
     'wage_price_index': (fetch_wage_price_index, ABS_CONFIG["wage_price_index"]["output_file"]),
     'building_approvals': (fetch_building_approvals, ABS_CONFIG["building_approvals"]["output_file"]),
 }

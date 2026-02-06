@@ -26,8 +26,8 @@
   "spending": {
     "weight": 0.10,
     "polarity": 1,
-    "label": "Retail Trade",
-    "description": "Consumer demand pressure. Strong retail growth signals demand-driven inflation."
+    "label": "Household Spending",
+    "description": "Consumer demand pressure. Strong household spending growth signals demand-driven inflation."
   },
   "building_approvals": {
     "weight": 0.05,

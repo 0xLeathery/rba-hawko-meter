@@ -51,13 +51,13 @@ ABS_CONFIG = {
         "description": "Total employed persons, Australia, Seasonally Adjusted (monthly, thousands)",
         "critical": True,
     },
-    "retail_trade": {
-        "dataflow": "RT",
-        "key": "M1.20.20.AUS.M",
+    "household_spending": {
+        "dataflow": "HSI_M",
+        "key": "7.TOT.CUR.20.AUS.M",
         "params": {"startPeriod": "2014", "detail": "dataonly"},
         "filters": {},
-        "output_file": "abs_retail_trade.csv",
-        "description": "Retail Trade turnover, Total Australia, Seasonally Adjusted, Current Prices (monthly, $millions)",
+        "output_file": "abs_household_spending.csv",
+        "description": "Monthly Household Spending Indicator, Total Australia, Seasonally Adjusted, Current Prices (monthly, $millions)",
         "critical": True,
     },
     "wage_price_index": {
@@ -109,10 +109,10 @@ SOURCE_METADATA = {
         "critical": True,
         "description": "Labour Force employment",
     },
-    "ABS_RETAIL": {
-        "file_path": DATA_DIR / "abs_retail_trade.csv",
+    "ABS_HSI": {
+        "file_path": DATA_DIR / "abs_household_spending.csv",
         "critical": True,
-        "description": "Retail Trade turnover",
+        "description": "Monthly Household Spending Indicator",
     },
     "ABS_WPI": {
         "file_path": DATA_DIR / "abs_wage_price_index.csv",
@@ -156,11 +156,11 @@ INDICATOR_CONFIG = {
         "description": "Labour force YoY % change",
     },
     "spending": {
-        "csv_file": "abs_retail_trade.csv",
+        "csv_file": "abs_household_spending.csv",
         "normalize": "yoy_pct_change",
         "frequency": "monthly",
         "yoy_periods": 12,
-        "description": "Retail trade turnover YoY % change",
+        "description": "Household spending YoY % change",
     },
     "building_approvals": {
         "csv_file": "abs_building_approvals.csv",

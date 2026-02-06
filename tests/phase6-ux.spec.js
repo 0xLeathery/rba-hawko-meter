@@ -24,10 +24,10 @@ test.describe('Phase 6 — UX & Plain English Overhaul', () => {
   test('12. All gauges show /100 suffix for clarity', async ({ page }) => {
     await page.goto('/');
 
-    // Hero gauge should display "41/100" (hawk_score 41.3 rounds to 41)
+    // Hero gauge should display "42/100" (hawk_score 41.8 rounds to 42)
     const heroPlot = page.locator('#hero-gauge-plot');
     await expect(heroPlot).toBeVisible();
-    await expect(heroPlot).toContainText('41/100', { timeout: 15000 });
+    await expect(heroPlot).toContainText('42/100', { timeout: 15000 });
 
     // At least one bullet gauge in the grid should contain "/100"
     const grid = page.locator('#metric-gauges-grid');
