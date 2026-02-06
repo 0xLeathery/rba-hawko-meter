@@ -1,6 +1,6 @@
 /**
  * GaugesModule - Plotly gauge rendering for Hawk-O-Meter.
- * Creates hero semicircle gauge and bullet gauges with 5-zone Blue/Grey/Red color scheme.
+ * Creates hero and metric semicircle needle gauges with 5-zone Blue/Grey/Red color scheme.
  * Uses safe DOM methods throughout (no innerHTML).
  */
 var GaugesModule = (function () {
@@ -195,76 +195,66 @@ var GaugesModule = (function () {
   }
 
   /**
-   * Create a compact horizontal bullet gauge for an individual metric.
+   * Build a metric needle gauge trace (shared by create/update).
+   * @param {number} value - Gauge value 0-100
+   * @returns {Object} Plotly trace
+   */
+  function metricGaugeTrace(value) {
+    return {
+      type: 'indicator',
+      mode: 'gauge+number',
+      value: value,
+      number: {
+        font: { size: 28, color: '#f3f4f6' },
+        valueformat: '.0f',
+        suffix: '/100'
+      },
+      gauge: {
+        shape: 'angular',
+        axis: {
+          range: [0, 100],
+          tickwidth: 1,
+          tickcolor: '#4a4a4a',
+          tickfont: { size: 10, color: '#6b7280' },
+          dtick: 20
+        },
+        bar: { color: getZoneColor(value), thickness: 0.6 },
+        bgcolor: '#1f2937',
+        borderwidth: 0,
+        steps: getGaugeSteps(),
+        threshold: {
+          line: { color: '#fbbf24', width: 2 },
+          thickness: 0.75,
+          value: 50
+        }
+      },
+      domain: { x: [0, 1], y: [0, 1] }
+    };
+  }
+
+  /**
+   * Create a semicircle needle gauge for an individual metric.
    * @param {string} containerId - DOM element ID
    * @param {Object} metricData - { value, weight, staleness_days, confidence }
    */
   function createBulletGauge(containerId, metricData) {
-    var trace = {
-      type: 'indicator',
-      mode: 'number+gauge',
-      value: metricData.value,
-      number: {
-        font: { size: 24, color: '#f3f4f6' },
-        valueformat: '.0f',
-        suffix: '/100'
-      },
-      gauge: {
-        shape: 'bullet',
-        axis: { range: [0, 100], dtick: 20 },
-        bar: { color: getZoneColor(metricData.value), thickness: 0.5 },
-        bgcolor: '#1f2937',
-        borderwidth: 0,
-        steps: getGaugeSteps(),
-        threshold: {
-          line: { color: '#fbbf24', width: 2 },
-          thickness: 0.75,
-          value: 50
-        }
-      },
-      domain: { x: [0.05, 0.95], y: [0.15, 0.85] }
-    };
-
     var layout = getDarkLayout({
-      height: 80,
-      margin: { t: 0, r: 40, l: 10, b: 0 }
+      height: 155,
+      margin: { t: 20, r: 15, l: 15, b: 0 }
     });
 
     var config = { responsive: true, displayModeBar: false, staticPlot: true };
 
-    Plotly.newPlot(containerId, [trace], layout, config);
+    Plotly.newPlot(containerId, [metricGaugeTrace(metricData.value)], layout, config);
   }
 
   /**
-   * Efficiently update a bullet gauge value.
+   * Efficiently update a metric needle gauge value.
    * @param {string} containerId - DOM element ID
    * @param {number} gaugeValue - New gauge value 0-100
    */
   function updateBulletGauge(containerId, gaugeValue) {
-    Plotly.react(containerId, [{
-      type: 'indicator',
-      mode: 'number+gauge',
-      value: gaugeValue,
-      number: {
-        font: { size: 24, color: '#f3f4f6' },
-        valueformat: '.0f',
-        suffix: '/100'
-      },
-      gauge: {
-        shape: 'bullet',
-        axis: { range: [0, 100], dtick: 20 },
-        bar: { color: getZoneColor(gaugeValue), thickness: 0.5 },
-        bgcolor: '#1f2937',
-        borderwidth: 0,
-        steps: getGaugeSteps(),
-        threshold: {
-          line: { color: '#fbbf24', width: 2 },
-          thickness: 0.75,
-          value: 50
-        }
-      },
-      domain: { x: [0.05, 0.95], y: [0.15, 0.85] }
-    }]);
+    Plotly.react(containerId, [metricGaugeTrace(gaugeValue)]);
   }
 
   return {
