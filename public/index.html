@@ -41,6 +41,14 @@
     ::-webkit-scrollbar-track { background: #0a0a0a; }
     ::-webkit-scrollbar-thumb { background: #2d2d2d; border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
+    /* Chart details: open by default on sm+ screens */
+    @media (min-width: 640px) {
+      #chart-details { pointer-events: none; }
+      #chart-details > summary { pointer-events: none; list-style: none; }
+      #chart-details > summary span { display: none !important; }
+      #chart-details > div, #chart-details > p { display: block !important; }
+    }
+    details summary::-webkit-details-marker { display: none; }
   </style>
 </head>
 <body class="bg-finance-dark text-gray-100 min-h-screen flex flex-col">
@@ -133,13 +141,19 @@
 
     <!-- Chart Section -->
     <section aria-label="Historical rate chart">
-      <h2 class="text-lg font-semibold text-gray-200 mb-4">Cash Rate History</h2>
-      <div id="rate-chart" class="w-full h-64 sm:h-80 md:h-96 lg:h-[500px] bg-finance-gray border border-finance-border rounded-xl overflow-hidden">
-        <div class="flex items-center justify-center h-full">
-          <p class="text-gray-500 text-sm">Loading chart data...</p>
+      <details id="chart-details" class="group" open>
+        <summary class="flex items-center justify-between cursor-pointer list-none">
+          <h2 class="text-lg font-semibold text-gray-200">Cash Rate History</h2>
+          <span class="text-sm text-gray-500 group-open:hidden sm:hidden">Show chart</span>
+          <span class="text-sm text-gray-500 hidden group-open:inline sm:hidden">Hide chart</span>
+        </summary>
+        <div id="rate-chart" class="w-full h-64 sm:h-80 md:h-96 lg:h-[500px] bg-finance-gray border border-finance-border rounded-xl overflow-hidden mt-4">
+          <div class="flex items-center justify-center h-full">
+            <p class="text-gray-500 text-sm">Loading chart data...</p>
+          </div>
         </div>
-      </div>
-      <p id="chart-source" class="text-xs text-gray-600 mt-2">Source: Reserve Bank of Australia</p>
+        <p id="chart-source" class="text-xs text-gray-600 mt-2">Source: Reserve Bank of Australia</p>
+      </details>
     </section>
 
     <!-- Individual Economic Indicator Gauges -->
