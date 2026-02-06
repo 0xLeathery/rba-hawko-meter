@@ -19,6 +19,13 @@ from typing import Dict, Any, Tuple, Callable
 # Import all ingestors
 from pipeline.ingest import rba_data, abs_data, corelogic_scraper, nab_scraper
 
+# Import normalization engine (guarded -- pipeline works even if module unavailable)
+try:
+    from pipeline.normalize.engine import generate_status
+    NORMALIZATION_AVAILABLE = True
+except ImportError:
+    NORMALIZATION_AVAILABLE = False
+
 
 # Define source tiers
 CRITICAL_SOURCES = [
@@ -123,6 +130,35 @@ def run_pipeline() -> Dict[str, Any]:
     else:
         results['status'] = 'success'
         print("\n✓ All optional sources succeeded")
+
+    # Phase 3: Data normalization and status.json generation
+    print("\n\nPHASE 3: DATA NORMALIZATION")
+    print("-" * 60)
+
+    if not NORMALIZATION_AVAILABLE:
+        print("\n  Normalization engine not installed -- skipping status.json generation")
+        results['normalization'] = {'status': 'skipped', 'reason': 'module not available'}
+    else:
+        try:
+            status = generate_status()
+            results['normalization'] = {
+                'status': 'success',
+                'hawk_score': status['overall']['hawk_score'],
+                'indicators_available': status['metadata']['indicators_available'],
+                'indicators_missing': status['metadata']['indicators_missing'],
+            }
+            print(f"\n  Normalization completed: Hawk Score = {status['overall']['hawk_score']:.1f}")
+            print(f"  Zone: {status['overall']['zone_label']}")
+            print(f"  Indicators: {status['metadata']['indicators_available']} available, {len(status['metadata']['indicators_missing'])} missing")
+
+        except Exception as e:
+            print(f"\n  WARNING: Normalization failed: {e}")
+            results['normalization'] = {
+                'status': 'failed',
+                'error': str(e)
+            }
+            # Normalization failure is non-fatal -- the pipeline still succeeds
+            # if critical data was ingested. status.json just won't be updated.
 
     # Print summary
     print("\n" + "=" * 60)
