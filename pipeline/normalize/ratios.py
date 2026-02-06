@@ -20,7 +20,8 @@ def load_indicator_csv(csv_path):
         csv_path: Path to the CSV file.
 
     Returns:
-        DataFrame with parsed date and numeric value columns, or None if file missing.
+        DataFrame with parsed date and numeric value columns, or None if file missing
+        or if CSV doesn't have the expected date/value schema.
     """
     path = Path(csv_path)
     if not path.exists():
@@ -28,6 +29,12 @@ def load_indicator_csv(csv_path):
         return None
 
     df = pd.read_csv(path)
+
+    # Check for required columns
+    if 'value' not in df.columns:
+        print(f"  CSV missing 'value' column (non-standard schema): {path}")
+        return None
+
     df['date'] = pd.to_datetime(df['date'])
     df['value'] = pd.to_numeric(df['value'], errors='coerce')
     df = df.sort_values('date').reset_index(drop=True)

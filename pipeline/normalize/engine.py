@@ -17,6 +17,7 @@ from pathlib import Path
 import numpy as np
 
 from pipeline.config import (
+    DATA_DIR,
     INDICATOR_CONFIG,
     OPTIONAL_INDICATOR_CONFIG,
     ZSCORE_WINDOW_YEARS,
@@ -25,7 +26,7 @@ from pipeline.config import (
     WEIGHTS_FILE,
     STATUS_OUTPUT,
 )
-from pipeline.normalize.ratios import normalize_indicator
+from pipeline.normalize.ratios import normalize_indicator, load_asx_futures_csv
 from pipeline.normalize.zscore import compute_rolling_zscores, determine_confidence
 from pipeline.normalize.gauge import (
     zscore_to_gauge,
@@ -163,6 +164,51 @@ def build_gauge_entry(name, latest_row, z_df, weight_config):
     }
 
 
+def build_asx_futures_entry():
+    """
+    Build the top-level asx_futures dict for status.json.
+
+    Reads data/asx_futures.csv directly (bypasses Z-score pipeline).
+    Returns the status.json asx_futures contract dict, or None if data
+    unavailable.
+    """
+    csv_path = DATA_DIR / "asx_futures.csv"
+    data = load_asx_futures_csv(csv_path)
+    if data is None:
+        return None
+
+    # Determine direction from change_bp
+    change_bp = data['change_bp']
+    if change_bp < -5:
+        direction = 'cut'
+    elif change_bp > 5:
+        direction = 'hike'
+    else:
+        direction = 'hold'
+
+    # Compute staleness
+    data_date = datetime.strptime(data['data_date'], '%Y-%m-%d')
+    staleness_days = (datetime.now() - data_date).days
+
+    # Get current cash rate from RBA data if available, otherwise use
+    # implied_rate minus change as approximation
+    current_rate = round(data['implied_rate'] - data['change_bp'] / 100, 2)
+
+    return {
+        'current_rate': current_rate,
+        'next_meeting': data['meeting_date'],
+        'implied_rate': round(data['implied_rate'], 2),
+        'probabilities': {
+            'cut': round(data['probability_cut'], 0),
+            'hold': round(data['probability_hold'], 0),
+            'hike': round(data['probability_hike'], 0),
+        },
+        'direction': direction,
+        'data_date': data['data_date'],
+        'staleness_days': staleness_days,
+    }
+
+
 def process_indicator(name, config, weight_config):
     """
     Process a single indicator end-to-end: normalize -> Z-score -> gauge.
@@ -269,6 +315,17 @@ def generate_status():
             'indicators_missing': missing_indicators,
         },
     }
+
+    # Build ASX futures entry (top-level, not in gauges)
+    asx_entry = build_asx_futures_entry()
+    if asx_entry is not None:
+        status['asx_futures'] = asx_entry
+        # Remove asx_futures from missing indicators since we have data
+        if 'asx_futures' in status['metadata']['indicators_missing']:
+            status['metadata']['indicators_missing'].remove('asx_futures')
+        print(f"\n  ASX Futures: implied={asx_entry['implied_rate']:.2f}%, "
+              f"direction={asx_entry['direction']}, "
+              f"P(cut)={asx_entry['probabilities']['cut']:.0f}%")
 
     # Write to output file
     STATUS_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
