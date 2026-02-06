@@ -88,10 +88,31 @@
   }
 
   /**
+   * Initialize the calculator module (Phase 5).
+   * Guarded so Phase 2 dashboard works without Phase 5 code.
+   */
+  function initCalculator() {
+    try {
+      if (typeof CalculatorModule !== 'undefined') {
+        CalculatorModule.init();
+      }
+    } catch (error) {
+      console.error('Calculator initialization failed:', error);
+      var calcSection = document.getElementById('calculator-section');
+      if (calcSection) {
+        DataModule.showError('calc-results', 'Calculator failed to load. Please refresh the page.');
+      }
+    }
+  }
+
+  /**
    * Initialize the dashboard.
    */
   function init() {
     setupBannerDismiss();
+
+    // Initialize calculator (independent of data loading)
+    initCalculator();
 
     // Show loading states
     DataModule.showLoading('rate-chart', 'Loading chart data...');
