@@ -76,7 +76,8 @@ var InterpretationsModule = (function () {
 
     var dashSpan = document.createElement('span');
     dashSpan.className = 'text-gray-300';
-    dashSpan.textContent = ' \u2014 ' + (overallData.verdict || '');
+    var plainVerdict = getPlainVerdict(overallData.hawk_score);
+    dashSpan.textContent = ' \u2014 ' + plainVerdict;
 
     container.appendChild(labelSpan);
     container.appendChild(dashSpan);

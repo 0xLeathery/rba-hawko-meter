@@ -96,6 +96,18 @@
 
     renderedMetricIds = [];
 
+    // Render data coverage notice
+    var coverageEl = document.getElementById('data-coverage-notice');
+    if (coverageEl) {
+      var total = 8;
+      var available = orderedIds.length;
+      if (available < total) {
+        coverageEl.textContent = 'Based on ' + available + ' of ' + total + ' indicators (more data coming soon)';
+      } else {
+        coverageEl.textContent = '';
+      }
+    }
+
     orderedIds.forEach(function (metricId) {
       var metricData = gaugesData[metricId];
       if (!metricData) return;
