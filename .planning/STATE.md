@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-02-04)
 ## Current Position
 
 Phase: 7 of 7 (ASX Futures Integration)
-Plan: 1 of 1 complete
-Status: Phase complete
-Last activity: 2026-02-06 — Completed 07-01-PLAN.md (ASX Futures JSON Scraper)
+Plan: 2 of 3 complete
+Status: In progress
+Last activity: 2026-02-07 — Completed 07-02-PLAN.md (ASX Futures Normalization Pipeline)
 
-Progress: [██████████████████████████] 100% (14/14 plans complete)
+Progress: [████████████████████████░░] 93.75% (15/16 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 14
-- Average duration: 3.1 minutes
-- Total execution time: 0.73 hours
+- Total plans completed: 15
+- Average duration: 3.0 minutes
+- Total execution time: 0.75 hours
 
 **By Phase:**
 
@@ -32,11 +32,11 @@ Progress: [███████████████████████
 | 04 | 2/2 | 4 min | 2.0 min |
 | 05 | 2/2 | 12.5 min | 6.25 min |
 | 06 | 3/3 | 8.8 min | 2.9 min |
-| 07 | 1/1 | 2 min | 2.0 min |
+| 07 | 2/3 | 4 min | 2.0 min |
 
 **Recent Trend:**
-- Last 5 plans: 05-02 (3 min), 06-01 (2 min), 06-03 (3 min), 06-02 (3.8 min), 07-01 (2 min)
-- Phase 7 complete - ASX futures scraper implemented
+- Last 5 plans: 06-01 (2 min), 06-03 (3 min), 06-02 (3.8 min), 07-01 (2 min), 07-02 (2 min)
+- Phase 7 in progress - ASX futures pipeline integration complete
 
 *Updated after each plan completion*
 
@@ -87,6 +87,10 @@ Recent decisions affecting current work:
 - **ASX JSON endpoints** (07-01): Use ASX DAM JSON endpoints (dynamic_text, market_expectations) instead of HTML parsing
 - **Probability derivation algorithm** (07-01): Derive rate movement probabilities from implied vs current rate with 5bp deadband
 - **Composite-key dedup for ASX** (07-01): Deduplicate on [date, meeting_date] instead of date alone for multi-meeting scrapes
+- **ASX futures bypass Z-score pipeline** (07-02): Benchmark indicators read directly via load_asx_futures_csv(), bypass normalization/Z-score/gauge flow
+- **Top-level asx_futures key in status.json** (07-02): asx_futures sits at same level as gauges/overall/metadata, NOT inside gauges dict
+- **Direction thresholds for ASX** (07-02): change_bp < -5 → cut, > 5 → hike, else hold (5bp deadband matches probability derivation)
+- **CSV schema validation in ratios.py** (07-02): load_indicator_csv() checks for 'value' column before processing to handle non-standard multi-column formats
 
 ### Pending Todos
 
@@ -101,7 +105,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-06 21:32 UTC
-Stopped at: Completed 07-01-PLAN.md -- ASX Futures JSON Scraper
+Last session: 2026-02-07 21:39 UTC
+Stopped at: Completed 07-02-PLAN.md -- ASX Futures Normalization Pipeline
 Resume file: None
-Next: Phase 7 complete. ASX futures scraper implemented (endpoints currently unavailable). Project ready for deployment.
+Next: One more plan (07-03) to complete Phase 7. ASX futures data flows from scraper → CSV → status.json. Frontend integration and end-to-end testing remaining.
