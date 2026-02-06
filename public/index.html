@@ -73,8 +73,8 @@
     <section id="hawk-o-meter-section" aria-label="Overview" class="mb-8">
       <div id="data-freshness" class="text-center text-sm mb-2"></div>
       <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-        <div class="lg:col-span-3">
-          <div id="hero-gauge-plot" class="w-full" style="min-height: 280px;">
+        <div class="lg:col-span-3 min-w-0">
+          <div id="hero-gauge-plot" class="w-full overflow-hidden" style="min-height: 280px; min-width: 0;">
             <div class="flex items-center justify-center h-64 text-gray-500">
               Loading Hawk Score...
             </div>
@@ -109,8 +109,10 @@
     <!-- Chart Section -->
     <section aria-label="Historical rate chart">
       <h2 class="text-lg font-semibold text-gray-200 mb-4">Cash Rate History</h2>
-      <div id="rate-chart" class="w-full h-64 sm:h-80 md:h-96 lg:h-[500px] bg-finance-gray border border-finance-border rounded-xl flex items-center justify-center">
-        <p class="text-gray-500 text-sm">Loading chart data...</p>
+      <div id="rate-chart" class="w-full h-64 sm:h-80 md:h-96 lg:h-[500px] bg-finance-gray border border-finance-border rounded-xl overflow-hidden">
+        <div class="flex items-center justify-center h-full">
+          <p class="text-gray-500 text-sm">Loading chart data...</p>
+        </div>
       </div>
       <p id="chart-source" class="text-xs text-gray-600 mt-2">Source: Reserve Bank of Australia</p>
     </section>
