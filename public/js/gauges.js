@@ -74,7 +74,8 @@ var GaugesModule = (function () {
       paper_bgcolor: 'transparent',
       plot_bgcolor: 'transparent',
       font: { color: '#e5e5e5', family: 'Inter, system-ui, sans-serif' },
-      margin: { t: 40, r: 25, l: 25, b: 0 }
+      margin: { t: 40, r: 25, l: 25, b: 0 },
+      autosize: true
     };
     return Object.assign({}, base, overrides || {});
   }
@@ -99,6 +100,14 @@ var GaugesModule = (function () {
    * @param {number} hawkScore - Hawk score 0-100
    */
   function createHeroGauge(containerId, hawkScore) {
+    // Clear container (remove loading placeholder)
+    var container = document.getElementById(containerId);
+    if (container) {
+      while (container.firstChild) {
+        container.removeChild(container.firstChild);
+      }
+    }
+
     var trace = {
       type: 'indicator',
       mode: 'gauge+number',

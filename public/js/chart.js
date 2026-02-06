@@ -30,7 +30,8 @@ var ChartModule = (function () {
         zeroline: false
       },
       hovermode: 'x unified',
-      margin: { t: 40, r: 20, b: 60, l: 60 }
+      margin: { t: 40, r: 20, b: 60, l: 60 },
+      autosize: true
     };
   }
 

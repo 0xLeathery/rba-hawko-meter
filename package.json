@@ -1,0 +1,13 @@
+{
+  "name": "rba-hawko-meter",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RBA Hawk-O-Meter — Interest Rate Dashboard",
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0"
+  }
+}

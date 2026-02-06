@@ -66,11 +66,11 @@ Plans:
   2. System calculates Z-scores using 10-year rolling window for mean and standard deviation
   3. System maps Z-scores to 0-100 gauge scale with documented transformation logic
   4. System outputs status.json with overall hawk score, per-gauge values, and metadata
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
+- [ ] 03-01-PLAN.md — Normalization engine core: config, weights.json, ratios.py, zscore.py, gauge.py
+- [ ] 03-02-PLAN.md — Status.json generation engine and pipeline integration
 
 ### Phase 4: Hawk-O-Meter Gauges
 **Goal**: Users can see visual traffic-light interpretation of interest rate pressure
@@ -82,11 +82,11 @@ Plans:
   3. Each gauge displays a plain-text interpretation (e.g., "Prices rising faster than wages")
   4. User can see ASX Futures implied probability of next rate move
   5. Overall verdict text summarizes the hawk/dove stance in plain English
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
+- [ ] 04-01-PLAN.md — Hero Hawk Score gauge (Plotly.js semicircle), ASX Futures probability table, overall verdict display
+- [ ] 04-02-PLAN.md — Individual metric bullet gauges (Housing, Jobs, Spending, Capacity, Inflation, Wages) with data-driven interpretation text
 
 ### Phase 5: Calculator & Compliance
 **Goal**: Users can personalize impact estimates and all content meets ASIC regulatory requirements
@@ -99,11 +99,11 @@ Plans:
   4. Calculator stores inputs in localStorage without requiring login
   5. All language uses neutral framing ("Market Expectation" not "Prediction")
   6. No content constitutes personal or general financial advice per ASIC RG 244
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
+- [ ] 05-01-PLAN.md — Mortgage impact calculator: input form, repayment math, scenario slider, localStorage persistence
+- [ ] 05-02-PLAN.md — Compliance audit and polish: disclaimer verification, neutral language enforcement, ASIC compliance review, accessibility audit
 
 ## Progress
 
@@ -114,6 +114,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Foundation & Data Pipeline | 3/5 | Gap closure | - |
 | 2. Core Dashboard | 0/2 | Planned | - |
-| 3. Data Normalization & Z-Scores | 0/TBD | Not started | - |
-| 4. Hawk-O-Meter Gauges | 0/TBD | Not started | - |
-| 5. Calculator & Compliance | 0/TBD | Not started | - |
+| 3. Data Normalization & Z-Scores | 0/2 | Planned | - |
+| 4. Hawk-O-Meter Gauges | 0/2 | Planned | - |
+| 5. Calculator & Compliance | 0/2 | Planned | - |

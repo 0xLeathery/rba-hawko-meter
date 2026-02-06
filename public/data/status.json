@@ -1,0 +1,117 @@
+{
+  "generated_at": "2026-02-06T05:45:19.971854Z",
+  "pipeline_version": "1.0.0",
+  "overall": {
+    "hawk_score": 46.0,
+    "zone": "neutral",
+    "zone_label": "Balanced",
+    "verdict": "Economic indicators are broadly balanced",
+    "confidence": "MEDIUM"
+  },
+  "gauges": {
+    "inflation": {
+      "value": 47.3,
+      "zone": "neutral",
+      "zone_label": "Balanced",
+      "z_score": -0.159,
+      "raw_value": 1.43,
+      "raw_unit": "% YoY",
+      "weight": 0.25,
+      "polarity": 1,
+      "data_date": "2025-12-01",
+      "staleness_days": 67,
+      "confidence": "HIGH",
+      "interpretation": "Inflation near long-run average",
+      "history": [
+        42.4,
+        44.5,
+        43.7,
+        41.7,
+        34.9,
+        38.2,
+        49.1,
+        44.1,
+        51.6,
+        49.9,
+        35.8,
+        47.3
+      ]
+    },
+    "wages": {
+      "value": 46.2,
+      "zone": "neutral",
+      "zone_label": "Balanced",
+      "z_score": -0.226,
+      "raw_value": 1.56,
+      "raw_unit": "% YoY",
+      "weight": 0.15,
+      "polarity": 1,
+      "data_date": "2025-07-01",
+      "staleness_days": 220,
+      "confidence": "HIGH",
+      "interpretation": "Wage growth near long-run average",
+      "history": [
+        31.0,
+        57.2,
+        58.7,
+        68.3,
+        37.1,
+        55.6,
+        66.8,
+        63.3,
+        82.9,
+        47.6,
+        44.4,
+        46.2
+      ]
+    },
+    "building_approvals": {
+      "value": 38.7,
+      "zone": "cool",
+      "zone_label": "Mild dovish pressure",
+      "z_score": -0.675,
+      "raw_value": -99.91,
+      "raw_unit": "% YoY",
+      "weight": 0.05,
+      "polarity": 1,
+      "data_date": "2025-12-31",
+      "staleness_days": 37,
+      "confidence": "MEDIUM",
+      "interpretation": "Building approvals below trend",
+      "history": [
+        38.9,
+        39.4,
+        100.0,
+        48.7,
+        38.7
+      ]
+    }
+  },
+  "weights": {
+    "inflation": 0.25,
+    "wages": 0.15,
+    "employment": 0.15,
+    "housing": 0.15,
+    "spending": 0.1,
+    "building_approvals": 0.05,
+    "business_confidence": 0.05,
+    "asx_futures": 0.1
+  },
+  "metadata": {
+    "window_years": 10,
+    "clamp_range": [
+      -3.0,
+      3.0
+    ],
+    "mapping": "linear",
+    "statistics": "robust (median/MAD)",
+    "indicators_available": 3,
+    "indicators_missing": [
+      "employment",
+      "spending",
+      "housing",
+      "business_confidence",
+      "asx_futures"
+    ]
+  }
+}

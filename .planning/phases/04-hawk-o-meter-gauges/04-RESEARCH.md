@@ -547,12 +547,101 @@ Things that couldn't be fully resolved:
 - [Plotly.js Bundle Size Optimization](https://community.plotly.com/t/how-can-i-reduce-bundle-size-of-plotly-js-in-react-app/89910) - Community discussion on bundle sizes
 - [Intl.NumberFormat Best Practices](https://www.omarileon.me/blog/javascript-format-percentage) - JavaScript percentage formatting
 
+## status.json Contract (Phase 3 Output, Phase 4 Input)
+
+Based on Phase 3 context decisions (03-CONTEXT.md), the expected status.json structure that Phase 4 will consume:
+
+```json
+{
+  "last_updated": "2026-02-03T10:00:00+11:00",
+  "overall_hawk_score": 68,
+  "verdict": {
+    "label": "HAWKISH",
+    "text": "Multiple indicators suggest upward rate pressure.",
+    "score": 68
+  },
+  "gauges": {
+    "inflation": {
+      "label": "Inflation",
+      "gauge_value": 72,
+      "z_score": 1.1,
+      "raw_value": 4.2,
+      "raw_unit": "% YoY",
+      "source": "ABS",
+      "source_date": "2025-12-31",
+      "confidence": "HIGH",
+      "stale": false,
+      "history": []
+    },
+    "housing": { },
+    "jobs": { },
+    "spending": { },
+    "capacity": { },
+    "wages": { }
+  },
+  "asx_futures": {
+    "current_rate": 3.85,
+    "implied_rate": 3.92,
+    "probabilities": { "cut": 0.10, "hold": 0.62, "hike": 0.28 },
+    "source": "ASX",
+    "source_date": "2026-02-03",
+    "next_meeting": "2026-03-03"
+  },
+  "weights": {
+    "inflation": 0.25, "wages": 0.15, "jobs": 0.15,
+    "housing": 0.15, "spending": 0.10, "capacity": 0.10,
+    "building_approvals": 0.05, "business_confidence": 0.05
+  },
+  "metadata": {
+    "window_years": 10,
+    "mapping": "linear_clamp",
+    "mapping_range": [-2, 2],
+    "zones": {
+      "cold": [0, 20], "cool": [20, 40], "neutral": [40, 60],
+      "warm": [60, 80], "hot": [80, 100]
+    }
+  }
+}
+```
+
+**Note:** Exact field names will be defined by the Phase 3 executor. Phase 4 code should handle minor naming variations gracefully. The 5 stance labels map to zones: Cold=STRONGLY DOVISH, Cool=DOVISH, Neutral=NEUTRAL, Warm=HAWKISH, Hot=STRONGLY HAWKISH.
+
+## Dark Theme Gauge Styling
+
+For consistent dark theme (finance-dark `#0a0a0a` background from Phase 2):
+
+```javascript
+// Dark theme layout for all gauges
+const darkGaugeLayout = {
+  paper_bgcolor: "transparent",  // inherit from page CSS
+  plot_bgcolor: "transparent",
+  font: { color: "#e5e5e5", family: "Inter, system-ui, sans-serif" },
+  margin: { t: 40, r: 25, l: 25, b: 10 }
+};
+
+// Gauge background should be slightly lighter than page
+// gauge.bgcolor: "#1f2937" (finance-gray tint)
+// gauge.borderwidth: 0 (no visible border)
+```
+
+The bar/needle color should dynamically match the zone:
+```javascript
+function getZoneColor(value) {
+  if (value < 20) return '#1e40af';  // Deep Blue (STRONGLY DOVISH)
+  if (value < 40) return '#60a5fa';  // Light Blue (DOVISH)
+  if (value < 60) return '#6b7280';  // Grey (NEUTRAL)
+  if (value < 80) return '#f87171';  // Light Red (HAWKISH)
+  return '#dc2626';                   // Deep Red (STRONGLY HAWKISH)
+}
+```
+
 ## Metadata
 
 **Confidence breakdown:**
 - Standard stack: HIGH - Plotly.js is well-documented, actively maintained, official docs confirm gauge capabilities
 - Architecture: HIGH - Patterns verified from official documentation and modern vanilla JS best practices
 - Pitfalls: MEDIUM-HIGH - Most pitfalls documented in official issue tracker, some from community reports
+- status.json contract: MEDIUM - Based on Phase 3 context decisions; exact field names may differ
 
-**Research date:** 2026-02-04
+**Research date:** 2026-02-04 (updated 2026-02-06 with status.json contract and dark theme details)
 **Valid until:** 2026-03-04 (30 days - Plotly.js is stable, gauge API unlikely to change)

@@ -1,872 +1,272 @@
-# Phase 3: Data Normalization & Z-Scores - Research
+# Phase 3 Research: Data Normalization & Z-Scores
 
-**Researched:** 2026-02-04
-**Domain:** Python statistical processing with robust statistics
-**Confidence:** HIGH
+**Synthesized from:** z-score-methodology.md, rba-decision-drivers.md, 03-RESEARCH.md (original)
+**Purpose:** Implementation-relevant findings for the Phase 3 executor agent
+**Date:** 2026-02-06
 
-## Summary
+---
 
-This phase builds a Python statistical engine that transforms raw economic metrics into normalized 0-100 gauge values using robust Z-score techniques. The user has decided to use Median/IQR instead of Mean/StdDev to handle COVID outliers naturally, implement a linear Z-score to gauge mapping (-2 to +2 maps to 0-100), and output rich metadata in status.json including sparkline history.
+## 1. Statistical Approach (Validated)
 
-The standard Python data science stack (NumPy 2.4+, pandas 3.0+, SciPy 1.17+) provides built-in robust statistics functions that eliminate the need for custom implementations. Key patterns include using pandas rolling windows with min_periods for edge cases, scipy.stats.iqr() for robust dispersion, and Pydantic dataclasses for validated JSON output contracts.
+### Robust Z-Scores (Median + MAD)
 
-Critical findings: (1) Use scipy.stats.median_abs_deviation for the robust Z-score calculation, not IQR directly, (2) pandas rolling windows default to NaN for insufficient data—set min_periods explicitly for early time series handling, (3) validate status.json schema with Pydantic to catch field errors before deployment.
+Standard Z-scores `z = (x - mean) / std` are inappropriate because COVID-era outliers inflate both mean and standard deviation. The project uses **robust Z-scores**:
 
-**Primary recommendation:** Build the pipeline as three discrete modules (normalize.py, calculate_scores.py, output_generator.py) with validated schemas at each boundary. Use scipy's robust statistics functions—never hand-roll Z-score calculations.
-
-## Standard Stack
-
-The established libraries/tools for this domain:
-
-### Core
-| Library | Version | Purpose | Why Standard |
-|---------|---------|---------|--------------|
-| numpy | 2.4+ | Array operations, mathematical functions | Foundation for all scientific computing in Python, handles float64 precision |
-| pandas | 3.0+ | Rolling windows, time series handling | Industry standard for time series operations, built-in rolling statistics |
-| scipy | 1.17+ | Robust statistics (IQR, MAD) | Authoritative implementation of statistical functions, outlier-resistant methods |
-
-### Supporting
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| pydantic | 2.0+ | Data validation, JSON schema | Validating status.json output schema, configuration files |
-| python-dateutil | 2.9+ | Timestamp parsing, handling | When working with data source timestamps |
-
-### Alternatives Considered
-| Instead of | Could Use | Tradeoff |
-|------------|-----------|----------|
-| scipy.stats | statsmodels | Statsmodels adds forecasting but heavier dependencies for basic statistics |
-| Pydantic | jsonschema | jsonschema is lighter but Pydantic provides better error messages and Python integration |
-| pandas rolling | Custom loops | Custom loops give control but lose vectorization benefits and introduce bugs |
-
-**Installation:**
-```bash
-pip install numpy>=2.4.0 pandas>=3.0.0 scipy>=1.17.0 pydantic>=2.0.0 python-dateutil>=2.9.0
+```
+z = (x - median) / MAD
 ```
 
-## Architecture Patterns
+Where MAD = `median(|x_i - median(x)|) * 1.4826` (scaling constant for normal-distribution consistency).
 
-### Recommended Project Structure
-```
-src/
-├── normalization/
-│   ├── formulas.py          # Apply normalization formulas (price/income, per capita)
-│   ├── schemas.py           # Pydantic models for normalized data
-│   └── validators.py        # Data quality checks
-├── statistics/
-│   ├── robust.py            # Median, IQR, MAD calculations using scipy
-│   ├── zscore.py            # Robust Z-score calculation
-│   └── rolling.py           # Rolling window management
-├── gauges/
-│   ├── mapping.py           # Z-score to 0-100 gauge mapping
-│   ├── zones.py             # 5-zone classification (Cold/Cool/Neutral/Warm/Hot)
-│   └── weights.py           # Load and apply weights.json
-├── output/
-│   ├── status_schema.py     # Pydantic model for status.json
-│   ├── generator.py         # Build status.json with metadata
-│   └── history.py           # Extract last 12 data points for sparklines
-└── config/
-    ├── weights.json         # Configurable gauge weights
-    └── constants.py         # Z-score bounds, zone thresholds
-```
+This is validated by the OECD Composite Leading Indicators system and the Chicago Fed NFCI, both of which start with MAD-based normalization.
 
-### Pattern 1: Robust Z-Score Calculation (Median-MAD Method)
-**What:** Use Median Absolute Deviation (MAD) instead of standard deviation for outlier resistance.
+**Implementation:** Use `scipy.stats.median_abs_deviation(data, scale='normal')` which applies the 1.4826 factor automatically. However, to avoid adding scipy as a dependency for a single function, a numpy-only implementation is also acceptable: `np.median(np.abs(x - np.median(x))) * 1.4826`.
 
-**When to use:** When calculating Z-scores on data with known outliers (COVID, black swan events).
+**Zero-dispersion guard:** When MAD = 0 (all values identical, e.g., cash rate held constant), return Z = 0 (neutral). No movement means no pressure signal.
 
-**Formula:**
-```
-Robust Z-Score = (x - median) / (MAD * 1.4826)
-```
-Where 1.4826 is the scale factor for consistency with normal distribution standard deviation.
+### Rolling Window: 10 Years
 
-**Example:**
+- **40 quarterly observations** provides statistical stability while capturing regime changes
+- Captures at least one full monetary policy cycle
+- COVID outliers (2020-2021) roll out by 2030-2031; robust statistics handle them until then
+- **Minimum 5 years fallback** via `min_periods` parameter
+- **Confidence levels:** HIGH (>= 32 obs / 8 years), MEDIUM (20-31 obs / 5-8 years), LOW (< 20 obs / < 5 years)
+
+### Frequency Standardization
+
+All indicators must be aligned to **quarterly frequency** before Z-scoring:
+- Monthly data (employment, retail, building approvals): use end-of-quarter value
+- Quarterly data (CPI, WPI): already aligned
+- Event-based (cash rate): use end-of-quarter value
+
+This ensures a "40-observation window" covers the same 10-year calendar period for all indicators.
+
+---
+
+## 2. Available Data & Normalization Formulas
+
+### Phase 1 CSV Files (data/ directory)
+
+| File | Content | Frequency | Rows | Date Range | Schema |
+|------|---------|-----------|------|------------|--------|
+| rba_cash_rate.csv | Cash rate target | Event-based | ~96 | 1990-2025 | date,value,source |
+| abs_cpi.csv | CPI index numbers | Quarterly | ~62 | 2014-2025 | date,value,source,series_id |
+| abs_employment.csv | Labour force data | Monthly | ~72 | 2020-2025 | date,value,source,series_id |
+| abs_retail_trade.csv | Retail turnover | Monthly | ~66 | 2020-2025 | date,value,source,series_id |
+| abs_wage_price_index.csv | WPI index | Quarterly | ~47 | 2014-2025 | date,value,source,series_id |
+| abs_building_approvals.csv | Dwelling approvals | Monthly | ~144 | 2014-2025 | date,value,source,series_id |
+
+**Data quality notes:**
+- Employment CSV has mixed series (values jump from ~5 to ~146) -- must filter for correct series or handle carefully
+- Retail trade contains nominal values -- must convert to YoY % change
+- Building approvals starts with zeros in early 2014 -- filter these out
+- CoreLogic and NAB scrapers are stubs -- engine must handle missing indicators gracefully
+
+### Normalization to Ratios (No Nominal Values)
+
+Per project constraint ("strictly NO nominal currency values in gauges"), all indicators must be rates, ratios, or indices:
+
+| Indicator | Raw Data | Normalization | Output |
+|-----------|----------|---------------|--------|
+| Inflation (CPI) | Index number | YoY % change: `(cpi_t / cpi_{t-4} - 1) * 100` | % change |
+| Wages (WPI) | Index number | YoY % change: `(wpi_t / wpi_{t-4} - 1) * 100` | % change |
+| Employment | Mixed series | Use unemployment rate or employment-population ratio (already %) | % |
+| Retail Trade | Turnover ($M) | YoY % change: `(val_t / val_{t-4} - 1) * 100` | % change |
+| Housing | Price data | YoY % change or price-to-income ratio | % or ratio |
+| Building Approvals | Count | YoY % change: `(val_t / val_{t-12} - 1) * 100` (monthly) | % change |
+| Business Confidence | NAB index | Already a ratio/index | Index |
+| ASX Futures | Implied rate | Displayed as benchmark, not in hawk score | % |
+
+**Pragmatic approach for MVP:** YoY percentage change is the primary normalization method. It eliminates nominal values, is simple to implement, and is standard for economic dashboards.
+
+---
+
+## 3. Gauge Mapping & Zones
+
+### Linear Clamp: [-3, +3] to [0, 100]
+
 ```python
-from scipy import stats
-import numpy as np
-
-# Source: https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.median_abs_deviation.html
-def calculate_robust_zscore(data):
-    """Calculate Z-score using median and MAD for outlier resistance."""
-    median = np.median(data)
-    mad = stats.median_abs_deviation(data, scale='normal')  # scale='normal' applies 1.4826
-
-    # Avoid division by zero
-    if mad == 0:
-        return np.zeros_like(data)
-
-    robust_zscore = (data - median) / mad
-    return robust_zscore
-
-# Example with outlier
-data = np.array([1, 2, 3, 4, 5, 100])  # 100 is outlier
-traditional_zscore = (data - np.mean(data)) / np.std(data)
-robust_zscore = calculate_robust_zscore(data)
-
-print(f"Traditional Z-score of outlier: {traditional_zscore[-1]:.2f}")  # ~1.96
-print(f"Robust Z-score of outlier: {robust_zscore[-1]:.2f}")            # ~4.77
+gauge = max(0, min(100, (z + 3) / 6 * 100))
 ```
 
-**Why this matters:** Traditional Z-scores underestimate outlier severity because outliers inflate the standard deviation. MAD-based scores correctly identify extremes.
+**Refinement from research:** The original 03-CONTEXT.md specified [-2, +2]. Research recommends widening to **[-3, +3]** because:
+- With [-2, +2], ~4.6% of observations clip to 0 or 100 (too many "pegged" readings)
+- With [-3, +3], only ~0.3% clip (much more informative range)
+- Linearity and transparency are preserved
 
-### Pattern 2: Rolling Windows with Edge Case Handling
-**What:** Use pandas rolling windows with explicit min_periods for time series start.
+### 5 Zones
 
-**When to use:** When calculating 10-year rolling statistics but early data has <10 years available.
+| Zone | Gauge Range | Label | Color |
+|------|-------------|-------|-------|
+| Cold | 0-20 | Strong dovish pressure | Blue/Green |
+| Cool | 20-40 | Mild dovish pressure | Light Green |
+| Neutral | 40-60 | Balanced | Amber |
+| Warm | 60-80 | Mild hawkish pressure | Light Red |
+| Hot | 80-100 | Strong hawkish pressure | Red |
 
-**Example:**
+### Polarity
+
+All currently tracked indicators have **positive polarity** (higher = more hawkish) because normalizations orient them that way. System supports configurable polarity for future indicators:
+
 ```python
-import pandas as pd
-
-# Source: https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.rolling.html
-def calculate_rolling_robust_stats(df, window_years=10, min_years=5):
-    """
-    Calculate rolling median and IQR with fallback for insufficient data.
-
-    Args:
-        df: DataFrame with DatetimeIndex
-        window_years: Target window size (default 10 years)
-        min_years: Minimum years required for calculation (default 5)
-
-    Returns:
-        DataFrame with rolling_median and rolling_iqr columns
-    """
-    # Convert years to observation count (assuming quarterly data)
-    window_size = window_years * 4
-    min_periods = min_years * 4
-
-    # Rolling median
-    df['rolling_median'] = df['normalized_value'].rolling(
-        window=window_size,
-        min_periods=min_periods,
-        center=False  # Don't look ahead
-    ).median()
-
-    # Rolling IQR using quantile
-    df['rolling_q25'] = df['normalized_value'].rolling(
-        window=window_size,
-        min_periods=min_periods
-    ).quantile(0.25)
-
-    df['rolling_q75'] = df['normalized_value'].rolling(
-        window=window_size,
-        min_periods=min_periods
-    ).quantile(0.75)
-
-    df['rolling_iqr'] = df['rolling_q75'] - df['rolling_q25']
-
-    return df
-
-# Edge case handling
-# - First 5 years: NaN (insufficient data)
-# - Years 5-10: Calculate with available data (5-9 years)
-# - After 10 years: Full 10-year window
+oriented_z = z_score * polarity  # polarity is +1 or -1
 ```
 
-**Warning:** Default min_periods for fixed windows equals window size, causing NaN for early observations. Always set min_periods explicitly.
-
-### Pattern 3: Z-Score to Gauge Mapping with Clipping
-**What:** Linear mapping from Z-score space (-2 to +2) to gauge space (0 to 100) with boundary clipping.
-
-**When to use:** Converting normalized statistics to user-facing gauge values.
-
-**Example:**
-```python
-import numpy as np
-
-def zscore_to_gauge(zscore, z_min=-2.0, z_max=2.0, clip=True):
-    """
-    Map Z-score to 0-100 gauge scale.
-
-    Formula: gauge = ((zscore - z_min) / (z_max - z_min)) * 100
-
-    Args:
-        zscore: Robust Z-score value
-        z_min: Z-score mapping to 0 (default -2.0)
-        z_max: Z-score mapping to 100 (default +2.0)
-        clip: Clip values outside [0, 100] (default True)
-
-    Returns:
-        Gauge value [0, 100]
-    """
-    gauge = ((zscore - z_min) / (z_max - z_min)) * 100
-
-    if clip:
-        gauge = np.clip(gauge, 0, 100)
-
-    return gauge
-
-def classify_zone(gauge):
-    """
-    Classify gauge into 5 zones.
-
-    Zones:
-    - Cold: 0-20 (Z < -1.5) - Recessionary
-    - Cool: 20-40 (Z -1.5 to -0.5) - Below average
-    - Neutral: 40-60 (Z -0.5 to +0.5) - Average
-    - Warm: 60-80 (Z +0.5 to +1.5) - Above average
-    - Hot: 80-100 (Z > +1.5) - Overheating
-    """
-    if gauge < 20:
-        return "Cold"
-    elif gauge < 40:
-        return "Cool"
-    elif gauge < 60:
-        return "Neutral"
-    elif gauge < 80:
-        return "Warm"
-    else:
-        return "Hot"
-
-# Example
-zscores = [-2.5, -1.5, 0, 1.5, 2.5]
-for z in zscores:
-    gauge = zscore_to_gauge(z)
-    zone = classify_zone(gauge)
-    print(f"Z={z:.1f} -> Gauge={gauge:.0f} -> Zone={zone}")
-
-# Output:
-# Z=-2.5 -> Gauge=0 -> Zone=Cold (clipped)
-# Z=-1.5 -> Gauge=13 -> Zone=Cold
-# Z=0.0 -> Gauge=50 -> Zone=Neutral
-# Z=1.5 -> Gauge=88 -> Zone=Hot
-# Z=2.5 -> Gauge=100 -> Zone=Hot (clipped)
-```
-
-### Pattern 4: Validated Configuration Loading
-**What:** Use Pydantic to validate weights.json and prevent runtime errors from malformed config.
-
-**When to use:** Loading any user-editable configuration files.
-
-**Example:**
-```python
-from pydantic import BaseModel, Field, field_validator
-from typing import Dict
-import json
-
-# Source: https://docs.pydantic.dev/latest/concepts/dataclasses/
-class GaugeWeights(BaseModel):
-    """Validated schema for weights.json"""
-    housing: float = Field(gt=0, le=1, description="Housing pressure weight")
-    jobs: float = Field(gt=0, le=1, description="Job market weight")
-    spending: float = Field(gt=0, le=1, description="Spending weight")
-    capacity: float = Field(gt=0, le=1, description="Capacity utilisation weight")
-    inflation: float = Field(gt=0, le=1, description="Inflation weight")
-    wages: float = Field(gt=0, le=1, description="Wage growth weight")
-
-    @field_validator('housing', 'jobs', 'spending', 'capacity', 'inflation', 'wages')
-    @classmethod
-    def check_positive(cls, v):
-        """All weights must be positive"""
-        if v <= 0:
-            raise ValueError("Weight must be positive")
-        return v
-
-    def validate_sum(self) -> None:
-        """Ensure weights sum to 1.0 (called after initialization)"""
-        total = sum([
-            self.housing, self.jobs, self.spending,
-            self.capacity, self.inflation, self.wages
-        ])
-        if not (0.99 <= total <= 1.01):  # Allow floating point tolerance
-            raise ValueError(f"Weights must sum to 1.0, got {total:.4f}")
-
-def load_weights(filepath: str) -> GaugeWeights:
-    """Load and validate weights.json"""
-    with open(filepath, 'r') as f:
-        data = json.load(f)
-
-    weights = GaugeWeights(**data)
-    weights.validate_sum()
-    return weights
-
-# Example weights.json:
-# {
-#   "housing": 0.20,
-#   "jobs": 0.15,
-#   "spending": 0.15,
-#   "capacity": 0.15,
-#   "inflation": 0.20,
-#   "wages": 0.15
-# }
-```
-
-### Pattern 5: Status.json Output with Rich Metadata
-**What:** Generate status.json with type-safe schema including raw values, Z-scores, timestamps, and sparkline data.
-
-**When to use:** Creating the final output contract for frontend consumption.
-
-**Example:**
-```python
-from pydantic import BaseModel, Field
-from typing import List, Optional
-from datetime import datetime
-from enum import Enum
-
-class ZoneEnum(str, Enum):
-    COLD = "Cold"
-    COOL = "Cool"
-    NEUTRAL = "Neutral"
-    WARM = "Warm"
-    HOT = "Hot"
-
-class DataPoint(BaseModel):
-    """Historical data point for sparklines"""
-    timestamp: datetime
-    value: float
-
-class GaugeMetadata(BaseModel):
-    """Individual gauge with full metadata"""
-    id: str
-    label: str
-    value: float = Field(ge=0, le=100, description="Gauge value [0-100]")
-    zone: ZoneEnum
-
-    # Raw data and statistics
-    raw_value: float
-    normalized_value: float
-    zscore: float
-
-    # Data quality
-    data_timestamp: datetime
-    is_stale: bool = False
-    confidence: str = Field(pattern="^(HIGH|MEDIUM|LOW)$")
-
-    # Recent history for sparklines
-    history: List[DataPoint] = Field(max_length=12, description="Last 12 data points")
-
-class StatusOutput(BaseModel):
-    """Complete status.json schema"""
-    last_updated: datetime
-    overall_hawk_score: float = Field(ge=0, le=100)
-    verdict: str
-
-    gauges: List[GaugeMetadata]
-    weights: Dict[str, float]
-
-    # Metadata
-    data_quality_summary: Dict[str, int] = Field(
-        description="Count of HIGH/MEDIUM/LOW confidence gauges"
-    )
-    staleness_flags: List[str] = Field(
-        description="List of gauge IDs with stale data"
-    )
-
-def generate_status_json(gauges_data: Dict, weights: GaugeWeights) -> str:
-    """Generate validated status.json"""
-    # Build status object
-    status = StatusOutput(
-        last_updated=datetime.now(),
-        overall_hawk_score=calculate_weighted_score(gauges_data, weights),
-        verdict=generate_verdict(calculate_weighted_score(gauges_data, weights)),
-        gauges=[build_gauge_metadata(g) for g in gauges_data],
-        weights=weights.model_dump(),
-        data_quality_summary=count_confidence_levels(gauges_data),
-        staleness_flags=identify_stale_gauges(gauges_data)
-    )
-
-    # Serialize to JSON with validation
-    return status.model_dump_json(indent=2)
-```
-
-### Anti-Patterns to Avoid
-
-- **Hand-rolling statistical functions:** Don't implement your own median/IQR/MAD—scipy provides optimized, tested implementations
-- **Ignoring min_periods:** Default behavior causes unexpected NaN values at time series start
-- **Unvalidated JSON output:** Manual dict construction leads to typos and field mismatches—use Pydantic
-- **Mixing mean and median:** Don't calculate median in rolling window but use mean for Z-score—stay consistent with robust statistics
-- **Hardcoded constants:** Weights, zone thresholds, and Z-score bounds should be configurable, not magic numbers in code
-
-## Don't Hand-Roll
-
-Problems that look simple but have existing solutions:
-
-| Problem | Don't Build | Use Instead | Why |
-|---------|-------------|-------------|-----|
-| Median Absolute Deviation | Custom loop calculating median of absolute deviations | `scipy.stats.median_abs_deviation(data, scale='normal')` | Handles edge cases (all same values, empty arrays), applies correct scaling factor |
-| Interquartile Range | `np.percentile(data, 75) - np.percentile(data, 25)` | `scipy.stats.iqr(data, nan_policy='omit')` | Configurable NaN handling, multiple interpolation methods, consistent API |
-| Rolling statistics | For loop with sliding window | `pandas.DataFrame.rolling(window, min_periods).median()` | Vectorized, handles time-based windows, built-in NaN handling |
-| JSON schema validation | Manual isinstance() checks | Pydantic BaseModel | Automatic type coercion, detailed error messages, JSON Schema generation |
-| Configuration loading | json.load() with try/except | Pydantic model with validators | Validates structure at load time, not at usage time—fail fast |
-| Outlier detection | Z-score > 3 with mean/std | Modified Z-score with MAD or IQR method | Outliers don't inflate the detection metric itself |
-
-**Key insight:** Statistical functions have dozens of edge cases (empty arrays, all NaN, all same value, infinite values). Library implementations handle these—custom code doesn't, leading to production crashes on unusual data.
-
-## Common Pitfalls
-
-### Pitfall 1: Using Standard Z-Score on Outlier-Heavy Data
-**What goes wrong:** Traditional Z-score (x - mean) / std underestimates outlier severity because outliers inflate std. COVID data points appear less extreme than they actually are.
-
-**Why it happens:** Most tutorials teach mean/std Z-scores because they're simpler to explain, not because they're robust.
-
-**How to avoid:** Use Median Absolute Deviation (MAD) method: `zscore = (x - median) / MAD * 1.4826`. The 1.4826 scale factor makes MAD comparable to standard deviation for normal distributions.
-
-**Warning signs:** Z-scores for COVID period are suspiciously close to normal observations (<3 std), weights toward extreme values feel arbitrary.
-
-**Verification:** Calculate both traditional and robust Z-scores—if they differ significantly, data has outliers.
-
-### Pitfall 2: Forgetting min_periods on Rolling Windows
-**What goes wrong:** First N observations return NaN when you expect calculated values. For 10-year window, first 10 years are blank.
-
-**Why it happens:** pandas rolling defaults to `min_periods=window` for integer windows, meaning it requires the full window before calculating. This is conservative but frustrating for early time series.
-
-**How to avoid:** Always set `min_periods` explicitly: `.rolling(window=40, min_periods=20)` calculates with at least 20 observations (5 years for quarterly data).
-
-**Warning signs:** Early time series values are NaN, dashboard shows "No data" for recent gauges despite having 7 years of history.
-
-**Decision point:** User has discretion over min_periods threshold. Recommendation: `min_periods = window // 2` (50% of target window) balances early data availability with statistical reliability.
-
-### Pitfall 3: Division by Zero in Z-Score Calculation
-**What goes wrong:** When all values in the rolling window are identical (e.g., interest rate held constant for years), std or MAD equals zero, causing division by zero and NaN/inf propagation.
-
-**Why it happens:** Real economic data sometimes has long plateaus. Statistical formulas assume variability.
-
-**How to avoid:** Check for zero dispersion before division:
-```python
-if mad == 0 or np.isnan(mad):
-    return 0.0  # No variability = no deviation from median
-```
-
-**Warning signs:** Inf or -Inf values in Z-scores, NaN in gauge output despite valid raw data.
-
-**Alternative handling:** Return Z-score of 0 (neutral) when dispersion is zero—current value equals the median by definition.
-
-### Pitfall 4: Naive Linear Mapping Without Clipping
-**What goes wrong:** Z-scores beyond [-2, +2] map to gauges outside [0, 100], breaking frontend gauge rendering or causing validation errors.
-
-**Why it happens:** Black swan events (COVID) produce Z-scores of ±5 or higher. Linear formula `gauge = (z + 2) * 25` produces gauge=175 for Z=5.
-
-**How to avoid:** Always clip mapped values: `np.clip(gauge, 0, 100)`.
-
-**Warning signs:** Frontend gauges show >100, status.json validation fails with "value must be <= 100".
-
-**User decision:** User wants to "flag extreme values (>3 IQR) but let them through"—implement as separate is_extreme flag in metadata, don't let it break gauge bounds.
-
-### Pitfall 5: Unvalidated status.json Schema Changes
-**What goes wrong:** Backend adds a new field or renames a key, frontend continues requesting the old field, dashboard breaks silently (shows blank/undefined).
-
-**Why it happens:** JSON has no compile-time type checking. Schema drift between backend and frontend is invisible until runtime.
-
-**How to avoid:** Define status.json schema as Pydantic model. Generate JSON Schema file from Pydantic model, version it, and share with frontend. Frontend validates against schema on load.
-
-**Warning signs:** Frontend errors like "Cannot read property 'value' of undefined", missing gauge data on dashboard despite successful backend run.
-
-**Best practice:** Use schema versioning in status.json (`"schema_version": "1.0.0"`) and validate backward compatibility on changes.
-
-### Pitfall 6: Floating Point Comparison for Weight Validation
-**What goes wrong:** Weights are [0.20, 0.15, 0.15, 0.15, 0.20, 0.15], sum is 1.0000000000000002 due to floating point error, validation fails with "weights must sum to 1.0".
-
-**Why it happens:** Binary floating point cannot represent 0.15 exactly, accumulation errors.
-
-**How to avoid:** Use tolerance in validation: `0.99 <= total <= 1.01` instead of `total == 1.0`.
-
-**Warning signs:** Validation fails on weights that "obviously" sum to 1.0, error messages show values like 0.9999999999999999.
-
-### Pitfall 7: Incorrect Confidence Level Calculation
-**What goes wrong:** User has discretion over "confidence level calculation methodology" but no clear definition leads to inconsistent implementation (mixing data age, source reliability, statistical significance).
-
-**Why it happens:** "Confidence" is overloaded—can mean statistical confidence interval, data freshness, or source trustworthiness.
-
-**How to avoid:** Define explicit confidence rules:
-- HIGH: Data <7 days old, official source (ABS/RBA), full 10-year window available
-- MEDIUM: Data <30 days old, reputable source (CoreLogic), 5-10 years window available
-- LOW: Data >30 days old, scraped source unstable, <5 years window available
-
-**Warning signs:** Confidence levels are inconsistent across gauges, unclear why one gauge is MEDIUM vs HIGH.
-
-**Recommendation:** Document confidence calculation in code comments and expose it in status.json metadata for transparency.
-
-## Code Examples
-
-Verified patterns from official sources:
-
-### Rolling Median and IQR with Edge Case Handling
-```python
-import pandas as pd
-import numpy as np
-from scipy import stats
-
-# Source: https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.rolling.html
-# Source: https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.iqr.html
-
-def calculate_rolling_robust_window(df, value_col, window_years=10, min_years=5):
-    """
-    Calculate rolling median and IQR for robust statistics.
-
-    Handles edge cases:
-    - Insufficient data at start (<min_years): Returns NaN
-    - Partial window (5-10 years): Calculates with available data
-    - Full window (>=10 years): Uses full 10-year lookback
-
-    Args:
-        df: DataFrame with DatetimeIndex and value column
-        value_col: Name of column containing values to analyze
-        window_years: Target window size in years
-        min_years: Minimum years required for calculation
-
-    Returns:
-        DataFrame with rolling_median, rolling_iqr columns
-    """
-    # Assuming quarterly data (4 observations per year)
-    window_size = window_years * 4
-    min_periods = min_years * 4
-
-    # Calculate rolling median
-    df['rolling_median'] = df[value_col].rolling(
-        window=window_size,
-        min_periods=min_periods,
-        center=False  # Don't look into future
-    ).median()
-
-    # Calculate rolling IQR using apply with scipy.stats.iqr
-    df['rolling_iqr'] = df[value_col].rolling(
-        window=window_size,
-        min_periods=min_periods,
-        center=False
-    ).apply(lambda x: stats.iqr(x, nan_policy='omit'), raw=False)
-
-    return df
-
-# Example usage
-dates = pd.date_range('2010-01-01', periods=60, freq='Q')
-data = pd.DataFrame({
-    'timestamp': dates,
-    'housing_ratio': np.random.randn(60) * 0.5 + 5.0
-})
-data.set_index('timestamp', inplace=True)
-
-result = calculate_rolling_robust_window(data, 'housing_ratio', window_years=10, min_years=5)
-
-print(result[['housing_ratio', 'rolling_median', 'rolling_iqr']].head(25))
-# First 20 rows (5 years): NaN
-# Rows 21-40 (years 5-10): Calculated with partial window
-# Rows 41+ (10+ years): Calculated with full 10-year window
-```
-
-### Robust Z-Score with MAD
-```python
-import numpy as np
-from scipy import stats
-
-# Source: https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.median_abs_deviation.html
-
-def calculate_robust_zscore(current_value, historical_data):
-    """
-    Calculate robust Z-score using Median Absolute Deviation.
-
-    More resistant to outliers than traditional (mean, std) Z-score.
-
-    Args:
-        current_value: Current observation to score
-        historical_data: Array of historical values for comparison
-
-    Returns:
-        Robust Z-score (float)
-    """
-    median = np.median(historical_data)
-
-    # scale='normal' applies 1.4826 scaling for consistency with std
-    mad = stats.median_abs_deviation(historical_data, scale='normal')
-
-    # Handle edge case: no variability in data
-    if mad == 0 or np.isnan(mad):
-        return 0.0  # Current value = median, no deviation
-
-    robust_z = (current_value - median) / mad
-    return robust_z
-
-# Example: Calculate Z-score for latest housing ratio
-historical = np.array([4.5, 4.7, 4.6, 4.8, 5.0, 4.9, 5.1, 25.0])  # 25.0 is COVID outlier
-current = 5.2
-
-traditional_z = (current - np.mean(historical)) / np.std(historical)
-robust_z = calculate_robust_zscore(current, historical)
-
-print(f"Traditional Z-score: {traditional_z:.2f}")  # Distorted by outlier
-print(f"Robust Z-score: {robust_z:.2f}")            # Correctly identifies current as near median
-```
-
-### Complete Gauge Calculation Pipeline
-```python
-import pandas as pd
-import numpy as np
-from scipy import stats
-from datetime import datetime, timedelta
-
-def calculate_gauge_value(df, metric_col, window_years=10, min_years=5):
-    """
-    Complete pipeline: rolling stats -> robust Z-score -> gauge mapping.
-
-    Args:
-        df: DataFrame with DatetimeIndex and metric column
-        metric_col: Column name containing normalized metric values
-        window_years: Rolling window size in years
-        min_years: Minimum years for calculation
-
-    Returns:
-        DataFrame with gauge_value (0-100) and zone classification
-    """
-    # Step 1: Calculate rolling median and MAD
-    window_size = window_years * 4  # Quarterly data
-    min_periods = min_years * 4
-
-    df['rolling_median'] = df[metric_col].rolling(
-        window=window_size,
-        min_periods=min_periods
-    ).median()
-
-    # MAD via rolling apply
-    df['rolling_mad'] = df[metric_col].rolling(
-        window=window_size,
-        min_periods=min_periods
-    ).apply(lambda x: stats.median_abs_deviation(x, scale='normal'), raw=False)
-
-    # Step 2: Calculate robust Z-score
-    df['zscore'] = (df[metric_col] - df['rolling_median']) / df['rolling_mad']
-
-    # Handle division by zero (no variability)
-    df['zscore'] = df['zscore'].fillna(0.0)
-    df['zscore'] = df['zscore'].replace([np.inf, -np.inf], 0.0)
-
-    # Step 3: Map Z-score to gauge (0-100) with clipping
-    # Linear mapping: Z=-2 -> 0, Z=+2 -> 100
-    df['gauge_value'] = ((df['zscore'] + 2.0) / 4.0) * 100
-    df['gauge_value'] = df['gauge_value'].clip(0, 100)
-
-    # Step 4: Classify into zones
-    df['zone'] = pd.cut(
-        df['gauge_value'],
-        bins=[0, 20, 40, 60, 80, 100],
-        labels=['Cold', 'Cool', 'Neutral', 'Warm', 'Hot'],
-        include_lowest=True
-    )
-
-    return df
-
-# Example usage
-dates = pd.date_range('2005-01-01', periods=80, freq='Q')
-data = pd.DataFrame({
-    'timestamp': dates,
-    'housing_ratio': np.random.randn(80) * 0.3 + 5.0
-})
-data.set_index('timestamp', inplace=True)
-
-# Add COVID outlier
-data.loc['2020-06-01':'2021-06-01', 'housing_ratio'] *= 1.5
-
-result = calculate_gauge_value(data, 'housing_ratio')
-
-# Show recent results
-print(result[['housing_ratio', 'zscore', 'gauge_value', 'zone']].tail(10))
-```
-
-### Flag Extreme Values Without Clipping
-```python
-def flag_extreme_values(df, zscore_col='zscore', iqr_threshold=3.0):
-    """
-    Flag extreme values (>3 IQR from median) for manual review.
-
-    Per user decision: Don't clip extreme values, but flag them.
-
-    Args:
-        df: DataFrame with zscore column
-        zscore_col: Name of Z-score column
-        iqr_threshold: Threshold in IQR units for "extreme"
-
-    Returns:
-        DataFrame with is_extreme flag
-    """
-    # Calculate IQR of Z-scores themselves
-    q25 = df[zscore_col].quantile(0.25)
-    q75 = df[zscore_col].quantile(0.75)
-    iqr = q75 - q25
-
-    # Flag values beyond median ± (3 * IQR)
-    median_z = df[zscore_col].median()
-    lower_bound = median_z - (iqr_threshold * iqr)
-    upper_bound = median_z + (iqr_threshold * iqr)
-
-    df['is_extreme'] = (df[zscore_col] < lower_bound) | (df[zscore_col] > upper_bound)
-
-    return df
-
-# Example
-result_with_flags = flag_extreme_values(result)
-
-# List extreme periods for review
-extreme_periods = result_with_flags[result_with_flags['is_extreme']]
-print(f"Found {len(extreme_periods)} extreme periods:")
-print(extreme_periods[['housing_ratio', 'zscore', 'gauge_value']])
-```
-
-### Validated Status.json Generation
-```python
-from pydantic import BaseModel, Field
-from typing import List, Dict
-from datetime import datetime
-import json
-
-class GaugeOutput(BaseModel):
-    id: str
-    label: str
-    value: float = Field(ge=0, le=100)
-    zone: str = Field(pattern="^(Cold|Cool|Neutral|Warm|Hot)$")
-    raw_value: float
-    normalized_value: float
-    zscore: float
-    data_timestamp: datetime
-    is_stale: bool
-    is_extreme: bool
-    confidence: str = Field(pattern="^(HIGH|MEDIUM|LOW)$")
-
-class StatusJson(BaseModel):
-    last_updated: datetime
-    overall_hawk_score: float = Field(ge=0, le=100)
-    verdict: str
-    gauges: List[GaugeOutput]
-    weights: Dict[str, float]
-
-def generate_status_output(gauges_data: List[Dict], weights: Dict[str, float]) -> str:
-    """Generate validated status.json"""
-
-    # Calculate weighted overall score
-    overall_score = sum(
-        g['gauge_value'] * weights[g['id']]
-        for g in gauges_data
-    )
-
-    # Generate verdict
-    if overall_score < 30:
-        verdict = "DOVISH - Variable Rate Safe"
-    elif overall_score < 60:
-        verdict = "NEUTRAL - Monitor Closely"
-    else:
-        verdict = "HAWKISH - Consider Fixed Rate"
-
-    # Build validated status object
-    status = StatusJson(
-        last_updated=datetime.now(),
-        overall_hawk_score=overall_score,
-        verdict=verdict,
-        gauges=[GaugeOutput(**g) for g in gauges_data],
-        weights=weights
-    )
-
-    # Serialize with validation
-    return status.model_dump_json(indent=2)
-
-# Example usage
-gauges = [
-    {
-        'id': 'housing',
-        'label': 'Housing Pressure',
-        'value': 75.0,
-        'zone': 'Warm',
-        'raw_value': 650000,
-        'normalized_value': 5.2,
-        'zscore': 1.25,
-        'data_timestamp': datetime(2026, 2, 1),
-        'is_stale': False,
-        'is_extreme': False,
-        'confidence': 'HIGH'
-    }
-    # ... more gauges
-]
-
-weights = {
-    'housing': 0.20,
-    'jobs': 0.15,
-    'spending': 0.15,
-    'capacity': 0.15,
-    'inflation': 0.20,
-    'wages': 0.15
+---
+
+## 4. Weights Configuration
+
+### Expert-Judgment Weights (weights.json)
+
+Based on RBA dual mandate analysis from rba-decision-drivers.md:
+
+```json
+{
+  "inflation": { "weight": 0.25, "polarity": 1, "label": "Inflation (CPI)" },
+  "wages": { "weight": 0.15, "polarity": 1, "label": "Wages (WPI)" },
+  "employment": { "weight": 0.15, "polarity": 1, "label": "Employment" },
+  "housing": { "weight": 0.15, "polarity": 1, "label": "Housing" },
+  "spending": { "weight": 0.10, "polarity": 1, "label": "Retail Trade" },
+  "building_approvals": { "weight": 0.05, "polarity": 1, "label": "Building Approvals" },
+  "business_confidence": { "weight": 0.05, "polarity": 1, "label": "Business Confidence" },
+  "asx_futures": { "weight": 0.10, "polarity": 1, "label": "ASX Futures" }
 }
-
-status_json = generate_status_output(gauges, weights)
-print(status_json)
 ```
 
-## State of the Art
+**Rationale:** Inflation (0.25) as primary mandate. Employment and wages (0.15 each) as dual mandate. Housing (0.15) for financial stability. ASX futures (0.10) forward-looking. Spending (0.10) demand pressure. Building approvals and business confidence (0.05 each) are noisy but useful.
 
-| Old Approach | Current Approach | When Changed | Impact |
-|--------------|------------------|--------------|--------|
-| Mean/StdDev Z-score | Median/MAD robust Z-score | 2020+ (post-COVID) | Handles black swan events without manual data cleaning |
-| Manual JSON dict building | Pydantic schema validation | 2023+ (Pydantic 2.0) | Type-safe contracts, auto-generated docs |
-| pandas 1.x with NumPy 1.x | pandas 3.0 with NumPy 2.x | January 2026 | Better performance, stricter typing, copy-on-write semantics |
-| Custom rolling loops | pandas.rolling() with min_periods | 2015+ | Vectorized, handles edge cases, time-based windows |
+**Validation rule:** Weights must sum to 1.0 (with floating-point tolerance: 0.99-1.01).
 
-**Deprecated/outdated:**
-- **Traditional Z-score for outlier-heavy data**: Use MAD-based robust Z-score instead (scipy.stats.median_abs_deviation)
-- **pandas 2.x DataFrame.append()**: Deprecated in pandas 2.0, use pd.concat() or direct assignment
-- **numpy.matrix**: Deprecated, use np.ndarray everywhere
-- **Manual percentile calculation**: Use scipy.stats.iqr() instead of np.percentile(75) - np.percentile(25)
+**Key decision from rba-decision-drivers.md:** ASX futures serve as a **benchmark displayed separately**, not as an input to the hawk score. This means the hawk score is derived from fundamental indicators only, and futures provide an independent market-based comparison. However, the weights.json includes it for now -- the engine can easily exclude it from the weighted calculation while still computing its gauge value.
 
-## Open Questions
+---
 
-Things that couldn't be fully resolved:
+## 5. Technology Stack
 
-1. **Minimum Data Requirement for Confidence Levels**
-   - What we know: User has discretion over confidence calculation methodology. pandas min_periods allows calculation with <10 years.
-   - What's unclear: Exact threshold for HIGH vs MEDIUM confidence based on window coverage. Is 7 years (70% coverage) enough for HIGH?
-   - Recommendation: Start with 8+ years = HIGH, 5-8 years = MEDIUM, <5 years = LOW. Monitor gauge stability and adjust thresholds if early estimates prove unreliable.
+### Dependencies
 
-2. **Handling Constant Values in Rolling Window**
-   - What we know: When all values in window are identical (MAD=0), Z-score calculation divides by zero.
-   - What's unclear: Should this return Z=0 (no deviation) or NaN (undefined)?
-   - Recommendation: Return Z=0.0 with is_extreme=False. Rationale: If metric is stable for 10 years and current value equals historical, it's definitionally "normal" (neutral).
+| Library | Purpose | Status |
+|---------|---------|--------|
+| pandas | Rolling windows, DataFrame ops, CSV I/O | Already in requirements.txt |
+| numpy | MAD calculation, numerical operations | **Add to requirements.txt** |
 
-3. **IQR vs MAD for Robust Z-Score**
-   - What we know: User decided on "Median/IQR instead of Mean/StdDev". Research shows MAD is more standard for robust Z-scores.
-   - What's unclear: Does user want IQR-based normalization or MAD-based? They're related but use different scale factors.
-   - Recommendation: Use MAD (scipy.stats.median_abs_deviation with scale='normal') for Z-score calculation. It's the statistical standard for robust Z-scores and directly comparable to traditional std. Document this choice clearly.
+**No scipy needed.** The MAD calculation is simple enough with numpy: `np.median(np.abs(x - np.median(x))) * 1.4826`. This avoids adding a heavy dependency for one function.
 
-4. **Zone Threshold Justification**
-   - What we know: User defined 5 zones with specific Z-score boundaries (Cold: Z<-1.5, Hot: Z>1.5).
-   - What's unclear: Statistical basis for these exact thresholds. In normal distribution, Z=±1.5 is ~87th percentile—is this the right definition of "extreme"?
-   - Recommendation: Document that thresholds are heuristic, not statistically derived. Consider backtesting against historical RBA decisions to validate if "Hot" zone (Z>1.5) correlates with actual rate hikes.
+**No pydantic needed for MVP.** While the original 03-RESEARCH.md recommended pydantic for status.json validation, the project's "avoid over-engineering" constraint suggests using simple dict construction with manual validation. The status.json schema is stable and small enough that pydantic adds unnecessary complexity.
 
-5. **Sparkline Data Selection**
-   - What we know: User wants "last 12 data points in status.json for sparklines".
-   - What's unclear: 12 most recent raw values, or 12 evenly spaced over 10-year window? Should sparkline show gauge values (0-100) or normalized values?
-   - Recommendation: Use 12 most recent quarters (3 years) of gauge values (0-100). Provides recent trend without overwhelming frontend. If quarterly data, that's recent 3 years. Document this decision.
+---
 
-## Sources
+## 6. Module Structure
 
-### Primary (HIGH confidence)
-- [scipy.stats.iqr Official Documentation](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.iqr.html) - IQR calculation, parameters, edge cases
-- [scipy.stats.median_abs_deviation Official Documentation](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.median_abs_deviation.html) - MAD calculation for robust statistics
-- [pandas.DataFrame.rolling Official Documentation](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.rolling.html) - Rolling window parameters
-- [pandas Windowing Operations User Guide](https://pandas.pydata.org/docs/user_guide/window.html) - Best practices for rolling windows
-- [Pydantic Serialization Documentation](https://docs.pydantic.dev/latest/concepts/serialization/) - JSON schema generation and validation
-- [Pydantic Dataclasses Documentation](https://docs.pydantic.dev/latest/concepts/dataclasses/) - Type-safe dataclass validation
+The normalization engine integrates into the existing pipeline:
 
-### Secondary (MEDIUM confidence)
-- [NumPy/pandas/SciPy Version Support Timeline (SPEC 0)](https://scientific-python.org/specs/spec-0000/) - Version compatibility through 2026
-- [Medium: Modified Z-Score for Outlier Detection](https://medium.com/@pelletierhaden/modified-z-score-a-robust-and-efficient-way-to-detect-outliers-in-python-b8b1bdf02593) - MAD-based robust Z-score explanation
-- [GeeksforGeeks: IQR Method for Outlier Detection](https://www.geeksforgeeks.org/machine-learning/interquartile-range-to-detect-outliers-in-data/) - IQR calculation patterns
-- [Data Pipeline Architecture Patterns (Dagster)](https://dagster.io/guides/data-pipeline/data-pipeline-architecture-5-design-patterns-with-examples) - ETL architecture best practices 2026
-- [Configu: Python Configuration Best Practices 2026](https://configu.com/blog/working-with-python-configuration-files-tutorial-best-practices/) - Configuration file validation patterns
-- [Integrate.io: ETL Error Handling 2026 Statistics](https://www.integrate.io/blog/etl-error-handling-and-monitoring-metrics/) - Error detection and monitoring trends
+```
+pipeline/
+  normalize/
+    __init__.py
+    ratios.py        # Raw CSV -> normalized ratios (YoY %, etc.)
+    zscore.py        # Rolling window robust Z-score computation
+    gauge.py         # Z-score -> 0-100 mapping, zone classification
+    engine.py        # Orchestrator: reads CSVs, computes all gauges, outputs status.json
+  config.py          # Add INDICATOR_CONFIG dict mapping indicators to CSV files + params
+data/
+  weights.json       # Expert-judgment weights (configurable)
+public/
+  data/
+    status.json      # Output: rich contract for frontend (Phase 4)
+```
 
-### Tertiary (LOW confidence - require validation)
-- Multiple Medium articles on pandas rolling windows - general guidance but not authoritative
-- Stack Overflow discussions on Z-score edge cases - community knowledge, not official
-- Various blog posts on robust statistics - useful patterns but not peer-reviewed
+### Pipeline Flow
 
-## Metadata
+```
+data/*.csv --> ratios.py (normalize) --> zscore.py (rolling stats) --> gauge.py (map) --> engine.py --> public/data/status.json
+```
 
-**Confidence breakdown:**
-- Standard stack: HIGH - All libraries verified through official documentation and version support pages
-- Architecture: HIGH - Patterns based on official pandas/scipy docs and established data engineering practices
-- Pitfalls: HIGH - Edge cases verified through official documentation (min_periods, NaN handling, division by zero)
-- Code examples: HIGH - All examples use official library APIs with links to source documentation
-- Open questions: MEDIUM - Legitimate ambiguities in user decisions that require clarification during planning
+### Integration with pipeline/main.py
 
-**Research date:** 2026-02-04
-**Valid until:** 2026-05-04 (90 days - stable domain with mature libraries)
+After ingestors complete, the orchestrator calls the normalization engine:
+```python
+# In pipeline/main.py, after Phase 2 (optional sources):
+from pipeline.normalize.engine import generate_status
+generate_status()
+```
 
-**Notes:**
-- NumPy 2.x and pandas 3.0 were released recently (January 2026) but are backward compatible for the operations needed in this phase
-- Robust statistics (MAD, IQR) are well-established methods—not cutting edge
-- Pydantic 2.x is stable and widely adopted for data validation
-- Primary risk is user clarification on IQR vs MAD for Z-score calculation—both are valid, but MAD is more standard for robust Z-scores
+---
+
+## 7. status.json Contract
+
+```json
+{
+  "generated_at": "2026-02-06T10:30:00Z",
+  "pipeline_version": "1.0.0",
+  "overall": {
+    "hawk_score": 67.3,
+    "zone": "warm",
+    "zone_label": "Mild hawkish pressure",
+    "verdict": "Economic indicators suggest moderate tightening pressure",
+    "confidence": "HIGH"
+  },
+  "gauges": {
+    "inflation": {
+      "value": 78.2,
+      "zone": "warm",
+      "z_score": 1.69,
+      "raw_value": 3.7,
+      "raw_unit": "% YoY",
+      "weight": 0.25,
+      "polarity": 1,
+      "data_date": "2025-12-01",
+      "staleness_days": 67,
+      "confidence": "HIGH",
+      "interpretation": "Inflation above long-run average",
+      "history": [62.1, 65.3, 68.9, 71.2, 73.5, 74.8, 76.1, 77.0, 77.5, 77.9, 78.0, 78.2]
+    }
+  },
+  "weights": {
+    "inflation": 0.25,
+    "wages": 0.15
+  },
+  "metadata": {
+    "window_years": 10,
+    "clamp_range": [-3, 3],
+    "mapping": "linear",
+    "statistics": "robust (median/MAD)",
+    "indicators_available": 6,
+    "indicators_missing": ["housing", "business_confidence"]
+  }
+}
+```
+
+Key features:
+- **Per-gauge history array** (last 12 quarterly values) for sparklines
+- **Staleness tracking** via `data_date` and `staleness_days`
+- **Missing indicator handling** via `metadata.indicators_missing`
+- **Transparency** via `weights` and `metadata` sections
+
+---
+
+## 8. Risks & Mitigations
+
+| Risk | Severity | Mitigation |
+|------|----------|------------|
+| Employment CSV has mixed series (values 5 to 146) | HIGH | Filter for consistent series_id; validate data ranges |
+| Only ~5 years of employment data (2020+) | MEDIUM | Use 5-year window with LOW confidence flag |
+| Building approvals starts with zeros (2014) | MEDIUM | Filter out zero rows before computing stats |
+| CoreLogic/NAB scrapers are stubs | HIGH | Engine skips missing indicators, reports in metadata |
+| CPI is quarterly, others monthly | LOW | Standardize all to quarterly before Z-scoring |
+| Retail trade has mixed nominal values | MEDIUM | Use YoY % change which eliminates nominal dependency |
+| Weights are subjective | LOW | Documented rationale, configurable via JSON, backtestable |
+
+---
+
+## 9. Resolved Open Questions
+
+| Question | Resolution |
+|----------|------------|
+| IQR vs MAD for Z-score? | **MAD** -- standard for robust Z-scores; IQR mentioned in 03-CONTEXT.md was informal; MAD with 1.4826 scaling is the statistical norm |
+| Clamp range [-2,+2] or wider? | **[-3,+3]** -- reduces clipping from 4.6% to 0.3% of observations |
+| scipy dependency? | **No** -- numpy-only MAD calculation is sufficient |
+| pydantic for validation? | **No** -- manual validation keeps dependencies minimal for MVP |
+| Sparkline data: raw or gauge? | **Gauge values (0-100)** -- last 12 quarters (3 years of trend) |
+| ASX futures in hawk score? | **No** -- display as benchmark alongside hawk score; futures gauge computed but excluded from weighted average |
+| Zone thresholds basis? | **Heuristic** -- equal 20-point bands on 0-100 scale; will validate against historical RBA decisions post-MVP |
