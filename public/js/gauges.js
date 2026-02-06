@@ -7,11 +7,11 @@ var GaugesModule = (function () {
   'use strict';
 
   var ZONE_COLORS = [
-    { range: [0, 20], color: '#1e40af', label: 'STRONGLY DOVISH' },
-    { range: [20, 40], color: '#60a5fa', label: 'DOVISH' },
-    { range: [40, 60], color: '#6b7280', label: 'NEUTRAL' },
-    { range: [60, 80], color: '#f87171', label: 'HAWKISH' },
-    { range: [80, 100], color: '#dc2626', label: 'STRONGLY HAWKISH' }
+    { range: [0, 20], color: '#1e40af', label: 'RATES LIKELY FALLING' },
+    { range: [20, 40], color: '#60a5fa', label: 'LEANING TOWARDS CUTS' },
+    { range: [40, 60], color: '#6b7280', label: 'HOLDING STEADY' },
+    { range: [60, 80], color: '#f87171', label: 'LEANING TOWARDS RISES' },
+    { range: [80, 100], color: '#dc2626', label: 'RATES LIKELY RISING' }
   ];
 
   var DISPLAY_LABELS = {

@@ -6,11 +6,11 @@ var InterpretationsModule = (function () {
   'use strict';
 
   var ZONE_LABEL_MAP = {
-    'Strong dovish pressure': 'STRONGLY DOVISH',
-    'Mild dovish pressure': 'DOVISH',
-    'Balanced': 'NEUTRAL',
-    'Mild hawkish pressure': 'HAWKISH',
-    'Strong hawkish pressure': 'STRONGLY HAWKISH'
+    'Strong dovish pressure': 'RATES LIKELY FALLING',
+    'Mild dovish pressure': 'LEANING TOWARDS CUTS',
+    'Balanced': 'HOLDING STEADY',
+    'Mild hawkish pressure': 'LEANING TOWARDS RISES',
+    'Strong hawkish pressure': 'RATES LIKELY RISING'
   };
 
   var percentFormatter = new Intl.NumberFormat('en-AU', {
