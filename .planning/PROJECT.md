@@ -8,7 +8,7 @@ An automated, unbiased economic dashboard ("Traffic Light" system) that visualiz
 Empowers laypeople to understand interest rate drivers without relying on media sensationalism or biased advice from banks/brokers.
 
 ## Constraints
-- **Zero Cost Hosting:** Must run entirely on GitHub Actions (backend) and GitHub Pages (frontend).
+- **Zero Cost Hosting:** Must run on Netlify (frontend) and GitHub Actions (backend).
 - **Maintenance:** "Silent Automation" preferred, though scraping maintenance is accepted.
 - **Data Integrity:** Strictly NO nominal currency values in gauges to avoid inflation bias; must use ratios/per-capita metrics.
 
@@ -21,7 +21,8 @@ Empowers laypeople to understand interest rate drivers without relying on media 
 ## Key Decisions
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| **Serverless/Static** | Minimizes cost and complexity. No database server required. | GitHub Pages + JSON flat files. |
+| **Netlify Hosting** | User preference for existing workflow/infrastructure. | Netlify auto-deploys from Git. |
+| **Serverless/Static** | Minimizes cost and complexity. No database server required. | Netlify + JSON flat files. |
 | **Z-Score Algorithm** | Normalizes diverse metrics ($, %, index) into a single 0-100 scale. | "Traffic Light" visualization logic. |
 | **Scraping** | Official APIs don't cover all "leading indicators" like capacity utilization. | Accepted maintenance burden for better data. |
 | **No Framework** | React/Vue is overkill for a single-page dashboard. | Vanilla JS + Tailwind + Plotly. |
