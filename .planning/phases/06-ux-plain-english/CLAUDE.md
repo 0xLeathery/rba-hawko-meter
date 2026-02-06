@@ -7,5 +7,6 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #812 | 6:24 PM | 🔵 | Project structured across 5 development phases with comprehensive documentation | ~497 |
+| #828 | 6:28 PM | 🔵 | Codebase research completed documenting current zone labels, number formatting, and HTML structure | ~700 |
+| #813 | 6:25 PM | ✅ | Phase 6 context document created for UX plain English overhaul | ~604 |
 </claude-mem-context>

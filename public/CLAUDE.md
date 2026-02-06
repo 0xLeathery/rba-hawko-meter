@@ -7,5 +7,5 @@
 
 | ID | Time | T | Title | Read |
 |----|------|---|-------|------|
-| #812 | 6:24 PM | 🔵 | Project structured across 5 development phases with comprehensive documentation | ~497 |
+| #838 | 6:42 PM | 🔵 | Onboarding section already exists in index.html at line 76 | ~267 |
 </claude-mem-context>
