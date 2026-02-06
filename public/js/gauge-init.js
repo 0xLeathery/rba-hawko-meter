@@ -117,6 +117,38 @@
   }
 
   /**
+   * Render calculator bridge paragraph with dynamic score/zone text.
+   * @param {number} score - Overall hawk score (0-100)
+   * @param {string} zoneLabel - Zone label from status.json
+   */
+  function renderCalculatorBridge(score, zoneLabel) {
+    var calcSection = document.getElementById('calculator-section');
+    if (!calcSection) return;
+
+    // Find or create calculator bridge div
+    var bridgeDiv = document.getElementById('calculator-bridge');
+    if (!bridgeDiv) {
+      bridgeDiv = document.createElement('div');
+      bridgeDiv.id = 'calculator-bridge';
+      bridgeDiv.className = 'mb-4 p-4 bg-finance-gray border border-finance-border rounded-lg';
+      // Insert before the first child (the h2 heading)
+      calcSection.insertBefore(bridgeDiv, calcSection.firstChild);
+    }
+
+    bridgeDiv.textContent = '';
+
+    var para = document.createElement('p');
+    para.className = 'text-sm text-gray-300';
+
+    // Convert zone label to plain English, lowercase
+    var plainLabel = GaugesModule.getStanceLabel(score).toLowerCase();
+
+    para.textContent = 'The Hawk-O-Meter reads ' + Math.round(score) + '/100 (' + plainLabel + '). Here\u2019s what current and potential rate changes could mean for a typical mortgage.';
+
+    bridgeDiv.appendChild(para);
+  }
+
+  /**
    * Main initialization: fetch status.json and render all gauges.
    */
   function initGauges() {
@@ -129,6 +161,16 @@
 
         // Render verdict
         InterpretationsModule.renderVerdict('verdict-container', data.overall);
+
+        // Render "jump to calculator" link in hero
+        var jumpContainer = document.getElementById('calculator-jump-link');
+        if (jumpContainer) {
+          var jumpLink = document.createElement('a');
+          jumpLink.href = '#calculator-section';
+          jumpLink.className = 'inline-block text-sm text-finance-accent hover:underline mt-1';
+          jumpLink.textContent = 'See what this means for your mortgage \u2193';
+          jumpContainer.appendChild(jumpLink);
+        }
 
         // Render ASX table (currently missing from data, will show unavailable)
         InterpretationsModule.renderASXTable('asx-futures-container', data.asx_futures || null);
@@ -146,6 +188,9 @@
             renderMissingIndicatorCards(gridContainer, data.metadata.indicators_missing, data.weights || {});
           }
         }
+
+        // Render calculator bridge text
+        renderCalculatorBridge(data.overall.hawk_score, data.overall.zone_label);
       })
       .catch(function (err) {
         console.error('Gauge initialization failed:', err);
