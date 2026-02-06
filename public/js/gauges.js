@@ -218,14 +218,14 @@ var GaugesModule = (function () {
           tickfont: { size: 10, color: '#6b7280' },
           dtick: 20
         },
-        bar: { color: getZoneColor(value), thickness: 0.6 },
+        bar: { color: 'rgba(0,0,0,0)', thickness: 0 },
         bgcolor: '#1f2937',
         borderwidth: 0,
         steps: getGaugeSteps(),
         threshold: {
-          line: { color: '#fbbf24', width: 2 },
-          thickness: 0.75,
-          value: 50
+          line: { color: '#ffffff', width: 4 },
+          thickness: 0.85,
+          value: value
         }
       },
       domain: { x: [0, 1], y: [0, 1] }
