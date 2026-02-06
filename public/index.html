@@ -69,6 +69,27 @@
   <!-- Main Content -->
   <main class="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-8 py-8 space-y-10">
 
+    <!-- Onboarding Section -->
+    <section id="onboarding" aria-label="About this dashboard" class="mb-6">
+      <details class="bg-finance-gray border border-finance-border rounded-xl px-6 py-4" open>
+        <summary class="cursor-pointer text-lg font-semibold text-gray-200 select-none">
+          What is the Hawk-O-Meter?
+        </summary>
+        <div class="mt-3 space-y-2 text-sm text-gray-400">
+          <p>
+            The Hawk-O-Meter tracks publicly available economic data that the Reserve Bank of Australia (RBA) considers when setting the cash rate. It combines these indicators into a single score out of 100.
+          </p>
+          <p>
+            <span class="text-blue-400 font-medium">Below 50</span> = economic data suggests pressure to <strong class="text-gray-200">cut</strong> interest rates.
+            <span class="text-red-400 font-medium">Above 50</span> = data suggests pressure to <strong class="text-gray-200">raise</strong> them.
+          </p>
+          <p>
+            This is not a prediction or financial advice. It is a mathematical summary of publicly available data.
+          </p>
+        </div>
+      </details>
+    </section>
+
     <!-- Hero Section: Hawk-O-Meter Gauge + ASX Futures + Cash Rate -->
     <section id="hawk-o-meter-section" aria-label="Overview" class="mb-8">
       <div id="data-freshness" class="text-center text-sm mb-2"></div>
