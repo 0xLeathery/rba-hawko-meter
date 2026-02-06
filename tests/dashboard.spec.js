@@ -14,11 +14,11 @@ test.describe('Phase 4 — Hawk-O-Meter Gauges', () => {
     const svg = heroPlot.locator('svg.main-svg');
     await expect(svg.first()).toBeVisible({ timeout: 15000 });
 
-    // Hawk score "46" should be visible in the rendered gauge
-    await expect(heroPlot).toContainText('46');
+    // Hawk score "46/100" should be visible in the rendered gauge
+    await expect(heroPlot).toContainText('46/100');
 
-    // Stance label "NEUTRAL" should be visible (score 46 falls in 40-60 range)
-    await expect(heroPlot).toContainText('NEUTRAL');
+    // Stance label "HOLDING STEADY" should be visible (score 46 falls in 40-60 range)
+    await expect(heroPlot).toContainText('HOLDING STEADY');
   });
 
   test('2. Individual metric cards render with interpretations', async ({ page }) => {
@@ -28,16 +28,18 @@ test.describe('Phase 4 — Hawk-O-Meter Gauges', () => {
     await expect(grid).toBeVisible();
 
     // Wait for metric cards to render (replaces the "Loading..." placeholder)
-    await expect(grid.locator('.bg-finance-gray')).toHaveCount(3, { timeout: 15000 });
+    // 3 active cards (bg-finance-gray) + 4 placeholder cards (bg-finance-gray/50) = 7 total
+    const allCards = grid.locator('[class*="bg-finance-gray"]');
+    await expect(allCards).toHaveCount(7, { timeout: 15000 });
 
     // Each card should have interpretation text with real numbers
-    const cards = grid.locator('.bg-finance-gray');
+    const cards = allCards;
 
-    // Inflation card: "CPI at 1.4" (raw_value 1.43 rounded to 1 decimal)
-    await expect(cards.nth(0)).toContainText('CPI at 1.4');
+    // Inflation card: "Prices up 1.4" (raw_value 1.43 rounded to 1 decimal)
+    await expect(cards.nth(0)).toContainText('Prices up 1.4');
 
-    // Wages card: "Wages growing 1.6" (raw_value 1.56)
-    await expect(cards.nth(1)).toContainText('Wages growing 1.6');
+    // Wages card: "Wages up 1.6" (raw_value 1.56)
+    await expect(cards.nth(1)).toContainText('Wages up 1.6');
 
     // Building approvals card: interpretation text present
     await expect(cards.nth(2)).toContainText('Building approvals');
@@ -49,7 +51,7 @@ test.describe('Phase 4 — Hawk-O-Meter Gauges', () => {
     await page.goto('/');
 
     const grid = page.locator('#metric-gauges-grid');
-    await expect(grid.locator('.bg-finance-gray')).toHaveCount(3, { timeout: 15000 });
+    await expect(grid.locator('[class*="bg-finance-gray"]')).toHaveCount(7, { timeout: 15000 });
 
     // At 375px the grid should be single-column
     let columns = await grid.evaluate(el => {
@@ -87,17 +89,17 @@ test.describe('Phase 4 — Hawk-O-Meter Gauges', () => {
     await page.goto('/');
 
     const grid = page.locator('#metric-gauges-grid');
-    await expect(grid.locator('.bg-finance-gray')).toHaveCount(3, { timeout: 15000 });
+    await expect(grid.locator('[class*="bg-finance-gray"]')).toHaveCount(7, { timeout: 15000 });
 
     // Wages is the second card (index 1) — staleness_days=220 > 90 threshold
-    const wagesCard = grid.locator('.bg-finance-gray').nth(1);
+    const wagesCard = grid.locator('[class*="bg-finance-gray"]').nth(1);
 
     // The card should have the amber border class applied by renderMetricCard
     const classAttr = await wagesCard.getAttribute('class');
     expect(classAttr).toContain('border-amber-500');
 
-    // It should also show the "(stale)" text
-    await expect(wagesCard).toContainText('(stale)');
+    // It should also show the "months old" text
+    await expect(wagesCard).toContainText('months old');
   });
 
 });
