@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RBA Hawk-O-Meter | Interest Rate Dashboard</title>
+  <meta name="description" content="Automated, unbiased economic dashboard visualizing Australian interest rate pressure. Data, not opinion.">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            'finance-dark': '#0a0a0a',
+            'finance-gray': '#1a1a1a',
+            'finance-border': '#2d2d2d',
+            'finance-accent': '#60a5fa',
+            'gauge-green': '#10b981',
+            'gauge-amber': '#f59e0b',
+            'gauge-red': '#ef4444'
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Plotly.js via CDN -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+
+  <style>
+    /* Smooth scrolling */
+    html { scroll-behavior: smooth; }
+    /* Custom scrollbar for dark theme */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0a0a0a; }
+    ::-webkit-scrollbar-thumb { background: #2d2d2d; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3d3d3d; }
+  </style>
+</head>
+<body class="bg-finance-dark text-gray-100 min-h-screen flex flex-col">
+
+  <!-- Disclaimer Banner (COMP-03: visible without scrolling) -->
+  <aside id="disclaimer-banner" role="banner" aria-label="Disclaimer" class="bg-finance-gray border-b border-finance-border px-4 py-2 text-xs sm:text-sm text-gray-400 flex items-center justify-between">
+    <p class="flex-1">
+      <span class="font-semibold text-gray-300">General Information Only</span> &mdash; This dashboard provides factual economic data for educational purposes. It does not constitute financial advice.
+      <a href="#disclaimer" class="text-finance-accent hover:underline ml-1">See full disclaimer below.</a>
+    </p>
+    <button id="dismiss-banner" type="button" aria-label="Dismiss disclaimer banner" class="ml-4 text-gray-500 hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-finance-accent rounded p-1 flex-shrink-0">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  </aside>
+
+  <!-- Header -->
+  <header class="px-4 sm:px-8 py-6 border-b border-finance-border">
+    <div class="max-w-6xl mx-auto">
+      <h1 class="text-2xl sm:text-3xl font-bold text-white tracking-tight">RBA Hawk-O-Meter</h1>
+      <p class="text-sm text-gray-400 mt-1">Data, not opinion.</p>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-8 py-8 space-y-10">
+
+    <!-- Hero Section: Gauge Placeholder + Cash Rate -->
+    <section aria-label="Overview">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+
+        <!-- Gauge Placeholder (Phase 4) -->
+        <div class="flex items-center justify-center">
+          <div class="w-64 h-40 sm:w-80 sm:h-48 border-2 border-dashed border-finance-border rounded-xl flex flex-col items-center justify-center text-gray-500">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-2 text-finance-border" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <p class="text-sm">Hawk-O-Meter Gauge</p>
+            <p class="text-xs text-gray-600 mt-1">Coming in Phase 4</p>
+          </div>
+        </div>
+
+        <!-- Cash Rate Display -->
+        <div class="text-center md:text-left">
+          <p class="text-sm text-gray-400 uppercase tracking-widest mb-2">RBA Cash Rate</p>
+          <p id="cash-rate-value" class="text-5xl sm:text-6xl lg:text-7xl font-bold text-white tabular-nums">
+            --
+          </p>
+          <p id="cash-rate-updated" class="text-sm text-gray-500 mt-2">Loading...</p>
+          <p class="text-xs text-gray-600 mt-1">Source: Reserve Bank of Australia</p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Countdown Section -->
+    <section id="countdown-section" aria-label="Next RBA meeting countdown" class="bg-finance-gray border border-finance-border rounded-xl px-6 py-5">
+      <p class="text-gray-500 text-sm">Loading next meeting date...</p>
+    </section>
+
+    <!-- Chart Section -->
+    <section aria-label="Historical rate chart">
+      <h2 class="text-lg font-semibold text-gray-200 mb-4">Cash Rate History</h2>
+      <div id="rate-chart" class="w-full h-64 sm:h-80 md:h-96 lg:h-[500px] bg-finance-gray border border-finance-border rounded-xl flex items-center justify-center">
+        <p class="text-gray-500 text-sm">Loading chart data...</p>
+      </div>
+      <p id="chart-source" class="text-xs text-gray-600 mt-2">Source: Reserve Bank of Australia</p>
+    </section>
+
+    <!-- Phase 4: Individual Gauges (placeholder) -->
+    <!-- <section aria-label="Economic indicators">
+      Individual metric gauges will be rendered here in Phase 4.
+      Housing, Jobs, Spending, Capacity, Inflation, Wages
+    </section> -->
+
+    <!-- Phase 5: Calculator (placeholder) -->
+    <!-- <section aria-label="Mortgage calculator">
+      Mortgage impact calculator will be rendered here in Phase 5.
+    </section> -->
+
+  </main>
+
+  <!-- Footer -->
+  <footer id="disclaimer" class="bg-finance-gray border-t border-finance-border mt-auto">
+    <div class="max-w-6xl mx-auto px-4 sm:px-8 py-8 space-y-6">
+
+      <!-- Full Legal Disclaimer (DASH-06) -->
+      <div>
+        <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-widest mb-3">Disclaimer</h2>
+        <p class="text-xs sm:text-sm text-gray-400 leading-relaxed">
+          <span class="font-semibold text-gray-300">General Information Only:</span>
+          The information on this website is for general informational and educational purposes only.
+          Nothing on this site constitutes, or is intended to constitute, financial advice, a recommendation,
+          or an offer to buy or sell any financial product. The data presented is sourced from publicly
+          available government and market sources (RBA, ABS, CoreLogic, NAB, ASX) and is provided
+          "as is" without warranty of any kind. Past trends do not predict future outcomes.
+          Always consult a licensed financial adviser before making financial decisions.
+        </p>
+      </div>
+
+      <!-- Data Sources -->
+      <div>
+        <h2 class="text-sm font-semibold text-gray-300 uppercase tracking-widest mb-3">Data Sources</h2>
+        <ul class="text-xs sm:text-sm text-gray-400 space-y-1">
+          <li><span class="text-gray-300 font-medium">RBA</span> &mdash; Reserve Bank of Australia (cash rate target)</li>
+          <li><span class="text-gray-300 font-medium">ABS</span> &mdash; Australian Bureau of Statistics (CPI, employment, retail trade, WPI, building approvals)</li>
+          <li><span class="text-gray-300 font-medium">CoreLogic</span> &mdash; Property market data (housing prices)</li>
+          <li><span class="text-gray-300 font-medium">NAB</span> &mdash; National Australia Bank (capacity utilisation)</li>
+          <li><span class="text-gray-300 font-medium">ASX</span> &mdash; Australian Securities Exchange (rate futures implied probability)</li>
+        </ul>
+      </div>
+
+      <!-- Copyright -->
+      <div class="border-t border-finance-border pt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+        <p class="text-xs text-gray-600">RBA Hawk-O-Meter &mdash; Data, not opinion.</p>
+        <p id="footer-updated" class="text-xs text-gray-600">Last updated: --</p>
+      </div>
+
+    </div>
+  </footer>
+
+  <!-- JS Modules (created in Plan 02-02) -->
+  <script src="js/data.js"></script>
+  <script src="js/chart.js"></script>
+  <script src="js/countdown.js"></script>
+  <script src="js/main.js"></script>
+
+</body>
+</html>
