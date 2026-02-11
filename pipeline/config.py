@@ -15,7 +15,7 @@ BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKi
 
 # Per-indicator timeout overrides for slow/unreliable sources
 TIMEOUT_OVERRIDES = {
-    'building_approvals': 60,  # Known to be slow/unreliable
+    'building_approvals': 30,  # Targeted key query, no longer slow
 }
 
 # ASX 30-Day Interbank Cash Rate Futures — MarkitDigital API
@@ -87,17 +87,8 @@ ABS_CONFIG = {
     },
     "building_approvals": {
         "dataflow": "BA_GCCSA",
-        "key": "all",
+        "key": "1.1.9.1.100.10.AUS.M",  # MEASURE.VALUE.SECTOR.WORK_TYPE.BUILDING_TYPE.TSEST.REGION.FREQ
         "params": {"startPeriod": "2014", "detail": "dataonly"},
-        "filters": {
-            "MEASURE": "1",           # Number of dwelling units
-            "REGION": "AUS",          # Australia total
-            "BUILDING_TYPE": "100",   # Total Residential
-            "VALUE": "1",             # Total (all value ranges)
-            "WORK_TYPE": "1",         # New work
-            "SECTOR": "9",            # Total Sectors
-            "TSEST": "10",            # Original
-        },
         "output_file": "abs_building_approvals.csv",
         "description": "Building Approvals, total new residential dwellings, Australia (monthly, original)",
         "critical": False,
