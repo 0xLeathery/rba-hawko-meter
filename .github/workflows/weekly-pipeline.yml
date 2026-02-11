@@ -9,12 +9,15 @@ permissions:
   contents: write              # Required for git-auto-commit-action
 
 concurrency:
-  group: data-pipeline
+  group: weekly-pipeline
   cancel-in-progress: false
 
 jobs:
   ingest:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONUNBUFFERED: '1'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,19 +39,23 @@ jobs:
         run: |
           echo "## Weekly Pipeline Status" >> $GITHUB_STEP_SUMMARY
           python3 -c "
-          import json
+          import json, os
+          summary_file = os.environ.get('GITHUB_STEP_SUMMARY', '/dev/null')
           try:
               with open('public/data/status.json') as f:
                   status = json.load(f)
               score = status['overall']['hawk_score']
               available = status['metadata']['indicators_available']
               missing = status['metadata']['indicators_missing']
-              print(f'Hawk Score: **{score:.1f}** ({status[\"overall\"][\"zone_label\"]})', file=open('$GITHUB_STEP_SUMMARY', 'a'))
-              print(f'Indicators: {available}/8 available', file=open('$GITHUB_STEP_SUMMARY', 'a'))
-              if missing:
-                  print(f'Missing: {', '.join(missing)}', file=open('$GITHUB_STEP_SUMMARY', 'a'))
+              zone = status['overall']['zone_label']
+              with open(summary_file, 'a') as out:
+                  out.write(f'Hawk Score: **{score:.1f}** ({zone})\n')
+                  out.write(f'Indicators: {available}/8 available\n')
+                  if missing:
+                      out.write('Missing: ' + ', '.join(missing) + '\n')
           except Exception as e:
-              print(f'Error reading status.json: {e}', file=open('$GITHUB_STEP_SUMMARY', 'a'))
+              with open(summary_file, 'a') as out:
+                  out.write(f'Error reading status.json: {e}\n')
           "
 
       - name: Commit updated data

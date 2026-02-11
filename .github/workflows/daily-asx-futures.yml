@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: data-pipeline
+  group: daily-asx-futures
   cancel-in-progress: false
 
 jobs:
