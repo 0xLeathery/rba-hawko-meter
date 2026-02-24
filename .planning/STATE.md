@@ -60,7 +60,7 @@ None active.
 
 ## Session Continuity
 
-Last session: 2026-02-24
-Stopped at: Roadmap created — ready to plan Phase 11
-Resume file: None
+Last session: 2026-02-25
+Stopped at: Phase 11 context gathered — ready to plan
+Resume file: .planning/phases/11-test-foundation/11-CONTEXT.md
 Next action: `/gsd:plan-phase 11`
