@@ -1,7 +1,7 @@
 # Project: RBA Hawk-O-Meter
 
 ## What This Is
-An automated, unbiased economic dashboard for Australian mortgage holders. Ingests raw economic data from ABS and RBA, normalizes it via Z-scores, and presents interest rate pressure through traffic-light gauges, a mortgage impact calculator, and plain English interpretations. Live at Netlify with daily/weekly automated data updates via GitHub Actions.
+An automated, unbiased economic dashboard for Australian mortgage holders. Ingests raw economic data from ABS, RBA, ASX, CoreLogic/Cotality, and NAB, normalizes it via Z-scores, and presents interest rate pressure through traffic-light gauges, a mortgage impact calculator, and plain English interpretations. 7 of 8 indicators active with full data coverage. Live at Netlify with daily/weekly automated data updates via GitHub Actions.
 
 ## Core Value
 **"Data, not opinion."**
@@ -17,7 +17,7 @@ Empowers laypeople to understand interest rate drivers without relying on media 
 - **Backend:** Python-based ETL pipeline (ingest → normalize → Z-score → status.json).
 - **Frontend:** Static HTML/JS dashboard using Plotly.js for gauges, Tailwind CSS, Decimal.js for calculator.
 - **Automation:** Weekly pipeline (Monday) + daily ASX futures scraper (weekdays) via GitHub Actions.
-- **Data Sources:** ABS (official — CPI, employment, wages, spending, building approvals), RBA (official — cash rate, meetings), ASX (JSON API — futures), CoreLogic (placeholder), NAB (placeholder).
+- **Data Sources:** ABS (official — CPI, employment, wages, spending, building approvals, RPPI housing), RBA (official — cash rate, meetings), ASX (JSON API — futures), Cotality HVI (PDF scraping — dwelling prices), NAB (HTML/PDF scraping — capacity utilisation).
 
 ## Requirements
 
@@ -37,20 +37,15 @@ Empowers laypeople to understand interest rate drivers without relying on media 
 - ✓ COMP-01 through COMP-03: ASIC compliance — v1.0
 - ✓ HAWK-01 through HAWK-03, HAWK-05: Hawk-O-Meter gauges and verdicts — v1.0
 - ✓ CALC-01 through CALC-04: Mortgage calculator — v1.0
-
-## Current Milestone: v1.1 Full Indicator Coverage
-
-**Goal:** Close all 3 remaining data source gaps so the dashboard reports "Based on 8 of 8 indicators."
-
-**Target features:**
-- CoreLogic median dwelling prices via free public data scraping (quarterly reports/media releases)
-- NAB capacity utilisation via quarterly business survey PDF parsing
-- ASX rate futures via working endpoint discovery and integration
+- ✓ ASX-01 through ASX-04: ASX futures multi-meeting display with CI freshness — v1.1
+- ✓ HOUS-01 through HOUS-04: Housing gauge with ABS RPPI + Cotality HVI fallback — v1.1
+- ✓ NAB-01 through NAB-05: NAB capacity utilisation scraper and gauge — v1.1
+- ✓ PIPE-03: CoreLogic/Cotality dwelling price scraping (HVI PDF media releases) — v1.1
+- ✓ PIPE-04: NAB capacity utilisation survey (HTML extraction + PDF fallback) — v1.1
+- ✓ HAWK-04: ASX Futures multi-meeting probability display — v1.1
 
 ### Active
-- [ ] PIPE-03: CoreLogic median dwelling price scraping (free public sources — quarterly reports, media releases)
-- [ ] PIPE-04: NAB capacity utilisation survey (PDF parsing from quarterly business survey)
-- [ ] HAWK-04: ASX Futures probability display (find current working endpoint)
+(No active requirements — next milestone not yet defined)
 
 ### Out of Scope
 | Feature | Reason |
@@ -69,22 +64,28 @@ Empowers laypeople to understand interest rate drivers without relying on media 
 | **Netlify Hosting** | User preference for existing workflow/infrastructure | ✓ Auto-deploys from Git |
 | **Serverless/Static** | Minimizes cost and complexity | ✓ Netlify + JSON flat files |
 | **Z-Score Algorithm** | Normalizes diverse metrics into 0-100 scale | ✓ Robust median/MAD with [-3,+3] clamp |
-| **Scraping** | Official APIs don't cover all leading indicators | ⚠️ CoreLogic/NAB still placeholders |
+| **Scraping** | Official APIs don't cover all leading indicators | ✓ CoreLogic/NAB scrapers shipped in v1.1 |
 | **No Framework** | React/Vue is overkill for single-page dashboard | ✓ Vanilla JS + Tailwind + Plotly |
 | **Blue/Grey/Red gauges** | 8% of males have red-green color deficiency | ✓ Colorblind-accessible |
 | **IIFE modules** | Encapsulate private state without a build system | ✓ Clean module pattern |
 | **Decimal.js for calculator** | IEEE 754 precision loss with native JS floats | ✓ Exact mortgage math |
 | **ASX futures as benchmark** | Market-derived, not an economic indicator | ✓ Excluded from hawk score, displayed separately |
 | **Plain English labels** | "RATES LIKELY FALLING" not "DOVISH" | ✓ Layperson clarity |
+| **ABS as primary housing source** | Cotality ToS (8.4d) prohibits automated scraping | ✓ ABS RPPI activates gauge; Cotality monthly PDF as supplement |
+| **Hybrid normalization** | Cotality YoY pre-computed, ABS is index | ✓ ratios.py separates sources to prevent double-normalization |
+| **NAB HTML-first extraction** | Capacity utilisation is inline in article HTML | ✓ PDF is fallback only; 7-month backfill successful |
+| **URL discovery for NAB** | Tag archive pages list current surveys | ✓ Never construct URLs from date templates for current month |
+| **Adaptive min_quarters** | New indicators lack 20 quarters of history | ✓ Lower z-score threshold for limited data with LOW confidence badge |
+| **45-day staleness for NAB** | Monthly data needs tighter threshold than 90d default | ✓ Business Conditions card fires amber border at 45d |
 
 ## Context
 
-Shipped v1.0 with ~5,900 LOC (2,683 Python + 2,750 JS + 468 HTML).
-Tech stack: Python (pandas, numpy, requests, beautifulsoup4), Vanilla JS, Tailwind CSS, Plotly.js, Decimal.js.
-24 Playwright tests (100% pass).
-5 of 8 economic indicators active. 3 placeholder (CoreLogic, NAB, ASX — all external data source issues).
-Dashboard clearly communicates coverage: "Based on 5 of 8 indicators".
-Hawk Score at launch: 41.8/100 (Balanced).
+Shipped v1.1 with ~6,276 LOC (3,227 Python + 3,049 JS).
+Tech stack: Python (pandas, numpy, requests, beautifulsoup4, pdfplumber), Vanilla JS, Tailwind CSS, Plotly.js, Decimal.js.
+28 Playwright tests (100% pass).
+7 of 8 economic indicators active (ASX futures displayed separately as 8th). All data source gaps closed.
+Dashboard coverage: "Based on 7 of 8 indicators".
+Automated data updates: weekly pipeline (Monday) + daily ASX futures (weekdays) via GitHub Actions.
 
 ## Success Criteria
 1. **Fully Automated:** ✓ Runs weekly + daily without manual intervention.
@@ -92,4 +93,4 @@ Hawk Score at launch: 41.8/100 (Balanced).
 3. **Accurate:** ✓ All metrics normalized via ratios/Z-scores, no nominal currency values.
 
 ---
-*Last updated: 2026-02-24 after v1.1 milestone initialization*
+*Last updated: 2026-02-24 after v1.1 milestone completion*

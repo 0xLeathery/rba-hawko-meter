@@ -26,3 +26,26 @@
 
 ---
 
+
+## v1.1 Full Indicator Coverage (Shipped: 2026-02-24)
+
+**Phases completed:** 3 phases, 6 plans, ~16 tasks
+
+**Key accomplishments:**
+- ASX futures multi-meeting probability table with traffic light stacked bars, CI freshness assertion, and 14d/30d staleness detection
+- ABS RPPI housing gauge with YoY % directional labels, quarter format, source attribution, and stale_display override
+- Cotality HVI PDF scraper with 4-candidate URL try-list, pdfplumber extraction, hybrid normalization fallback in ratios.py
+- NAB capacity utilisation scraper with tag archive URL discovery, HTML regex extraction, PDF fallback, and 12-month backfill
+- Business Conditions gauge with trend label format ("83.6% — ABOVE avg, STEADY (Jan 2026)"), 45-day staleness threshold, and inflation pressure framing
+- Dashboard coverage moved from "5 of 8" to "7 of 8" indicators — all 3 data source gaps closed (ASX, Housing, NAB)
+
+**Stats:**
+- Timeline: 2026-02-24 (1 day)
+- Files modified: 37
+- Lines changed: +5,383 / -300
+- Codebase total: ~6,276 LOC (3,227 Python + 3,049 JS)
+- Tests: 28 Playwright tests (100% pass)
+- Git range: feat(08-01) → feat(10-02)
+
+---
+
