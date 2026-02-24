@@ -26,7 +26,7 @@ Requirements for milestone v1.1 — Full Indicator Coverage. Each maps to roadma
 - [x] **NAB-01**: Capacity utilisation percentage scraped from NAB Monthly Business Survey HTML article body
 - [x] **NAB-02**: Survey URL discovered via tag archive page, not constructed from date templates
 - [x] **NAB-03**: Business confidence gauge activated with capacity utilisation data
-- [ ] **NAB-04**: Gauge shows trend label indicating above/below long-run average (~81%)
+- [x] **NAB-04**: Gauge shows trend label indicating above/below long-run average (~81%)
 - [x] **NAB-05**: PDF fallback extracts capacity utilisation if HTML extraction fails for a given month
 
 ## Future Requirements
@@ -67,7 +67,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NAB-01 | Phase 10 | Complete |
 | NAB-02 | Phase 10 | Complete |
 | NAB-03 | Phase 10 | Complete |
-| NAB-04 | Phase 10 | Pending |
+| NAB-04 | Phase 10 | Complete |
 | NAB-05 | Phase 10 | Complete |
 
 **Coverage:**

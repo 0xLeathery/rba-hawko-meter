@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-24)
 
 **Core value:** "Data, not opinion." Empowers laypeople to understand interest rate drivers without relying on media sensationalism or biased advice.
-**Current focus:** Phase 10 NAB Capacity Utilisation Gauge — 10-01 complete, phase done
+**Current focus:** Phase 10 NAB Capacity Utilisation Gauge — COMPLETE (both plans done)
 
 ## Current Position
 
 Phase: 10 of 10 (NAB Capacity Utilisation Gauge — COMPLETE)
-Plan: 1 of 1 in phase 10 (10-01 NAB scraper + config wire-up — complete)
-Status: Phase 10 complete — all 8 indicators active
-Last activity: 2026-02-24 — 10-01 complete: NAB scraper (URL discovery, HTML/PDF extraction, backfill), business_confidence config activated, 7 rows in nab_capacity.csv, normalization engine processes 7 of 8 indicators (ASX futures separate)
+Plan: 2 of 2 in phase 10 (10-02 frontend activation — complete)
+Status: Phase 10 complete — all 8 indicators active, Business Conditions gauge live with trend label
+Last activity: 2026-02-24 — 10-02 complete: Business Conditions gauge fully activated, trend label format "83.6% — ABOVE avg, STEADY", source attribution, 45-day staleness, 28/28 Playwright tests passing
 
 Progress: [██████████] 100% (10 of 10 phases complete — v1.1 shipped)
 
@@ -29,8 +29,9 @@ Progress: [██████████] 100% (10 of 10 phases complete — v1
 |-------|-------|--------|
 | 8. ASX Futures Live Data | 2 | Complete (08-01 pipeline, 08-02 frontend table) |
 | 9. Housing Prices Gauge | 2 | Complete (09-01 ABS RPPI + frontend, 09-02 Cotality HVI scraper) |
-| 10. NAB Capacity Utilisation Gauge | 1 | Complete (10-01 NAB scraper + config wire-up) |
+| 10. NAB Capacity Utilisation Gauge | 2 | Complete (10-01 NAB scraper + config wire-up, 10-02 frontend activation) |
 | Phase 10 P01 | 556 | 2 tasks | 5 files |
+| Phase 10 P02 | 318 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -55,6 +56,8 @@ Progress: [██████████] 100% (10 of 10 phases complete — v1
 - [10-01] Backfill uses MONTH_URL_PATTERNS — only place URL construction used; tag archive omits historical articles
 - [10-01] normalize=direct kept for business_confidence — capacity utilisation is an absolute %, not a YoY ratio
 - [10-01] engine.py adaptive min_quarters — lowers z-score minimum for indicators with <20 quarters of backfill history
+- [Phase 10]: Pass config param through build_gauge_entry() — needed to access csv_file path for indicator-specific enrichment
+- [Phase 10]: Coverage notice shows '7 of 8 indicators' — ASX futures is the 8th, displayed separately in What Markets Expect section
 
 ### Research Flags (check before implementing)
 
@@ -69,5 +72,5 @@ None active.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 10-01-PLAN.md — NAB scraper rewrite (URL discovery, HTML/PDF extraction, 12-month backfill), business_confidence config wired to nab_capacity.csv, engine adaptive min_quarters fix, 7 rows in nab_capacity.csv, normalization engine processing business_confidence (Z=1.35, Gauge=72.5). Phase 10 complete.
+Stopped at: Completed 10-02-PLAN.md — Business Conditions gauge frontend activation: trend label "83.6% — ABOVE avg, STEADY", source attribution, 45-day staleness threshold, inflation pressure framing. 28/28 Playwright tests passing. Phase 10 fully complete.
 Resume file: None
