@@ -38,10 +38,19 @@ Empowers laypeople to understand interest rate drivers without relying on media 
 - ✓ HAWK-01 through HAWK-03, HAWK-05: Hawk-O-Meter gauges and verdicts — v1.0
 - ✓ CALC-01 through CALC-04: Mortgage calculator — v1.0
 
+## Current Milestone: v1.1 Full Indicator Coverage
+
+**Goal:** Close all 3 remaining data source gaps so the dashboard reports "Based on 8 of 8 indicators."
+
+**Target features:**
+- CoreLogic median dwelling prices via free public data scraping (quarterly reports/media releases)
+- NAB capacity utilisation via quarterly business survey PDF parsing
+- ASX rate futures via working endpoint discovery and integration
+
 ### Active
-- [ ] PIPE-03: CoreLogic median dwelling price scraping (placeholder, needs real scraper or API)
-- [ ] PIPE-04: NAB capacity utilisation survey scraping (placeholder, needs PDF parsing or API)
-- [ ] HAWK-04: ASX Futures probability display (implemented, awaiting ASX endpoint restoration)
+- [ ] PIPE-03: CoreLogic median dwelling price scraping (free public sources — quarterly reports, media releases)
+- [ ] PIPE-04: NAB capacity utilisation survey (PDF parsing from quarterly business survey)
+- [ ] HAWK-04: ASX Futures probability display (find current working endpoint)
 
 ### Out of Scope
 | Feature | Reason |
@@ -83,4 +92,4 @@ Hawk Score at launch: 41.8/100 (Balanced).
 3. **Accurate:** ✓ All metrics normalized via ratios/Z-scores, no nominal currency values.
 
 ---
-*Last updated: 2026-02-24 after v1.0 milestone*
+*Last updated: 2026-02-24 after v1.1 milestone initialization*
