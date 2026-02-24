@@ -145,8 +145,8 @@ test.describe('Phase 6 — UX & Plain English Overhaul', () => {
     const allCards = grid.locator('[class*="bg-finance-gray"]');
     await expect(allCards).toHaveCount(7, { timeout: 15000 });
 
-    // Building approvals is the 5th active card (index 4)
-    const buildingCard = allCards.nth(4);
+    // Building approvals is the 6th active card (index 5) — housing now active at index 3
+    const buildingCard = allCards.nth(5);
     await expect(buildingCard).toContainText('Building');
 
     // Should NOT contain the invalid -99.9 value
@@ -173,8 +173,8 @@ test.describe('Phase 6 — UX & Plain English Overhaul', () => {
     const inflationCard = allCards.nth(0);
     await expect(inflationCard).toContainText('High importance');
 
-    // Building approvals card (index 4, weight=5%) should show "Lower importance"
-    const buildingCard = allCards.nth(4);
+    // Building approvals card (index 5, weight=5%) should show "Lower importance" — housing now active at index 3
+    const buildingCard = allCards.nth(5);
     await expect(buildingCard).toContainText('Lower importance');
 
     // Wages card should contain staleness indicator (220 days > 90 threshold)
@@ -202,10 +202,10 @@ test.describe('Phase 6 — UX & Plain English Overhaul', () => {
     }
     expect(foundAustralianDate).toBe(true);
 
-    // Data coverage notice should indicate 5 of 8 indicators
+    // Data coverage notice should indicate 6 of 8 indicators (housing now active via Cotality HVI)
     const coverageNotice = page.locator('#data-coverage-notice');
     await expect(coverageNotice).toBeVisible({ timeout: 15000 });
-    await expect(coverageNotice).toContainText('5 of 8 indicators');
+    await expect(coverageNotice).toContainText('6 of 8 indicators');
   });
 
   test('20. Placeholder cards for missing indicators', async ({ page }) => {
@@ -216,8 +216,9 @@ test.describe('Phase 6 — UX & Plain English Overhaul', () => {
     await expect(allCards).toHaveCount(7, { timeout: 15000 });
 
     // Count cards with "Data coming soon" text — placeholder cards use bg-finance-gray/50
+    // Housing is now active (Cotality HVI data), so only business_confidence remains as placeholder
     const placeholderCards = grid.locator('[class*="bg-finance-gray"]:has-text("Data coming soon")');
-    await expect(placeholderCards).toHaveCount(2); // housing, business_confidence
+    await expect(placeholderCards).toHaveCount(1); // business_confidence only
 
     // Verify no placeholder card contains "ASX" (futures are benchmark only)
     const placeholderText = await placeholderCards.allTextContents();

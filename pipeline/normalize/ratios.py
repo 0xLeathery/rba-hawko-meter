@@ -118,9 +118,46 @@ def normalize_indicator(name, config):
         return None
 
     csv_path = DATA_DIR / csv_file
-    df = load_indicator_csv(csv_path)
-    if df is None:
-        return None
+
+    # Hybrid source detection: if the CSV has a 'source' column with mixed sources,
+    # separate rows that store pre-computed YoY % (e.g. Cotality HVI) from rows
+    # that store absolute index values (e.g. ABS RPPI). The pre-computed rows are
+    # appended after YoY normalization of the index rows, avoiding double-normalization.
+    precomputed_yoy_sources = {'Cotality HVI'}
+    precomputed_rows = None
+    df_override = None
+
+    raw_path = Path(csv_path)
+    if raw_path.exists() and raw_path.stat().st_size > 0:
+        try:
+            _full = pd.read_csv(raw_path)
+            if 'source' in _full.columns:
+                mask = _full['source'].isin(precomputed_yoy_sources)
+                if mask.any():
+                    # Extract pre-computed YoY rows (latest one only)
+                    _precomp = _full[mask][['date', 'value']].copy()
+                    _precomp['date'] = pd.to_datetime(_precomp['date'])
+                    _precomp['value'] = pd.to_numeric(_precomp['value'], errors='coerce')
+                    _precomp = _precomp.dropna(subset=['value']).sort_values('date').tail(1)
+                    if len(_precomp) > 0:
+                        precomputed_rows = _precomp
+
+                    # Build a filtered DataFrame (only non-precomputed rows) for standard pipeline
+                    _index_rows = _full[~mask][['date', 'value']].copy()
+                    _index_rows['date'] = pd.to_datetime(_index_rows['date'])
+                    _index_rows['value'] = pd.to_numeric(_index_rows['value'], errors='coerce')
+                    _index_rows = _index_rows.sort_values('date').reset_index(drop=True)
+                    df_override = _index_rows
+        except Exception:
+            pass  # Fall through to standard load path
+
+    # Load CSV: use filtered df_override if available, otherwise load normally
+    if df_override is not None:
+        df = df_override
+    else:
+        df = load_indicator_csv(csv_path)
+        if df is None:
+            return None
 
     # Filter out zeros and invalid values before normalization
     df = filter_valid_data(df)
@@ -153,6 +190,12 @@ def normalize_indicator(name, config):
     # Filter any remaining invalid values after normalization
     df = df.replace([np.inf, -np.inf], np.nan)
     df = df.dropna(subset=['value'])
+
+    # Append pre-computed YoY rows (e.g. Cotality HVI) as the latest data point(s).
+    # These values are already in YoY % format -- no further transformation needed.
+    if precomputed_rows is not None and len(precomputed_rows) > 0:
+        df = pd.concat([df, precomputed_rows[['date', 'value']]], ignore_index=True)
+        df = df.sort_values('date').reset_index(drop=True)
 
     # Return only date and value columns
     return df[['date', 'value']].reset_index(drop=True)

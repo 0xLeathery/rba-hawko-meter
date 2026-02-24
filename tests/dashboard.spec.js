@@ -150,8 +150,8 @@ test.describe('Phase 9 — Housing Prices Gauge', () => {
     // Check quarter format label
     await expect(interpretation).toContainText(/\(Q\d \d{4}\)/);
 
-    // Check source attribution
-    await expect(housingCard).toContainText('Source: ABS RPPI');
+    // Check source attribution (either ABS RPPI fallback or Cotality HVI when scraper succeeds)
+    await expect(housingCard).toContainText(/Source: (?:ABS RPPI|Cotality HVI)/);
   });
 
   test('housing gauge has no amber staleness border despite stale data', async ({ page }) => {
