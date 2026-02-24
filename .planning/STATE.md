@@ -12,9 +12,9 @@ See: .planning/PROJECT.md (updated 2026-02-04)
 Phase: 7 of 7 (ASX Futures Integration)
 Plan: 3 of 3 complete
 Status: Phase complete
-Last activity: 2026-02-07 — Completed 07-03-PLAN.md (CI/CD Workflow Updates & Frontend Testing)
+Last activity: 2026-02-24 — Completed 02-02-PLAN.md (Core Dashboard JS Modules — gap closure)
 
-Progress: [██████████████████████████] 100% (16/16 plans complete)
+Progress: [██████████████████████████] 100% (17/17 plans complete)
 
 ## Performance Metrics
 
@@ -95,6 +95,9 @@ Recent decisions affecting current work:
 - **Daily workflow regenerates status.json** (07-03): Daily ASX scraper regenerates status.json after scraping to ensure dashboard reflects latest data immediately
 - **Playwright route interception for testing** (07-03): Use page.route() to mock status.json responses for isolated frontend testing regardless of real data availability
 - **Gap closure audit via git log** (01-05): Workflows confirmed operational by checking git history for automated commits — 11 automated commits from both workflows confirmed live execution
+- [Phase 02-02]: IIFE pattern for all JS modules — encapsulates private state without a build system
+- [Phase 02-02]: Promise.allSettled not Promise.all — prevents cascade failure between independent data sources
+- [Phase 02-02]: Safe DOM methods only (createElement/textContent) in all JS modules — XSS prevention, no innerHTML
 
 ### Pending Todos
 
@@ -109,7 +112,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-24 04:12 UTC
-Stopped at: Completed 01-05-PLAN.md -- GitHub Actions Workflow Validation (gap closure)
+Last session: 2026-02-24 04:15 UTC
+Stopped at: Completed 02-02-PLAN.md -- Core Dashboard JS Modules (gap closure)
 Resume file: None
-Next: All planned work complete (17/17 plans). Phase 01 gap fully closed, all phases complete end-to-end.
+Next: All planned work complete (17/17 plans). Phase 02 gap fully closed, all phases complete end-to-end.

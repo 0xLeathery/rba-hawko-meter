@@ -13,7 +13,7 @@ This roadmap transforms raw economic data into a simple traffic-light dashboard 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation & Data Pipeline** - Automated data ingestion skeleton
-- [ ] **Phase 2: Core Dashboard** - Static UI with rate display and historical charts
+- [x] **Phase 2: Core Dashboard** - Static UI with rate display and historical charts (completed 2026-02-24)
 - [ ] **Phase 3: Data Normalization & Z-Scores** - Statistical engine for metric transformation
 - [ ] **Phase 4: Hawk-O-Meter Gauges** - Traffic-light visualization system
 - [x] **Phase 5: Calculator & Compliance** - Mortgage calculator and regulatory polish
@@ -151,7 +151,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Data Pipeline | 5/5 | Complete   | 2026-02-24 |
-| 2. Core Dashboard | 2/2 | Complete | 2026-02-06 |
+| 2. Core Dashboard | 2/2 | Complete   | 2026-02-24 |
 | 3. Data Normalization & Z-Scores | 2/2 | Complete | 2026-02-06 |
 | 4. Hawk-O-Meter Gauges | 2/2 | Complete | 2026-02-06 |
 | 5. Calculator & Compliance | 2/2 | Complete | 2026-02-06 |
