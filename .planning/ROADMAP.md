@@ -79,5 +79,5 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1-7. MVP Phases | v1.0 | 19/19 | Complete | 2026-02-24 |
 | 8. ASX Futures Live Data | 2/2 | Complete   | 2026-02-24 | - |
-| 9. Housing Prices Gauge | v1.1 | 0/2 | Planning complete | - |
+| 9. Housing Prices Gauge | 1/2 | In Progress|  | - |
 | 10. NAB Capacity Utilisation Gauge | v1.1 | 0/? | Not started | - |
