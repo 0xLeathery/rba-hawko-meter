@@ -5,16 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-24)
 
 **Core value:** "Data, not opinion." Empowers laypeople to understand interest rate drivers without relying on media sensationalism or biased advice.
-**Current focus:** Planning next milestone
+**Current focus:** v2.0 Local CI & Test Infrastructure
 
 ## Current Position
 
-Phase: All phases complete (v1.0 + v1.1 shipped)
-Plan: N/A
-Status: v1.1 Full Indicator Coverage shipped — all 3 data source gaps closed, 7 of 8 indicators active
-Last activity: 2026-02-24 — v1.1 milestone archived
-
-Progress: [██████████] 100% (v1.0: 7 phases, v1.1: 3 phases — all shipped)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-24 — Milestone v2.0 started
 
 ## Performance Metrics
 
@@ -42,5 +40,5 @@ None active.
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: v1.1 milestone complete and archived. Next step: /gsd:new-milestone
+Stopped at: Defining v2.0 milestone requirements
 Resume file: None

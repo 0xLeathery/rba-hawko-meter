@@ -45,7 +45,13 @@ Empowers laypeople to understand interest rate drivers without relying on media 
 - ✓ HAWK-04: ASX Futures multi-meeting probability display — v1.1
 
 ### Active
-(No active requirements — next milestone not yet defined)
+- [ ] Python unit test suite (pytest) for pipeline modules (ingest, normalize, Z-scores)
+- [ ] status.json data validation (all indicators present, values in range, timestamps valid)
+- [ ] Linting — Python (ruff) + JavaScript (ESLint)
+- [ ] Full pipeline verification with real API calls (ABS, RBA, ASX)
+- [ ] Live scraper verification (Cotality HVI, NAB capacity utilisation)
+- [ ] Pre-push git hook running fast test suite
+- [ ] Unified npm scripts for two-tier verification (fast + full)
 
 ### Out of Scope
 | Feature | Reason |
@@ -78,6 +84,19 @@ Empowers laypeople to understand interest rate drivers without relying on media 
 | **Adaptive min_quarters** | New indicators lack 20 quarters of history | ✓ Lower z-score threshold for limited data with LOW confidence badge |
 | **45-day staleness for NAB** | Monthly data needs tighter threshold than 90d default | ✓ Business Conditions card fires amber border at 45d |
 
+## Current Milestone: v2.0 Local CI & Test Infrastructure
+
+**Goal:** Nothing broken gets to GitHub. Two-tier verification — fast pre-push hook + full live verification on demand.
+
+**Target features:**
+- Python unit test suite (pytest) covering all pipeline modules
+- status.json data validation
+- Python (ruff) + JavaScript (ESLint) linting
+- Full pipeline verification with real API calls
+- Live scraper verification (Cotality, NAB)
+- Pre-push git hook for fast test gate
+- Unified npm scripts (`npm run test:fast`, `npm run verify`)
+
 ## Context
 
 Shipped v1.1 with ~6,276 LOC (3,227 Python + 3,049 JS).
@@ -93,4 +112,4 @@ Automated data updates: weekly pipeline (Monday) + daily ASX futures (weekdays) 
 3. **Accurate:** ✓ All metrics normalized via ratios/Z-scores, no nominal currency values.
 
 ---
-*Last updated: 2026-02-24 after v1.1 milestone completion*
+*Last updated: 2026-02-24 after v2.0 milestone started*
