@@ -56,25 +56,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| ASX-01 | — | Pending |
-| ASX-02 | — | Pending |
-| ASX-03 | — | Pending |
-| ASX-04 | — | Pending |
-| HOUS-01 | — | Pending |
-| HOUS-02 | — | Pending |
-| HOUS-03 | — | Pending |
-| HOUS-04 | — | Pending |
-| NAB-01 | — | Pending |
-| NAB-02 | — | Pending |
-| NAB-03 | — | Pending |
-| NAB-04 | — | Pending |
-| NAB-05 | — | Pending |
+| ASX-01 | Phase 8 | Pending |
+| ASX-02 | Phase 8 | Pending |
+| ASX-03 | Phase 8 | Pending |
+| ASX-04 | Phase 8 | Pending |
+| HOUS-01 | Phase 9 | Pending |
+| HOUS-02 | Phase 9 | Pending |
+| HOUS-03 | Phase 9 | Pending |
+| HOUS-04 | Phase 9 | Pending |
+| NAB-01 | Phase 10 | Pending |
+| NAB-02 | Phase 10 | Pending |
+| NAB-03 | Phase 10 | Pending |
+| NAB-04 | Phase 10 | Pending |
+| NAB-05 | Phase 10 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13
+- Mapped to phases: 13
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-24*
-*Last updated: 2026-02-24 after initial definition*
+*Last updated: 2026-02-24 after roadmap creation (traceability complete)*
