@@ -10,12 +10,12 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 ## Current Position
 
 Phase: 12 (Python Unit Tests)
-Plan: 01 complete
-Status: Plan 12-01 complete
-Last activity: 2026-02-25 — Plan 12-01 complete (60 unit tests for zscore.py and gauge.py)
+Plan: 02 complete
+Status: Plan 12-02 complete
+Last activity: 2026-02-25 — Plan 12-02 complete (54 unit tests for ratios.py, csv_handler.py, schema contract)
 
 ```
-v2.0 Progress: [███       ] 30%
+v2.0 Progress: [████      ] 40%
 Phase 11 [✓] Phase 12 [~] Phase 13 [ ] Phase 14 [ ] Phase 15 [ ]
 ```
 
@@ -64,6 +64,10 @@ Archived to PROJECT.md Key Decisions table. All v1.0 and v1.1 decisions preserve
 - compute_hawk_score rebalancing verified manually: (60*0.4 + 40*0.4) / 0.8 = 50.0
 - Boundary tables use exact threshold values (19.9/20.0, 39.9/40.0, 59.9/60.0, 79.9/80.0)
 
+**v2.0 decisions (Plan 12-02):**
+- Use jsonschema StrictValidator (Draft7 + custom type_checker) to enforce hawk_score as Python int, not float
+- Auto-fixed load_indicator_csv to return None for header-only CSV (empty DataFrame was missing correctness check)
+
 ### Critical Context for v2.0
 
 - `DATA_DIR = Path("data")` in `pipeline/config.py` is a relative path — all tests must patch this via autouse fixture or they silently read/write live CSV files
@@ -79,6 +83,6 @@ None active.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Plan 12-01 complete — 60 unit tests for zscore.py and gauge.py (19 + 41 tests)
-Resume file: .planning/phases/12-python-unit-tests/12-01-SUMMARY.md
+Stopped at: Completed .planning/phases/12-python-unit-tests/12-02-PLAN.md
+Resume file: .planning/phases/12-python-unit-tests/12-02-SUMMARY.md
 Next action: Continue Phase 12 (additional plans if any) or proceed to Phase 13

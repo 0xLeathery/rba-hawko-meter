@@ -19,9 +19,9 @@ Requirements for v2.0 Local CI & Test Infrastructure. Each maps to roadmap phase
 
 - [x] **UNIT-01**: Z-score calculations verified (rolling window, median/MAD, gauge mapping)
 - [x] **UNIT-02**: Zone classification and hawk score computation verified
-- [ ] **UNIT-03**: YoY ratio normalization verified (including hybrid Cotality/ABS handling)
-- [ ] **UNIT-04**: CSV read/write operations verified (dedup, timestamp handling)
-- [ ] **UNIT-05**: status.json validated against schema (required keys, value ranges [0-100], valid zone enums)
+- [x] **UNIT-03**: YoY ratio normalization verified (including hybrid Cotality/ABS handling)
+- [x] **UNIT-04**: CSV read/write operations verified (dedup, timestamp handling)
+- [x] **UNIT-05**: status.json validated against schema (required keys, value ranges [0-100], valid zone enums)
 
 ### Linting
 
@@ -76,9 +76,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FOUND-05 | Phase 11 | Complete (11-01) |
 | UNIT-01 | Phase 12 | Complete |
 | UNIT-02 | Phase 12 | Complete |
-| UNIT-03 | Phase 12 | Pending |
-| UNIT-04 | Phase 12 | Pending |
-| UNIT-05 | Phase 12 | Pending |
+| UNIT-03 | Phase 12 | Complete |
+| UNIT-04 | Phase 12 | Complete |
+| UNIT-05 | Phase 12 | Complete |
 | LINT-01 | Phase 13 | Pending |
 | LINT-02 | Phase 13 | Pending |
 | LINT-03 | Phase 13 | Pending |

@@ -29,7 +29,7 @@ Delivered: ASX futures multi-meeting probability table, ABS RPPI + Cotality HVI 
 ### v2.0 Local CI & Test Infrastructure (Phases 11-15)
 
 - [x] **Phase 11: Test Foundation** — pyproject.toml config hub + isolated test harness (conftest.py + fixtures)
-- [ ] **Phase 12: Python Unit Tests** — Pure-function coverage for zscore, gauge, ratios, csv_handler, status.json schema
+- [x] **Phase 12: Python Unit Tests** — Pure-function coverage for zscore, gauge, ratios, csv_handler, status.json schema (completed 2026-02-24)
 - [ ] **Phase 13: Linting Baseline** — Ruff (Python) + ESLint v10 (JS) verified clean before hook is enabled
 - [ ] **Phase 14: Live Verification** — On-demand end-to-end verification against real APIs and live scrapers
 - [ ] **Phase 15: Pre-Push Hook** — Automated fast gate via lefthook + unified npm scripts
@@ -108,7 +108,7 @@ Plans:
 | 9. Housing Prices Gauge | v1.1 | 2/2 | Complete | 2026-02-24 |
 | 10. NAB Capacity Utilisation Gauge | v1.1 | 2/2 | Complete | 2026-02-24 |
 | 11. Test Foundation | v2.0 | Complete    | 2026-02-24 | 2026-02-25 |
-| 12. Python Unit Tests | 1/2 | In Progress|  | - |
+| 12. Python Unit Tests | 2/2 | Complete   | 2026-02-24 | - |
 | 13. Linting Baseline | v2.0 | 0/? | Not started | - |
 | 14. Live Verification | v2.0 | 0/? | Not started | - |
 | 15. Pre-Push Hook | v2.0 | 0/? | Not started | - |
