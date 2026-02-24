@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-02-23T06:45:02.837225Z",
+  "generated_at": "2026-02-24T05:38:57.752003Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 48.9,
@@ -19,7 +19,7 @@
       "weight": 0.25,
       "polarity": 1,
       "data_date": "2025-12-31",
-      "staleness_days": 54,
+      "staleness_days": 55,
       "confidence": "HIGH",
       "interpretation": "Inflation below long-run average",
       "history": [
@@ -47,7 +47,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2025-10-01",
-      "staleness_days": 145,
+      "staleness_days": 146,
       "confidence": "HIGH",
       "interpretation": "Wage growth significantly above long-run average",
       "history": [
@@ -75,7 +75,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -36,
+      "staleness_days": -35,
       "confidence": "HIGH",
       "interpretation": "Labour market looser than historical average",
       "history": [
@@ -103,7 +103,7 @@
       "weight": 0.1,
       "polarity": 1,
       "data_date": "2025-12-31",
-      "staleness_days": 54,
+      "staleness_days": 55,
       "confidence": "HIGH",
       "interpretation": "Consumer spending above trend",
       "history": [
@@ -131,7 +131,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2025-12-31",
-      "staleness_days": 54,
+      "staleness_days": 55,
       "confidence": "HIGH",
       "interpretation": "Building approvals near trend",
       "history": [
@@ -185,6 +185,44 @@
     },
     "direction": "hold",
     "data_date": "2026-02-23",
-    "staleness_days": 0
+    "staleness_days": 1,
+    "meetings": [
+      {
+        "meeting_date": "2026-03-03",
+        "meeting_date_label": "3 Mar 2026",
+        "implied_rate": 3.86,
+        "change_bp": 1.0,
+        "probability_cut": 0.0,
+        "probability_hold": 100.0,
+        "probability_hike": 0.0
+      },
+      {
+        "meeting_date": "2026-04-07",
+        "meeting_date_label": "7 Apr 2026",
+        "implied_rate": 3.88,
+        "change_bp": 2.5,
+        "probability_cut": 0.0,
+        "probability_hold": 100.0,
+        "probability_hike": 0.0
+      },
+      {
+        "meeting_date": "2026-05-05",
+        "meeting_date_label": "5 May 2026",
+        "implied_rate": 4.03,
+        "change_bp": 17.5,
+        "probability_cut": 0.0,
+        "probability_hold": 30.0,
+        "probability_hike": 70.0
+      },
+      {
+        "meeting_date": "2026-06-02",
+        "meeting_date_label": "2 Jun 2026",
+        "implied_rate": 4.07,
+        "change_bp": 21.5,
+        "probability_cut": 0.0,
+        "probability_hold": 14.0,
+        "probability_hike": 86.0
+      }
+    ]
   }
 }
