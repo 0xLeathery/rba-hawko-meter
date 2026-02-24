@@ -18,8 +18,8 @@ Requirements for milestone v1.1 — Full Indicator Coverage. Each maps to roadma
 
 - [x] **HOUS-01**: ABS RPPI data ingested via existing SDMX API pattern, activating the housing gauge
 - [x] **HOUS-02**: Housing gauge displays YoY % change with staleness metadata label when data is older than 90 days
-- [ ] **HOUS-03**: Cotality HVI PDF scraped monthly for current dwelling price data
-- [ ] **HOUS-04**: Housing gauge uses Cotality data when available, falls back to ABS RPPI when not
+- [x] **HOUS-03**: Cotality HVI PDF scraped monthly for current dwelling price data
+- [x] **HOUS-04**: Housing gauge uses Cotality data when available, falls back to ABS RPPI when not
 
 ### NAB Capacity Utilisation
 
@@ -62,8 +62,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ASX-04 | Phase 8 | Complete |
 | HOUS-01 | Phase 9 | Complete |
 | HOUS-02 | Phase 9 | Complete |
-| HOUS-03 | Phase 9 | Pending |
-| HOUS-04 | Phase 9 | Pending |
+| HOUS-03 | Phase 9 | Complete |
+| HOUS-04 | Phase 9 | Complete |
 | NAB-01 | Phase 10 | Pending |
 | NAB-02 | Phase 10 | Pending |
 | NAB-03 | Phase 10 | Pending |
