@@ -48,10 +48,11 @@ Plans:
   2. When housing data is older than 90 days, the gauge label includes a staleness note such as "(data to Dec 2021)" visible to the user
   3. The Cotality HVI PDF scraper runs monthly and appends current dwelling price data to `corelogic_housing.csv`
   4. The pipeline uses Cotality data when available and falls back to ABS RPPI when the Cotality scrape fails or returns no new data
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 09-01: TBD
+- [ ] 09-01-PLAN.md — ABS RPPI pipeline integration + housing gauge activation with directional labels, quarter format, source attribution
+- [ ] 09-02-PLAN.md — Cotality HVI PDF scraper + fallback logic + dynamic source attribution (gated on ToS decision)
 
 ---
 
@@ -78,5 +79,5 @@ Plans:
 |-------|-----------|----------------|--------|-----------|
 | 1-7. MVP Phases | v1.0 | 19/19 | Complete | 2026-02-24 |
 | 8. ASX Futures Live Data | 2/2 | Complete   | 2026-02-24 | - |
-| 9. Housing Prices Gauge | v1.1 | 0/? | Not started | - |
+| 9. Housing Prices Gauge | v1.1 | 0/2 | Planning complete | - |
 | 10. NAB Capacity Utilisation Gauge | v1.1 | 0/? | Not started | - |
