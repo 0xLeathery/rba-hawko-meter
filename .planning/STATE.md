@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-02-24)
 
 **Core value:** "Data, not opinion." Empowers laypeople to understand interest rate drivers without relying on media sensationalism or biased advice.
-**Current focus:** v2.0 Local CI & Test Infrastructure — Phase 11: Test Foundation
+**Current focus:** v2.0 Local CI & Test Infrastructure — Phase 12: Python Unit Tests
 
 ## Current Position
 
-Phase: 11 (Test Foundation)
-Plan: 02 complete (2/2 plans done — Phase 11 complete)
-Status: In progress
-Last activity: 2026-02-25 — Plan 11-02 complete: conftest.py + fixture CSVs + smoke tests
+Phase: 12 (Python Unit Tests)
+Plan: —
+Status: Ready to plan
+Last activity: 2026-02-25 — Phase 11 complete (verified), Phase 12 ready
 
 ```
-v2.0 Progress: [==        ] 10%
-Phase 11 [==] Phase 12 [ ] Phase 13 [ ] Phase 14 [ ] Phase 15 [ ]
+v2.0 Progress: [██        ] 20%
+Phase 11 [✓] Phase 12 [ ] Phase 13 [ ] Phase 14 [ ] Phase 15 [ ]
 ```
 
 ## Performance Metrics
@@ -72,6 +72,6 @@ None active.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Plan 11-02 complete — conftest.py + fixture CSVs + smoke tests created
-Resume file: .planning/phases/11-test-foundation/11-02-SUMMARY.md
-Next action: Phase 11 complete — begin Phase 12 (Unit Tests)
+Stopped at: Phase 11 verified and complete — auto-advance pipeline finished
+Resume file: .planning/phases/11-test-foundation/11-VERIFICATION.md
+Next action: `/gsd:discuss-phase 12` or `/gsd:plan-phase 12`
