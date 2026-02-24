@@ -108,7 +108,7 @@ Plans:
 | 9. Housing Prices Gauge | v1.1 | 2/2 | Complete | 2026-02-24 |
 | 10. NAB Capacity Utilisation Gauge | v1.1 | 2/2 | Complete | 2026-02-24 |
 | 11. Test Foundation | v2.0 | Complete    | 2026-02-24 | 2026-02-25 |
-| 12. Python Unit Tests | v2.0 | 0/2 | Planned | - |
+| 12. Python Unit Tests | 1/2 | In Progress|  | - |
 | 13. Linting Baseline | v2.0 | 0/? | Not started | - |
 | 14. Live Verification | v2.0 | 0/? | Not started | - |
 | 15. Pre-Push Hook | v2.0 | 0/? | Not started | - |
