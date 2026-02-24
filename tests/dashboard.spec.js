@@ -44,7 +44,8 @@ test.describe('Phase 4 — Hawk-O-Meter Gauges', () => {
     await expect(grid).toBeVisible();
 
     // Wait for metric cards to render (replaces the "Loading..." placeholder)
-    // 5 active cards (bg-finance-gray) + 2 placeholder cards (bg-finance-gray/50) = 7 total
+    // 6 active cards (bg-finance-gray) + 1 placeholder card (bg-finance-gray/50) = 7 total
+    // METRIC_ORDER: inflation, wages, employment, housing, spending, building_approvals, business_confidence
     const allCards = grid.locator('[class*="bg-finance-gray"]');
     await expect(allCards).toHaveCount(7, { timeout: 15000 });
 
@@ -60,11 +61,14 @@ test.describe('Phase 4 — Hawk-O-Meter Gauges', () => {
     // Employment card (index 2): job market text
     await expect(cards.nth(2)).toContainText('job market');
 
-    // Spending card (index 3): consumer spending text
-    await expect(cards.nth(3)).toContainText('Consumer spending');
+    // Housing card (index 3): directional label (RISING/FALLING/STEADY)
+    await expect(cards.nth(3)).toContainText(/(?:RISING|FALLING|STEADY)/);
 
-    // Building approvals card (index 4): interpretation text present
-    await expect(cards.nth(4)).toContainText('Building Approvals');
+    // Spending card (index 4): consumer spending text
+    await expect(cards.nth(4)).toContainText('Consumer spending');
+
+    // Building approvals card (index 5): interpretation text present
+    await expect(cards.nth(5)).toContainText('Building Approvals');
   });
 
   test('3. Responsive layout — single column at mobile, 3 columns at desktop', async ({ page }) => {
@@ -73,7 +77,7 @@ test.describe('Phase 4 — Hawk-O-Meter Gauges', () => {
     await page.goto('/');
 
     const grid = page.locator('#metric-gauges-grid');
-    // 5 active + 2 placeholder = 7 total
+    // 6 active + 1 placeholder = 7 total
     await expect(grid.locator('[class*="bg-finance-gray"]')).toHaveCount(7, { timeout: 15000 });
 
     // At 375px the grid should be single-column
@@ -112,7 +116,7 @@ test.describe('Phase 4 — Hawk-O-Meter Gauges', () => {
     await page.goto('/');
 
     const grid = page.locator('#metric-gauges-grid');
-    // 5 active + 2 placeholder = 7 total
+    // 6 active + 1 placeholder = 7 total
     await expect(grid.locator('[class*="bg-finance-gray"]')).toHaveCount(7, { timeout: 15000 });
 
     // Wages is the second card (index 1) — staleness_days=220 > 90 threshold
@@ -124,6 +128,42 @@ test.describe('Phase 4 — Hawk-O-Meter Gauges', () => {
 
     // It should also show the "months old" text
     await expect(wagesCard).toContainText('months old');
+  });
+
+});
+
+test.describe('Phase 9 — Housing Prices Gauge', () => {
+
+  test('housing gauge shows directional label and source attribution', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('#metric-gauges-grid');
+
+    // Check housing card exists (not a placeholder)
+    const housingCard = page.locator('#metric-gauges-grid .bg-finance-gray').filter({ hasText: 'Housing' });
+    await expect(housingCard).toBeVisible({ timeout: 15000 });
+
+    // Check directional label (RISING, FALLING, or STEADY) with % in interpretation
+    const interpretation = housingCard.locator('[id^="interp-housing"]');
+    await expect(interpretation).toContainText(/(?:RISING|FALLING|STEADY)/);
+    await expect(interpretation).toContainText('year-on-year');
+
+    // Check quarter format label
+    await expect(interpretation).toContainText(/\(Q\d \d{4}\)/);
+
+    // Check source attribution
+    await expect(housingCard).toContainText('Source: ABS RPPI');
+  });
+
+  test('housing gauge has no amber staleness border despite stale data', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('#metric-gauges-grid');
+
+    const housingCard = page.locator('#metric-gauges-grid .bg-finance-gray').filter({ hasText: 'Housing' });
+    await expect(housingCard).toBeVisible({ timeout: 15000 });
+
+    // Housing card should NOT have amber border even though data is >90 days old
+    const classAttr = await housingCard.getAttribute('class');
+    expect(classAttr).not.toContain('border-amber-500');
   });
 
 });

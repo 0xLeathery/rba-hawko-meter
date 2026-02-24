@@ -345,6 +345,19 @@ var InterpretationsModule = (function () {
   }
 
   /**
+   * Convert ISO date string to quarter format label.
+   * @param {string} isoDateStr - ISO 8601 date string (e.g. "2021-10-01")
+   * @returns {string} Quarter label e.g. "(Q4 2021)" or empty string if invalid
+   */
+  function toQuarterLabel(isoDateStr) {
+    if (!isoDateStr) return '';
+    var d = new Date(isoDateStr);
+    if (isNaN(d.getTime())) return '';
+    var q = Math.ceil((d.getMonth() + 1) / 3);
+    return '(Q' + q + ' ' + d.getFullYear() + ')';
+  }
+
+  /**
    * Generate data-driven interpretation text for a metric.
    * @param {string} metricId - Metric identifier (e.g. 'inflation')
    * @param {Object} metricData - { value, z_score, raw_value, raw_unit, data_date, staleness_days, confidence, interpretation }
@@ -376,9 +389,21 @@ var InterpretationsModule = (function () {
         return 'New building approvals are above average \u2014 a sign of strong construction demand';
 
       case 'housing':
-        if (v < 40) return 'House prices are easing \u2014 less pressure on affordability';
-        if (v <= 60) return 'House prices are growing at a moderate pace';
-        return 'House prices are rising strongly \u2014 adding to affordability pressure';
+        var direction, sign;
+        var rawNum = parseFloat(raw);
+        // Neutral zone: +/-1% per research recommendation
+        if (isNaN(rawNum) || (rawNum > -1 && rawNum < 1)) {
+          direction = 'STEADY';
+          sign = '';
+        } else if (rawNum >= 1) {
+          direction = 'RISING';
+          sign = '+';
+        } else {
+          direction = 'FALLING';
+          sign = '';
+        }
+        var quarterLabel = toQuarterLabel(metricData.data_date);
+        return direction + ' ' + sign + raw + '% year-on-year ' + quarterLabel;
 
       case 'employment':
         if (v < 40) return 'The job market is softening \u2014 fewer new jobs being created';
@@ -451,6 +476,10 @@ var InterpretationsModule = (function () {
     if (!container) return;
 
     var stale = metricData.staleness_days > 90;
+    // Housing: quarter-only staleness — suppress amber border per CONTEXT.md
+    if (metricId === 'housing' && metricData.stale_display === 'quarter_only') {
+      stale = false;
+    }
 
     var card = document.createElement('div');
     card.className = 'bg-finance-gray rounded-lg p-4 border border-finance-border';
@@ -510,6 +539,14 @@ var InterpretationsModule = (function () {
       card.appendChild(whyDiv);
     }
 
+    // Source attribution for housing
+    if (metricId === 'housing' && metricData.data_source) {
+      var srcAttr = document.createElement('div');
+      srcAttr.className = 'text-xs text-gray-500 mt-1';
+      srcAttr.textContent = 'Source: ' + metricData.data_source;
+      card.appendChild(srcAttr);
+    }
+
     // Source citation with Australian date format
     var sourceDiv = document.createElement('div');
     sourceDiv.className = 'text-xs text-gray-600 mt-2';
@@ -535,6 +572,7 @@ var InterpretationsModule = (function () {
     getWhyItMatters: getWhyItMatters,
     getPlainVerdict: getPlainVerdict,
     formatAusDate: formatAusDate,
-    isDataSuspect: isDataSuspect
+    isDataSuspect: isDataSuspect,
+    toQuarterLabel: toQuarterLabel
   };
 })();
