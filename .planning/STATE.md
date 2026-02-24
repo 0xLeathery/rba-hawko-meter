@@ -10,13 +10,13 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 ## Current Position
 
 Phase: 11 (Test Foundation)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-02-24 — v2.0 roadmap created (5 phases, 22 requirements mapped)
+Plan: 01 complete (1/2 plans done)
+Status: In progress
+Last activity: 2026-02-25 — Plan 11-01 complete: pyproject.toml config hub + requirements-dev.txt
 
 ```
-v2.0 Progress: [          ] 0%
-Phase 11 [ ] Phase 12 [ ] Phase 13 [ ] Phase 14 [ ] Phase 15 [ ]
+v2.0 Progress: [=         ] 5%
+Phase 11 [=] Phase 12 [ ] Phase 13 [ ] Phase 14 [ ] Phase 15 [ ]
 ```
 
 ## Performance Metrics
@@ -43,8 +43,12 @@ Phase 11 [ ] Phase 12 [ ] Phase 13 [ ] Phase 14 [ ] Phase 15 [ ]
 
 Archived to PROJECT.md Key Decisions table. All v1.0 and v1.1 decisions preserved there.
 
-**v2.0 decisions (pending):**
-- None yet — decisions will be recorded during phase execution
+**v2.0 decisions (Plan 11-01):**
+- Use [tool.pytest.ini_options] (not [tool.pytest] native TOML) for pytest 6+ compatibility
+- testpaths = [tests/python] to scope discovery and keep Playwright tests isolated
+- pythonpath = [.] so import pipeline.config works from flat layout (no src/)
+- ruff select E/F/W/B/I/UP with no ignores (clean slate baseline)
+- jsonschema included in requirements-dev.txt now (needed Phase 12) for one-command dev install
 
 ### Critical Context for v2.0
 
@@ -61,6 +65,6 @@ None active.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: Phase 11 context gathered — ready to plan
-Resume file: .planning/phases/11-test-foundation/11-CONTEXT.md
-Next action: `/gsd:plan-phase 11`
+Stopped at: Plan 11-01 complete — pyproject.toml and requirements-dev.txt created
+Resume file: .planning/phases/11-test-foundation/11-01-SUMMARY.md
+Next action: Execute plan 11-02 (conftest.py + fixture CSVs + smoke tests)

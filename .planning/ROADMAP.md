@@ -48,7 +48,7 @@ Delivered: ASX futures multi-meeting probability table, ABS RPPI + Cotality HVI 
   5. Developer installs dev dependencies from `requirements-dev.txt` in one command and pytest, ruff, jsonschema are available
 **Plans**: 2 plans
 Plans:
-- [ ] 11-01-PLAN.md -- Config hub (pyproject.toml) and dev dependencies (requirements-dev.txt)
+- [x] 11-01-PLAN.md -- Config hub (pyproject.toml) and dev dependencies (requirements-dev.txt)
 - [ ] 11-02-PLAN.md -- Test fixtures (conftest.py, fixture CSVs) and smoke tests
 
 ### Phase 12: Python Unit Tests
@@ -104,7 +104,7 @@ Plans:
 | 8. ASX Futures Live Data | v1.1 | 2/2 | Complete | 2026-02-24 |
 | 9. Housing Prices Gauge | v1.1 | 2/2 | Complete | 2026-02-24 |
 | 10. NAB Capacity Utilisation Gauge | v1.1 | 2/2 | Complete | 2026-02-24 |
-| 11. Test Foundation | v2.0 | 0/2 | Planned | - |
+| 11. Test Foundation | v2.0 | 1/2 | In progress | - |
 | 12. Python Unit Tests | v2.0 | 0/? | Not started | - |
 | 13. Linting Baseline | v2.0 | 0/? | Not started | - |
 | 14. Live Verification | v2.0 | 0/? | Not started | - |

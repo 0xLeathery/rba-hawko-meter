@@ -9,11 +9,11 @@ Requirements for v2.0 Local CI & Test Infrastructure. Each maps to roadmap phase
 
 ### Test Foundation
 
-- [ ] **FOUND-01**: Developer can configure pytest and ruff from a single `pyproject.toml`
+- [x] **FOUND-01**: Developer can configure pytest and ruff from a single `pyproject.toml`
 - [ ] **FOUND-02**: Unit tests are isolated from production data via autouse DATA_DIR fixture
 - [ ] **FOUND-03**: Test fixtures provide deterministic CSV data for reproducible test runs
-- [ ] **FOUND-04**: Tests are tiered via `@pytest.mark.live` so fast and live tests run separately
-- [ ] **FOUND-05**: Dev dependencies managed separately in `requirements-dev.txt`
+- [x] **FOUND-04**: Tests are tiered via `@pytest.mark.live` so fast and live tests run separately
+- [x] **FOUND-05**: Dev dependencies managed separately in `requirements-dev.txt`
 
 ### Python Unit Tests
 
@@ -69,11 +69,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 11 | Pending |
+| FOUND-01 | Phase 11 | Complete (11-01) |
 | FOUND-02 | Phase 11 | Pending |
 | FOUND-03 | Phase 11 | Pending |
-| FOUND-04 | Phase 11 | Pending |
-| FOUND-05 | Phase 11 | Pending |
+| FOUND-04 | Phase 11 | Complete (11-01) |
+| FOUND-05 | Phase 11 | Complete (11-01) |
 | UNIT-01 | Phase 12 | Pending |
 | UNIT-02 | Phase 12 | Pending |
 | UNIT-03 | Phase 12 | Pending |
@@ -99,4 +99,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-24*
-*Last updated: 2026-02-24 after roadmap creation (all 22 requirements mapped)*
+*Last updated: 2026-02-25 after Plan 11-01 execution (FOUND-01, FOUND-04, FOUND-05 complete)*
