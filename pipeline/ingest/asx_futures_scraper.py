@@ -214,6 +214,35 @@ def scrape_asx_futures() -> pd.DataFrame:
     return df
 
 
+def _check_staleness(csv_path: Path) -> None:
+    """
+    Check if the ASX futures CSV contains stale data and log warnings.
+
+    Non-fatal — ASX is an optional tier. Logs a warning at 14 days and an
+    error at 30 days without raising. Called after every successful CSV write
+    so operators know when the endpoint is returning stale data.
+
+    Args:
+        csv_path: Path to the asx_futures.csv file.
+    """
+    try:
+        df = pd.read_csv(csv_path)
+        df['date'] = pd.to_datetime(df['date'])
+        staleness_days = (datetime.now() - df['date'].max()).days
+        if staleness_days >= 30:
+            logger.error(
+                f"ASX futures data is {staleness_days} days old (threshold: 30). "
+                "Endpoint may be down or data is missing."
+            )
+        elif staleness_days >= 14:
+            logger.warning(
+                f"ASX futures data is {staleness_days} days old (threshold: 14). "
+                "Fresh data expected but not received."
+            )
+    except Exception as e:
+        logger.warning(f"Could not check ASX staleness: {e}")
+
+
 def fetch_and_save() -> Dict[str, Union[str, int]]:
     """
     Fetch ASX futures data and save to CSV.
@@ -249,6 +278,10 @@ def fetch_and_save() -> Dict[str, Union[str, int]]:
 
         # Write to CSV
         result_df.to_csv(output_path, index=False)
+
+        # Check for stale data even after a successful scrape — the endpoint
+        # may return data but the max date may still be old
+        _check_staleness(output_path)
 
         logger.info(f"ASX futures data saved: {len(result_df)} total rows, {len(df)} new")
         return {

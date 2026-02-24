@@ -194,7 +194,7 @@ def build_asx_futures_entry():
     # implied_rate minus change as approximation
     current_rate = round(data['implied_rate'] - data['change_bp'] / 100, 2)
 
-    return {
+    entry = {
         'current_rate': current_rate,
         'next_meeting': data['meeting_date'],
         'implied_rate': round(data['implied_rate'], 2),
@@ -207,6 +207,27 @@ def build_asx_futures_entry():
         'data_date': data['data_date'],
         'staleness_days': staleness_days,
     }
+
+    # Phase 8: add meetings array with human-readable date labels
+    if 'meetings' in data:
+        meetings_out = []
+        for m in data['meetings']:
+            dt = datetime.strptime(m['meeting_date'], '%Y-%m-%d')
+            # Cross-platform day without zero-padding: str(int(day)) avoids %-d on Windows
+            day = str(dt.day)
+            meeting_date_label = f"{day} {dt.strftime('%b %Y')}"
+            meetings_out.append({
+                'meeting_date': m['meeting_date'],
+                'meeting_date_label': meeting_date_label,
+                'implied_rate': round(m['implied_rate'], 2),
+                'change_bp': m['change_bp'],
+                'probability_cut': round(m['probability_cut'], 0),
+                'probability_hold': round(m['probability_hold'], 0),
+                'probability_hike': round(m['probability_hike'], 0),
+            })
+        entry['meetings'] = meetings_out
+
+    return entry
 
 
 def process_indicator(name, config, weight_config):

@@ -213,9 +213,24 @@ def load_asx_futures_csv(csv_path):
     if future_meetings.empty:
         # All meetings in the past -- use the latest meeting as fallback
         next_meeting_row = latest_rows.iloc[0]
+        # No future meetings to build array from
+        upcoming_meetings = future_meetings  # empty DataFrame
     else:
         # Pick the nearest future meeting
-        next_meeting_row = future_meetings.sort_values('meeting_date').iloc[0]
+        upcoming_meetings = future_meetings.sort_values('meeting_date')
+        next_meeting_row = upcoming_meetings.iloc[0]
+
+    # Build multi-meeting list: next 3-4 upcoming meetings
+    meetings = []
+    for _, row in upcoming_meetings.head(4).iterrows():
+        meetings.append({
+            'meeting_date': row['meeting_date'].strftime('%Y-%m-%d'),
+            'implied_rate': float(row['implied_rate']),
+            'change_bp': float(row['change_bp']),
+            'probability_cut': float(row['probability_cut']),
+            'probability_hold': float(row['probability_hold']),
+            'probability_hike': float(row['probability_hike']),
+        })
 
     return {
         'data_date': latest_date.strftime('%Y-%m-%d'),
@@ -225,4 +240,5 @@ def load_asx_futures_csv(csv_path):
         'probability_cut': float(next_meeting_row['probability_cut']),
         'probability_hold': float(next_meeting_row['probability_hold']),
         'probability_hike': float(next_meeting_row['probability_hike']),
+        'meetings': meetings,
     }
