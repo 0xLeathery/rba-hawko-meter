@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-02-24)
 ## Current Position
 
 Phase: 8 of 10 (ASX Futures Live Data)
-Plan: 1 of ? in current phase (08-01 complete)
+Plan: 2 of 2 in current phase (08-02 complete)
 Status: In progress
-Last activity: 2026-02-24 — 08-01 complete: multi-meeting pipeline with staleness detection and CI freshness assertion
+Last activity: 2026-02-24 — 08-02 complete: multi-meeting ASX table with traffic light bars, placeholder fallback, updated Playwright tests
 
 Progress: [███████░░░] 70% (7 of 10 phases complete — v1.0 shipped)
 
@@ -27,7 +27,7 @@ Progress: [███████░░░] 70% (7 of 10 phases complete — v1.0
 
 | Phase | Plans | Status |
 |-------|-------|--------|
-| 8. ASX Futures Live Data | 1+ | In progress (08-01 done) |
+| 8. ASX Futures Live Data | 2 | Complete (08-01 pipeline, 08-02 frontend table) |
 | 9. Housing Prices Gauge | TBD | Not started |
 | 10. NAB Capacity Utilisation Gauge | TBD | Not started |
 
@@ -42,6 +42,8 @@ Progress: [███████░░░] 70% (7 of 10 phases complete — v1.0
 - [08-01] CI freshness step uses continue-on-error: true — intermittent ASX outages must not block data commits
 - [08-01] meetings[] contract extension is additive — all existing single-meeting fields preserved for backward compatibility
 - [08-01] Cross-platform day formatting via str(dt.day) — %-d strftime is Linux/macOS only, crashes on Windows CI
+- [08-02] ASX section always visible — container.style.display='' unconditionally; placeholder shown when meetings[] null/empty
+- [08-02] Traffic light colors replace old blue/gray/red — green (#10b981) cut, amber (#f59e0b) hold, red (#ef4444) hike
 
 ### Research Flags (check before implementing)
 
@@ -57,5 +59,5 @@ Progress: [███████░░░] 70% (7 of 10 phases complete — v1.0
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 08-01-PLAN.md — multi-meeting pipeline, staleness detection, CI freshness assertion
+Stopped at: Completed 08-02-PLAN.md — multi-meeting ASX table with traffic light bars, always-visible placeholder, Playwright tests updated
 Resume file: None
