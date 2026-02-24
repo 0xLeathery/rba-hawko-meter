@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-24)
 
 **Core value:** "Data, not opinion." Empowers laypeople to understand interest rate drivers without relying on media sensationalism or biased advice.
-**Current focus:** Phase 9 complete — moving to Phase 10 NAB Capacity Utilisation Gauge (v1.1 in progress)
+**Current focus:** Phase 10 NAB Capacity Utilisation Gauge — 10-01 complete, phase done
 
 ## Current Position
 
-Phase: 9 of 10 (Housing Prices Gauge — COMPLETE)
-Plan: 2 of 2 in phase 09 (09-01 ABS RPPI, 09-02 Cotality HVI scraper — both complete)
-Status: In progress (Phase 9 done, Phase 10 pending)
-Last activity: 2026-02-24 — 09-02 complete: Cotality HVI PDF scraper, hybrid normalization, 26/26 Playwright tests, HOUS-03+HOUS-04 satisfied
+Phase: 10 of 10 (NAB Capacity Utilisation Gauge — COMPLETE)
+Plan: 1 of 1 in phase 10 (10-01 NAB scraper + config wire-up — complete)
+Status: Phase 10 complete — all 8 indicators active
+Last activity: 2026-02-24 — 10-01 complete: NAB scraper (URL discovery, HTML/PDF extraction, backfill), business_confidence config activated, 7 rows in nab_capacity.csv, normalization engine processes 7 of 8 indicators (ASX futures separate)
 
-Progress: [████████░░] 75% (7.5 of 10 phases complete — v1.0 shipped, v1.1 in progress)
+Progress: [██████████] 100% (10 of 10 phases complete — v1.1 shipped)
 
 ## Performance Metrics
 
@@ -29,7 +29,8 @@ Progress: [████████░░] 75% (7.5 of 10 phases complete — v1
 |-------|-------|--------|
 | 8. ASX Futures Live Data | 2 | Complete (08-01 pipeline, 08-02 frontend table) |
 | 9. Housing Prices Gauge | 2 | Complete (09-01 ABS RPPI + frontend, 09-02 Cotality HVI scraper) |
-| 10. NAB Capacity Utilisation Gauge | TBD | Not started |
+| 10. NAB Capacity Utilisation Gauge | 1 | Complete (10-01 NAB scraper + config wire-up) |
+| Phase 10 P01 | 556 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -50,19 +51,23 @@ Progress: [████████░░] 75% (7.5 of 10 phases complete — v1
 - [Phase 09]: Cotality PDF scraper wired into automated pipeline (project owner approved: 'publicly available information')
 - [Phase 09]: Hybrid normalization in ratios.py separates ABS index rows from Cotality pre-computed YoY rows to prevent double-normalization
 - [Phase 09]: 4-candidate URL try-list for Cotality PDFs handles URL pattern inconsistency across monthly releases
+- [10-01] URL discovery via tag archive crawl — never construct NAB article URLs from date templates for current-month scraping
+- [10-01] Backfill uses MONTH_URL_PATTERNS — only place URL construction used; tag archive omits historical articles
+- [10-01] normalize=direct kept for business_confidence — capacity utilisation is an absolute %, not a YoY ratio
+- [10-01] engine.py adaptive min_quarters — lowers z-score minimum for indicators with <20 quarters of backfill history
 
 ### Research Flags (check before implementing)
 
 - Phase 9 (resolved): ABS RPPI SDMX key confirmed as `1.3.100.Q` (not `3.2.100.Q`) — 74 rows fetched successfully
 - Phase 9 (resolved): HOUS-03/HOUS-04 (Cotality PDF) — project owner approved, scraper implemented, 9.4% YoY Feb 2026 data live
-- Phase 10: Manually verify NAB HTML regex matches the current month's page before committing Phase 10 implementation
+- Phase 10 (resolved): NAB HTML regex verified against live backfill — 7 months scraped successfully (Apr 2025 — Jan 2026)
 
 ### Blockers/Concerns
 
-None active — Cotality ToS blocker resolved (project owner approved, HOUS-03/HOUS-04 complete).
+None active.
 
 ## Session Continuity
 
 Last session: 2026-02-24
-Stopped at: Completed 09-02-PLAN.md — Cotality HVI PDF scraper, hybrid normalization fix, HOUS-03+HOUS-04 satisfied, 26/26 Playwright tests passing. Phase 9 complete.
+Stopped at: Completed 10-01-PLAN.md — NAB scraper rewrite (URL discovery, HTML/PDF extraction, 12-month backfill), business_confidence config wired to nab_capacity.csv, engine adaptive min_quarters fix, 7 rows in nab_capacity.csv, normalization engine processing business_confidence (Z=1.35, Gauge=72.5). Phase 10 complete.
 Resume file: None
