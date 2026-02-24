@@ -1,0 +1,29 @@
+# pyproject.toml — Tool configuration hub for pytest and ruff.
+# This project is not a distributable Python package; no [project] section.
+# Source: https://docs.pytest.org/en/stable/reference/customize.html
+# Source: https://docs.astral.sh/ruff/configuration/
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = ["tests/python"]
+pythonpath = ["."]
+addopts = ["--strict-markers"]
+markers = [
+    "live: marks tests that require live network access (deselect with '-m \"not live\"')",
+]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "node_modules",
+    ".pytest_cache",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I", "UP"]
+ignore = []
+fixable = ["ALL"]
