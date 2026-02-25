@@ -1,17 +1,17 @@
 # Project Research Summary
 
-**Project:** RBA Hawk-O-Meter — v3.0 Full Test Coverage
-**Domain:** Python unit test coverage — I/O-heavy scraper, ingest, and orchestration modules
+**Project:** RBA Hawk-O-Meter — v4.0 Dashboard Visual Overhaul
+**Domain:** Static financial/economic data dashboard — frontend UX overhaul of existing vanilla JS app
 **Researched:** 2026-02-25
 **Confidence:** HIGH
 
 ## Executive Summary
 
-The v3.0 milestone extends the test infrastructure built in v2.0 (pytest foundation, conftest autouse fixtures, 118 unit tests for pure math modules) to the I/O-heavy layer that was deliberately left uncovered: five ingest/scraper modules, the normalization engine, the pipeline orchestrator, and the HTTP client utility. These modules are currently at 0-42% coverage. The target is 85%+ per-module coverage enforced by a custom `scripts/check_coverage.py` script (since `coverage.py` offers no per-file threshold configuration natively). Three new packages are added: `pytest-mock` for clean multi-target mocking, `responses` for HTTP transport-layer interception (though research ultimately recommends `unittest.mock.MagicMock` with `create_session` patching as the primary pattern), and `pytest-cov` wired into `pyproject.toml addopts` so coverage is measured on every test run including the pre-push hook.
+The RBA Hawk-O-Meter v4.0 milestone is a pure frontend visual overhaul of a fully-shipped v3.0 dashboard. The project uses a no-build-step architecture (Tailwind CDN, Plotly.js CDN, vanilla JS IIFE modules) that is already mature and well-validated. The three milestone deliverables — hero section redesign, verdict explanation section, and visual polish — are all achievable using existing data structures and utility functions with no changes to the Python pipeline, status.json schema, or any backend infrastructure. The recommended approach is strictly additive: restructure one HTML section, extend one existing JS module, and tune CSS classes.
 
-The recommended approach is an inside-out test writing sequence: pure functions first (zero mocking, immediate coverage gains), then file-I/O functions using the existing `isolate_data_dir` autouse fixture, then mock-session tests for the five ingest modules, and finally orchestration tests for `engine.py` and `main.py`. This order is critical because the mock session pattern must be established and verified in one module before being replicated across all five ingest modules. The single most important architectural rule — established in ARCHITECTURE.md and reinforced across all four research files — is that `create_session` must be patched in the module where it is used (e.g., `pipeline.ingest.abs_data.create_session`), not in the source module (`pipeline.utils.http_client.create_session`). Getting this wrong produces confusing `RuntimeError: Network access blocked in tests` failures that look like infrastructure problems.
+The recommended implementation sequence is HTML restructure first, JS logic second, CSS polish third. This order is dictated by the architectural constraint that the DOM must be stable before CSS is tuned to avoid rework, and by the Plotly.js sizing constraint that gauge containers must be in their final layout before `Plotly.newPlot()` is called. The single optional dependency addition is Inter font via Google Fonts CDN (already referenced in the Plotly font stack but never loaded), plus CountUp.js 2.9.0 as an optional delight feature for the score counter animation.
 
-Three categories of risk dominate the pitfalls research. First, the correct patch target for `create_session` is the most likely source of frustration during Phase 1. Second, error-path coverage is the primary reason modules plateau at 60-70% — every ingest function has 4-8 distinct error branches that each require their own test. Third, date-dependent logic in the CoreLogic and NAB scrapers causes non-deterministic CI failures unless `datetime.now()` is frozen or patched per-test. A fourth structural gap that is easy to miss: `pipeline.config.STATUS_OUTPUT` (pointing to `public/data/status.json`) is NOT patched by the `isolate_data_dir` autouse fixture, so any test calling `generate_status()` writes to the real output file unless explicitly patched.
+The key risks are all well-understood and have clear mitigations: Plotly gauge zero-width rendering after DOM restructure (prevent with `requestAnimationFrame` + explicit resize call), Tailwind CDN silently dropping dynamically concatenated class names (prevent by using complete literal strings or `element.style` with hex values), ASIC compliance violations in verdict explanation copy (prevent with hedged factual-information framing), and Playwright test brittleness from nth-index selectors (prevent by running the suite after every structural HTML change). All risks are LOW-MEDIUM recovery cost if caught early.
 
 ---
 
@@ -19,135 +19,134 @@ Three categories of risk dominate the pitfalls research. First, the correct patc
 
 ### Recommended Stack
 
-The v2.0 test infrastructure (pytest 9.0.2, pytest-cov 7.0.0, ruff 0.15.2, jsonschema 4.26.0, lefthook, `unittest.mock` stdlib) requires only three additions for v3.0. All versions verified against PyPI as of 2026-02-25. No changes to `package.json`, the Playwright suite, or GitHub Actions workflows are required.
+The existing stack requires no significant changes for v4.0. All tooling — Tailwind CDN v3, Plotly.js 2.35.2, Decimal.js, vanilla JS IIFE modules — must stay at current versions. Tailwind v4 CDN uses a fundamentally incompatible configuration format, and Plotly v3 has breaking changes to `title` handling that would require auditing every layout call with no feature benefit for this milestone.
 
-**Core technologies added:**
+Two additions are recommended: Inter via Google Fonts CDN (already declared in `getDarkLayout()`'s font stack but never actually loaded, causing Windows browsers to fall back to Segoe UI), and CountUp.js 2.9.0 UMD from jsDelivr (optional — creates the most impactful UX moment of the hero redesign). All hero animations use native CSS `@keyframes` in the existing `<style>` block — no animation library needed.
 
-- **pytest-mock 3.15.1**: `mocker` fixture for clean multi-target mock trees — auto-resets after each test; use for tests with 3+ simultaneous mock targets; `monkeypatch.setattr` remains for single-target patches
-- **responses 0.26.0**: HTTP transport-layer interceptor (released 2026-02-19) — intercepts at `HTTPAdapter.send()` level before the socket blocker fires; HOWEVER, research determined `MagicMock` + `create_session` patching is simpler and sufficient for this codebase; `responses` is available if needed
-- **pytest-cov wired into addopts**: Already installed but not wired; add `--cov=pipeline --cov-report=term-missing --cov-report=json:.coverage.json` to `pyproject.toml addopts` so coverage is measured on every `pytest` invocation
-- **scripts/check_coverage.py**: ~30-line custom script parsing `.coverage.json` and asserting >=85% per `pipeline/` module; enforced in the lefthook pre-push sequence; necessary because `coverage.py` has no per-file `fail_under` configuration (GitHub issue #444, confirmed unimplemented)
-
-**What NOT to add:** vcrpy/betamax (cassette staleness), httpretty (conflicts with socket blocker), pytest-httpserver (port management overhead), reportlab (4MB for PDF generation), pytest-cov-threshold (unmaintained 2020), pytest-xdist (no payoff at 200-300 test scale), mypy/pyright (explicitly out of scope per PROJECT.md), tox (one Python version target).
+**Core technologies:**
+- Tailwind CDN v3 (`cdn.tailwindcss.com`): utility-first CSS — stay on v3; v4 CDN is incompatible with existing JS config object
+- Plotly.js 2.35.2 (`cdn.plot.ly`): gauge and chart rendering — stay pinned; v3 has breaking title API changes with no feature benefit for this milestone
+- Inter (Google Fonts CDN): typography — ADD via preconnect + link tag; already referenced in Plotly font stack, just never loaded
+- CountUp.js 2.9.0 (jsDelivr UMD): hero score count-up animation — ADD as optional; 5.83KB, MIT, handles edge cases correctly; replaceable with ~25 lines of vanilla `requestAnimationFrame`
+- Native CSS `@keyframes`: hero entry animations — no library needed; two keyframe definitions (`fadeSlideIn`, `fadeIn`) cover all animation needs
 
 ### Expected Features
 
-The coverage gap is entirely in I/O-heavy modules. The path to 85% per module is systematic: cover pure functions first (highest effort-to-coverage ratio), then file-reading functions via `tmp_path`, then network-mocking tests for each scraper, then orchestration.
+The feature research establishes a clear P1/P2/P3 hierarchy. All P1 features are pure frontend additions requiring zero backend or schema changes. The single differentiating feature — the verdict explanation section showing what is driving the score — has no comparable equivalent in CNN Fear & Greed or the MacroMicro Hawk-Dove Index.
 
-**Must have (table stakes — structurally required to reach 85%):**
+**Must have (table stakes — v4.0 P1):**
+- Verdict label as visual hero (large, zone-coloured, above-the-fold) — the primary UX purpose of the milestone
+- Score immediately legible as a number with context — users cannot interpret a gauge needle alone
+- Scale explainer physically adjacent to the verdict — currently can scroll below fold on mobile
+- Data freshness badge inside the hero card — users must know if the score is current before trusting it
+- Consistent zone colour across hero verdict, card accent border, and explanation headings — colour vocabulary collapses if inconsistent
+- Graceful loading states with no layout shift — `min-height: 280px` on gauge container must be preserved
 
-- Pure function tests for all zero-I/O functions: `_parse_abs_date`, `_derive_probabilities`, `_find_meeting_for_contract`, `get_candidate_urls`, `generate_interpretation`, `_check_staleness` — fastest wins, zero mocking overhead
-- `http_client.py` direct session inspection tests — call `create_session()` with custom params; assert adapter config; no mocking; gets module to 85%+
-- `build_gauge_entry` direct tests with synthetic `pd.Series`/`pd.DataFrame` — covers large portion of `engine.py` with no mock setup
-- HTML bytes fixture tests for NAB scraper (`extract_capacity_from_html`, `get_pdf_link`) — pure bytes in, value out, zero mocking
-- Mock-session tests for all 5 ingest modules: `abs_data`, `rba_data`, `asx_futures_scraper`, `corelogic_scraper`, `nab_scraper` — must cover happy path AND all error branches
-- `main.py` orchestration tests — patch all 4 ingest modules at `pipeline.main.*` level; test tier behavior and `sys.exit(1)` with `pytest.raises(SystemExit)`
-- pdfplumber mock tests for `extract_cotality_yoy` and `extract_capacity_from_pdf` — mock at `page.extract_text()` level, never use real PDF files
+**Should have (differentiators — v4.0 P1/P2):**
+- Verdict explanation section: two plain-English lists of "pushing rates up" and "pulling rates down" indicators — the feature no competitor offers
+- Hero card with zone-coloured accent border — reinforces verdict at the card boundary level
+- Gauge entrance animation (sweep from 0 to score) — P2, after P1 features verified; requires `requestAnimationFrame` workaround since Plotly indicator gauges do not animate natively
 
-**Should have (pushes coverage beyond 85%):**
-
-- `abs_data.fetch_and_save` ABS filter-path tests (multi-dimensional CSV filter logic)
-- `asx_futures_scraper.scrape_asx_futures` full flow with fixture JSON response body
-- `engine.py:generate_status` assembly test with real fixture CSVs (not full mock of sub-functions)
-- `nab_scraper.discover_latest_survey_url` with two-archive-URL fallback logic
-- `nab_scraper.backfill_nab_history` month iteration logic
-
-**Defer to v4+ (future milestone):**
-
-- `engine.py:generate_status` full integration (more appropriate as a smoke test than a unit test)
-- `asx_futures_scraper._get_rba_meeting_dates` (reads from `public/data/meetings.json`, not under `DATA_DIR` — needs additional isolation strategy)
-- 100% coverage on `main.py` (the `if __name__ == '__main__':` guard is unreachable from pytest; 90-95% is the realistic ceiling)
+**Defer (v4.x or v5+):**
+- Indicator direction delta badges — requires `previous_value` field in status.json; backend pipeline change, not frontend work
+- Historical hawk score chart — requires archiving status.json snapshots; no current archive mechanism
+- Dark/light theme toggle — requires dual Tailwind class definitions and Plotly style rewrites across every module; high complexity for low value against the finance-terminal aesthetic
+- Real-time polling — ABS/RBA data is monthly/quarterly; polling is theatre
 
 ### Architecture Approach
 
-The v3.0 test expansion adds 8 new test files and 3 new fixture files to `tests/python/`. No existing test files or `conftest.py` are modified. The existing autouse fixtures (`isolate_data_dir`, `block_network`) handle all new ingest tests automatically. The only new shared fixture needed is `engine_data_dir` (patches `STATUS_OUTPUT` in addition to `DATA_DIR`, copies all fixture CSVs and `weights.json` to `tmp_path`).
+v4.0 adds no new directories, no new JS modules, and no new data sources. Three files change: `public/index.html` (hero section restructure + `#verdict-explanation` div), `public/js/interpretations.js` (add `renderVerdictExplanation()` + expose in return object), and `public/js/gauge-init.js` (add one function call in the existing `.then()` callback). Everything else is unchanged.
 
-**Major components:**
+The key architectural insight from direct codebase inspection is that `DataModule` already caches `status.json` by URL — any module can call `DataModule.fetch("data/status.json")` and get the cached result as a resolved Promise with no network cost and no coordination protocol. This means `renderVerdictExplanation` does not need its own data fetch; it receives `data.gauges` and `data.overall.hawk_score` directly from gauge-init.js's existing `.then()` callback, where the data is already available.
 
-1. **8 new test files** — `test_http_client.py`, `test_ingest_abs.py`, `test_ingest_rba.py`, `test_ingest_asx.py`, `test_ingest_corelogic.py`, `test_ingest_nab.py`, `test_engine.py`, `test_main.py` — each owning tests for the named module
-2. **`_make_mock_session` helper** — shared within each test file; builds `MagicMock` session/response object; patch target is always `pipeline.ingest.<module>.create_session`
-3. **3 new fixture files** — `asx_futures_api_response.json` (MarkitDigital API mock), `rba_a2_data.csv` (RBA A2 with metadata header rows), `nab_article.html` (optional; inline HTML bytes preferred)
-4. **`scripts/check_coverage.py`** — reads `.coverage.json`, iterates per-file coverage percentages, asserts each `pipeline/` module meets 85%, exits non-zero with diff table on failure
-5. **Updated `pyproject.toml` addopts** — adds `--cov=pipeline --cov-report=term-missing --cov-report=json:.coverage.json` so coverage runs automatically
-6. **Updated `requirements-dev.txt`** — adds `pytest-mock>=3.15,<4`, `responses>=0.26,<1`, `pytest-cov>=7.0,<8`
-7. **Updated lefthook pre-push** — adds `coverage-check` command after `unit-tests`: `python scripts/check_coverage.py --min 85`
-
-**Four isolation layers that must all be respected:**
-- Layer 1: Socket level (`block_network` autouse — any real socket call raises `RuntimeError`)
-- Layer 2: HTTP session level (`patch("pipeline.ingest.X.create_session")` in each ingest test)
-- Layer 3: Data directory level (`isolate_data_dir` autouse — `DATA_DIR` → `tmp_path`)
-- Layer 4: Status output level (must patch `pipeline.config.STATUS_OUTPUT` explicitly in engine tests — NOT covered by autouse)
+**Major components and v4.0 change surface:**
+1. `public/index.html` — MODIFIED: promote `#verdict-container` above the 5-column gauge grid; add `#verdict-explanation` container; add Inter font link tags; add `@keyframes` to `<style>` block; extend `tailwind.config` with `fontFamily.sans`
+2. `public/js/interpretations.js` (InterpretationsModule) — MODIFIED: add `renderVerdictExplanation(containerId, gaugesData, overallScore)`; expose in return object; reuse `getWhyItMatters()` and `generateMetricInterpretation()` for ASIC-safe copy
+3. `public/js/gauge-init.js` — MODIFIED: add one call to `InterpretationsModule.renderVerdictExplanation()` after `renderVerdict()` in the existing `.then()` callback
+4. `public/js/gauges.js` (GaugesModule) — UNCHANGED: `getZoneColor()` and `getStanceLabel()` already support all new colour logic needs
+5. `public/js/data.js` (DataModule) — UNCHANGED: cache mechanism handles repeated status.json fetches transparently
 
 ### Critical Pitfalls
 
-1. **Wrong patch target for `create_session`** — patch `"pipeline.ingest.abs_data.create_session"` (where it is USED), never `"pipeline.utils.http_client.create_session"` (where it is DEFINED). Patching the source has no effect on the already-bound name in the consuming module. Symptoms: `RuntimeError: Network access blocked in tests` even with a mock in place. Resolution: establish the correct target in the first test written for `test_ingest_abs.py` and replicate across all 5 ingest modules.
+1. **Plotly gauge renders at zero width after hero DOM restructure** — Plotly measures `offsetWidth` at `newPlot()` call time. If new above-the-fold elements change the grid layout before paint, the gauge initialises at 0px and never recovers via `autosize` (which only listens to `window.resize`). Prevention: wrap `createHeroGauge()` in `requestAnimationFrame()`; call `Plotly.Plots.resize('hero-gauge-plot')` explicitly after inserting new hero HTML. Test at 375px, 768px, 1024px, 1440px immediately after any structural change. Never reduce `min-height: 280px` on the gauge container.
 
-2. **Missing error-path coverage is the dominant coverage gap** — happy-path-only tests for ingest modules plateau at 60-70%. Each `fetch_abs_series()` has 7 distinct error branches; each `fetch_and_save()` has 4 exception types. Budget 3-6 tests per function, not 1. Symptoms: module stuck at 65% even after adding more tests; uncovered lines are all inside `except` blocks.
+2. **Tailwind CDN silently drops dynamically concatenated class names** — CDN scans source for literal class name tokens at load time; it cannot execute JS expressions. `'border-' + zoneColor + '-500'` produces a class Tailwind never generates CSS for — the style fails silently with no error. Prevention: use complete-string lookup objects (`ZONE_BORDER_CLASSES = { cold: 'border-blue-800', ... }`) or bypass Tailwind entirely with `element.style.color = GaugesModule.getZoneColor(score)` — already the established pattern in `gauges.js`.
 
-3. **Date-dependent logic causes non-deterministic CI failures** — `_current_month_already_scraped()` in CoreLogic and NAB scrapers compares fixture CSV dates against `datetime.now()`. A fixture with `date = 2026-01-01` behaves differently in January vs February. Fix: patch `datetime` at the module level (`pipeline.ingest.corelogic_scraper.datetime`) or use `freezegun` `@freeze_time` decorator. Never use fixture CSVs with the actual current month's date for idempotency tests.
+3. **Verdict explanation copy crosses into ASIC general advice territory** — Explaining why a score is high naturally pulls language toward prediction and recommendation. "Rates will rise" and "you should consider fixing now" are ASIC RG 244 violations. Prevention: strict framing rules — state what the indicator is doing, not what it means for user decisions. Use "tends to," "historically associated with," "the data is consistent with." Mirror `getPlainVerdict()`'s hedged language pattern. Review every new sentence against: "Would a person reading this feel they have received personal advice?"
 
-4. **STATUS_OUTPUT not isolated by autouse** — `pipeline.config.STATUS_OUTPUT = Path("public/data/status.json")` is computed at import time and not patched by `isolate_data_dir`. Any test calling `generate_status()` without explicit `monkeypatch.setattr(pipeline.config, "STATUS_OUTPUT", tmp_path / "status.json")` writes to the real production file. Encapsulate in an `engine_data_dir` fixture.
+4. **Playwright nth-index selectors break after any DOM insertion near the gauge grid** — Tests use `.nth(0)`, `.nth(1)`, `.nth(5)` to address metric cards. Any new `bg-finance-gray` element inserted near `#metric-gauges-grid` shifts all indices. Prevention: keep `#verdict-explanation` structurally separate from `#metric-gauges-grid`; run the full 28-test Playwright suite before and after every structural HTML change; replace nth selectors for named indicators with `.filter({ hasText: 'Indicator Name' })` when updating tests.
 
-5. **`sys.exit(1)` terminates the entire test runner** — `main.run_pipeline()` calls `sys.exit(1)` on critical failure. Without `pytest.raises(SystemExit)` wrapping, this kills the entire pytest process. All subsequent tests are skipped; their coverage is not recorded. Always wrap critical-failure path tests in `with pytest.raises(SystemExit) as exc_info:` and assert `exc_info.value.code == 1`.
+5. **Mobile above-the-fold congestion after hero redesign** — The existing vertical stack (disclaimer + header + onboarding accordion + gauge at 280px + verdict + links) is already long on 375px viewports. Adding a prominent hero verdict block without removing other elements pushes the verdict below the fold, defeating the purpose of the redesign. Prevention: hero redesign must *replace* the current verbose verdict container and scale explainer, not add above them. Design constraint: score + verdict + 1 sentence explanation must fit in approximately 350-400px on mobile. Consider changing the onboarding `<details>` to default-closed on mobile.
 
 ---
 
 ## Implications for Roadmap
 
-Based on combined research, the natural build sequence follows dependency order: no mocking needed → file I/O only → mock session → orchestration. This maps cleanly to two phases.
+Based on combined research, the architecture prescribes a strict three-phase sequence where each phase is a prerequisite for the next.
 
-### Phase 1: Ingest Module Tests (HTTP mocking layer)
+### Phase 1: Hero HTML Restructure
 
-**Rationale:** Five ingest modules dominate the coverage gap (0-24% each). Covering them requires the mock-session pattern. This pattern must be established first in `test_http_client.py` and `test_ingest_abs.py` because it is reused verbatim across all five modules. Build order within this phase is critical: pure functions first (zero setup), then file-reading functions, then mock-session functions, then error paths.
+**Rationale:** DOM structure must be stable before any JS or CSS work begins. Plotly gauge sizing depends on container dimensions at render time — restructuring HTML after JS is wired creates zero-width gauge risk and CSS rework. The existing element IDs (`#verdict-container`, `#hero-gauge-plot`, etc.) are Playwright test targets that must survive the restructure. Establish the final DOM shape first so subsequent phases have a stable target.
 
-**Delivers:** 85%+ coverage on `http_client.py`, `abs_data.py`, `rba_data.py`, `asx_futures_scraper.py`, `corelogic_scraper.py`, `nab_scraper.py`. `scripts/check_coverage.py` created and wired into lefthook.
+**Delivers:** Above-the-fold hero section with `#verdict-container` promoted to visual top position; `#verdict-explanation` empty placeholder div added; Inter font preconnect + link tags in `<head>`; `tailwind.config` extended with `fontFamily.sans`; `@keyframes fadeSlideIn` and `fadeIn` added to `<style>` block; existing Playwright suite still passing 28/28; gauge rendering verified at 375px, 768px, 1024px, 1440px.
 
-**Features from FEATURES.md:** P1 pure function tests (7 functions), P1 http_client tests, P1 HTML bytes tests, P1 idempotency tests, P2 mock-session tests for abs/rba/asx/corelogic/nab, P2 pdfplumber mock tests.
+**Addresses features from FEATURES.md:** Verdict label as visual hero (P1); scale explainer adjacent to verdict (P1); data freshness inside hero zone (P1); hero card zone-coloured accent border (P1 — CSS + 1 JS line).
 
-**Pitfalls to avoid:** Pitfall 1 (wrong patch target), Pitfall 2 (error-path coverage), Pitfall 3 (date-dependent non-determinism), Pitfall 4 (binary PDF fixtures), Pitfall 8 (asx_futures dual path dependency for meetings.json).
+**Avoids pitfalls:** Plotly zero-width render (test at all breakpoints immediately; wrap `createHeroGauge()` in `requestAnimationFrame()`); Playwright nth-selector breakage (run suite after every structural change); mobile above-fold congestion (test at 375x812 throughout; hero is a replacement, not an addition).
 
-**Build sequence within phase:**
-1. `test_http_client.py` — establishes direct inspection pattern; zero mocking
-2. `test_ingest_abs.py` — establishes `_make_mock_session` helper and correct patch target
-3. `test_ingest_rba.py` — same pattern; key difference is metadata header row handling
-4. `test_ingest_asx.py` — pure functions first; then mock session + meetings.json patch
-5. `test_ingest_corelogic.py` — get_candidate_urls pure; then pdfplumber mock pattern
-6. `test_ingest_nab.py` — most complex; HTML bytes first; pdfplumber last; backfill guard via pre-populated CSV
+**Research flag:** Standard patterns — no deeper research needed. All changes are HTML restructure and CSS class tuning with well-documented patterns.
 
-### Phase 2: Engine and Orchestration Tests (multi-module wiring)
+---
 
-**Rationale:** `engine.py` and `main.py` depend on all ingest modules being individually tested and their return contracts understood. Engine tests should use real sub-functions (normalize_indicator, compute_rolling_zscores) with fixture CSV data — not mocks of those functions — so wiring errors are caught. `main.py` tests mock entire ingest modules at `pipeline.main.*` level to test tier-failure behavior independently of ingest correctness.
+### Phase 2: Verdict Explanation Component
 
-**Delivers:** 85%+ coverage on `engine.py` and `main.py`. Full 85%+ per-module milestone confirmed by `scripts/check_coverage.py` passing in lefthook.
+**Rationale:** Requires Phase 1's `#verdict-explanation` container to exist in the DOM. The explanation logic ranks indicators by `(value - 50) * weight` — this is the only new algorithmic work in the milestone. Must be completed before visual polish so the explanation section's typography and spacing can be tuned in Phase 3 against real rendered content.
 
-**Features from FEATURES.md:** P1 `build_gauge_entry` direct tests, P1 `build_asx_futures_entry` tmp_path tests, P2 `generate_status` assembly tests, P2 `main.py` orchestration tests.
+**Delivers:** `renderVerdictExplanation()` function added to `interpretations.js` and exposed in its return object; wired in `gauge-init.js` `.then()` after `renderVerdict()`; two plain-English lists of hawkish and dovish indicator drivers rendered into `#verdict-explanation`; ASIC compliance verified on all new copy; safe DOM methods (`createElement`/`textContent`) used throughout; `GaugesModule.getZoneColor()` used for colour — no Tailwind class concatenation.
 
-**Pitfalls to avoid:** Pitfall 4 (STATUS_OUTPUT not isolated — use `engine_data_dir` fixture), Pitfall 5 (coverage gaming with trivial assertions), Pitfall 6 (over-mocking generate_status — use real sub-functions for integration-style tests), Pitfall 7 (`sys.exit(1)` must be wrapped in `pytest.raises(SystemExit)`), Pitfall 9 (housing auxiliary file gap — create corelogic_housing.csv and nab_capacity.csv for build_gauge_entry tests).
+**Uses from STACK.md:** No new libraries required. Uses existing `GaugesModule.getZoneColor()`, `getWhyItMatters()`, `generateMetricInterpretation()`, and `getStanceLabel()`. Safe DOM methods following established `renderMetricCard()` pattern.
 
-**Build sequence within phase:**
-1. `generate_interpretation` parametrized — 35 combos (7 indicators × 5 zones), zero I/O
-2. `build_asx_futures_entry` with tmp_path CSV — uses existing `isolate_data_dir`
-3. `build_gauge_entry` with synthetic Series/DataFrame — standard, housing, and business_confidence enrichment branches
-4. `process_indicator` with fixture CSVs in `engine_data_dir`
-5. `generate_status` end-to-end with `engine_data_dir` fixture
-6. `test_main.py` — all tier behaviors, sys.exit contract, result dict structure
+**Implements architecture component:** `renderVerdictExplanation(containerId, gaugesData, overallScore)` — sorts indicators by absolute contribution (`(value - 50) * weight`), renders top 3 hawkish and top 2 dovish drivers with ASIC-compliant copy.
+
+**Addresses features from FEATURES.md:** Verdict explanation section — "what's driving the score" (P1 differentiator); hawkish/dovish two-list layout per driver (P1 differentiator).
+
+**Avoids pitfalls:** Tailwind CDN concatenated class names (use `element.style` with hex values from `getZoneColor()`); ASIC copy compliance (hedge every sentence; apply factual-information review checklist per commit); new IIFE anti-pattern (extend InterpretationsModule, not a new IIFE with independent data fetch — avoids race conditions).
+
+**Research flag:** Standard patterns — ASIC framing rules are clear from existing `getWhyItMatters()` and `getPlainVerdict()` implementations. No deeper research needed.
+
+---
+
+### Phase 3: Visual Polish
+
+**Rationale:** Must come last — CSS tuning against a DOM that is still changing causes double rework. Typography scale, spacing standardisation, and colour hierarchy require real content in all sections to evaluate correctly. The optional CountUp.js score animation and gauge entrance animation also belong here as final delight layers once structure and data rendering are confirmed working.
+
+**Delivers:** Consistent typography hierarchy (36-48px verdict label, 52px score, defined text-gray scale for secondary/body/metadata); standardised spacing across all sections; zone colour consistently applied to verdict label, hero border, and explanation headings; `fadeSlideIn` animation applied via `classList.add` on data load; CountUp.js integration for score number (with `prefers-reduced-motion` guard); final mobile verification at 375x812; gauge entrance animation if time permits (P2).
+
+**Uses from STACK.md:** Inter font (activated in Phase 1, applied universally in Phase 3 via `font-sans`); CountUp.js 2.9.0 UMD (added in script tags with `prefers-reduced-motion` guard); native CSS `@keyframes` (declared in Phase 1, triggered in Phase 3 JS).
+
+**Addresses features from FEATURES.md:** Visual polish — spacing, typography, colour hierarchy (all P1); gauge entrance animation via `requestAnimationFrame` workaround (P2 — add if time allows).
+
+**Avoids pitfalls:** Never reduce `min-height: 280px` on gauge container; never add zone colour to every page element (reserve for verdict label, hero border, explanation headings — colour overuse destroys signal value); always include `prefers-reduced-motion` guard around CountUp.js.
+
+**Research flag:** Standard patterns — established Tailwind CDN + `<style>` block pattern is fully documented. No deeper research needed.
+
+---
 
 ### Phase Ordering Rationale
 
-- Phase 1 before Phase 2: `main.py` orchestration tests require understanding what each scraper's `fetch_and_save()` returns on success and failure. Those return contracts are only verified by writing Phase 1 tests first.
-- Pure functions before mock-session tests within Phase 1: pure function tests are zero-cost to write and immediately improve coverage percentages, confirming the module is importable and partially working before more complex setup is invested.
-- Error paths within each module immediately after happy paths: attempting to write all happy paths first, then all error paths, leads to over-mocking and coverage gaming. Error paths are harder the longer you wait.
-- Engine tests use real sub-functions (not mocked): avoids Pitfall 6 — mocking `normalize_indicator` in engine tests means wiring errors are invisible. Use real functions on fixture data.
+- **HTML before JS:** Plotly gauge container dimensions are measured at `newPlot()` call time. The final DOM layout must exist before gauge initialisation fires — or an explicit `Plotly.Plots.resize()` call must follow any DOM change. Doing HTML restructure in Phase 1 means the gauge renders correctly in its final container from the start, eliminating the most critical pitfall at its source.
+- **JS before CSS:** The verdict explanation section must have real content rendered before spacing and typography can be tuned correctly. CSS polish applied to empty or placeholder content requires rework when content arrives.
+- **Pitfalls drive phase boundaries:** The three most critical pitfalls (Plotly zero-width, Tailwind class concatenation, ASIC copy) each map to a specific phase. Separating the phases makes each pitfall the sole focus of its phase's verification checklist.
+- **Feature dependencies confirm this order:** All P1 features are frontend-only with no backend dependencies. No feature in Phase 2 or 3 requires anything outside the frontend codebase. Parallel execution is not beneficial — the dependencies are strictly sequential.
 
 ### Research Flags
 
-Phases with standard patterns (research already complete — no further research needed):
-- **Phase 1 (Ingest tests):** All patterns are fully documented in ARCHITECTURE.md with production-ready code examples. The `_make_mock_session` helper, pdfplumber mock pattern, and HTML bytes fixture approach are all verified and ready to implement.
-- **Phase 2 (Engine/main tests):** `engine_data_dir` fixture pattern fully specified in ARCHITECTURE.md. `pytest.raises(SystemExit)` pattern for `sys.exit` testing is documented with code examples in both FEATURES.md and PITFALLS.md.
+Phases with standard patterns (no `/gsd:research-phase` needed):
+- **Phase 1 (HTML Restructure):** Direct codebase inspection provides a complete implementation map. Tailwind CDN + Plotly resize patterns are well-documented with specific code examples. All element IDs and Playwright test targets are fully known from direct file inspection.
+- **Phase 2 (Verdict Explanation):** InterpretationsModule extension pattern follows direct precedent from `renderMetricCard()`. ASIC framing rules are established by existing compliant functions. The contribution ranking algorithm `(value - 50) * weight` is documented with worked examples in ARCHITECTURE.md.
+- **Phase 3 (Visual Polish):** Tailwind utility class application has no unknowns. CountUp.js integration is documented in STACK.md with a complete production-ready code snippet including the `prefers-reduced-motion` guard.
 
-Phases requiring attention during execution:
-- **Phase 1 — ASX futures scraper specifically:** Has two implicit file dependencies (`public/data/meetings.json` under a hardcoded relative path outside `DATA_DIR`; `rba_cash_rate.csv` under `DATA_DIR`). Both must be addressed before writing `scrape_asx_futures()` tests. Patch `_get_rba_meeting_dates` directly; create `rba_cash_rate.csv` in `tmp_path`.
-- **Phase 1 — NAB scraper specifically:** `backfill_nab_history()` is triggered if `nab_capacity.csv` has fewer than 3 rows. Pre-populate `tmp_path / "nab_capacity.csv"` with 5+ rows in any test for `scrape_nab_capacity()` to prevent inadvertent backfill execution that would make the test suite take 10-30 seconds.
+No phase in this milestone requires a `/gsd:research-phase` pass. All implementation decisions are fully resolved by existing codebase inspection and verified external documentation.
 
 ---
 
@@ -155,51 +154,43 @@ Phases requiring attention during execution:
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All 3 new packages verified against PyPI at current stable versions. `pytest-mock 3.15.1`, `responses 0.26.0` (released 2026-02-19), `pytest-cov 7.0.0` already locally installed. Version compatibility cross-checked against Python 3.11/3.13. `coverage.py` per-file limitation confirmed via official docs and open GitHub issue #444. |
-| Features | HIGH | Feature list derived entirely from direct codebase analysis of live `pipeline/` and `tests/python/` directories. Coverage percentages are real measurements, not estimates. Prioritization matrix is grounded in actual module structure. |
-| Architecture | HIGH | All patterns verified against the live codebase. Import paths, autouse fixture behaviors, `STATUS_OUTPUT` isolation gap — all confirmed by direct code inspection. Code examples in ARCHITECTURE.md are production-ready, not illustrative. Build order dependencies are concrete and grounded in Python import semantics. |
-| Pitfalls | HIGH | All 9 pitfalls derived from direct codebase analysis — not generic test-writing pitfalls. Specific line references (e.g., `asx_futures_scraper._get_rba_meeting_dates()` hardcoded `Path("public/data/meetings.json")`), confirmed in source. `conftest.py` gap for `STATUS_OUTPUT` verified by reading actual conftest implementation. |
+| Stack | HIGH | All technology decisions verified against official CDN registries, official docs, and Plotly changelog. Versions pinned and confirmed. Explicit anti-list (Tailwind v4, Plotly v3, Animate.css, Alpine.js, GSAP) grounded in confirmed breaking changes or architectural mismatches. |
+| Features | HIGH | Competitor analysis against CNN Fear & Greed and MacroMicro confirmed directly. Feature prioritisation anchored to existing utility functions verified in the live codebase. Anti-feature list includes specific technical reasons for each deferral. |
+| Architecture | HIGH | All findings from direct codebase inspection of 6 JS modules (98-694 LOC each), live status.json, and Playwright test files. No inference required. Integration points, data flow map, and build order all derived from reading actual source. |
+| Pitfalls | HIGH | All 5 critical pitfalls verified against Plotly GitHub issues (#3984, #2769), official Tailwind CDN docs, official ASIC RG 244, and official Playwright locator docs. Recovery strategies and warning signs are concrete and specific. |
 
-**Overall confidence: HIGH**
+**Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **`freezegun` vs manual `datetime` patch:** PITFALLS.md documents both approaches for date-dependent tests. Neither `freezegun` is currently in `requirements-dev.txt` nor is manual `datetime` patching established in the existing test suite. Decision needed at implementation time: add `freezegun>=1.5,<2` to `requirements-dev.txt` (cleaner `@freeze_time` decorator) or use `monkeypatch.setattr("pipeline.ingest.MODULE.datetime", ...)` inline (no new dependency). Low risk — either approach works; consistent choice matters more than which choice.
-
-- **FEATURES.md vs STACK.md on `responses` library:** STACK.md recommends using `responses` for HTTP mocking. FEATURES.md recommends `MagicMock` + `create_session` patching as primary, with `responses` listed as an anti-feature (VCR cassette staleness concern extends to `responses` when used with recorded fixtures). Resolution: use `MagicMock` + `create_session` patching as the primary pattern; install `responses` in `requirements-dev.txt` in case specific tests need transport-layer interception, but do not use it as the default.
-
-- **`engine.py` deferred imports (`import pandas as _pd` inside function body):** PITFALLS.md identifies uncovered lines in `build_gauge_entry()` housing/business_confidence branches due to inline imports. Coverage tool may or may not count these import lines differently. Verify during implementation — the fix is simply to write tests that exercise those branches.
+- **CountUp.js `prefers-reduced-motion` guard:** STACK.md includes the correct wrapper pattern but it must be implemented (not just documented) in Phase 3. The guard is not optional — it is an accessibility requirement.
+- **Onboarding accordion mobile behaviour:** PITFALLS.md flags the `<details open>` default as a mobile congestion risk after the hero redesign. Whether to change it to default-closed on mobile is a measurement-driven decision deferred to Phase 1 execution — test at 375x812 and decide based on actual vertical height.
+- **Gauge entrance animation timing:** FEATURES.md marks this P2 (add after P1 features verified). The `requestAnimationFrame` workaround for Plotly indicator gauge animation is documented — the implementation approach is clear. The decision is whether Phase 3 has time for it, not how to implement it.
 
 ---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-
-- PyPI: pytest-mock 3.15.1 — https://pypi.org/project/pytest-mock/ (verified Feb 2026)
-- PyPI: responses 0.26.0 — https://pypi.org/project/responses/ (released 2026-02-19, verified)
-- PyPI: pytest-cov 7.0.0 — https://pypi.org/project/pytest-cov/ (already installed locally)
-- coverage.py per-file threshold limitation — https://coverage.readthedocs.io/en/latest/config.html and https://github.com/pytest-dev/pytest-cov/issues/444 (confirmed unimplemented)
-- Python unittest.mock "where to patch" — https://docs.python.org/3/library/unittest.mock.html#where-to-patch (fundamental mock patching rule)
-- pytest.raises(SystemExit) — https://docs.pytest.org/en/stable/reference/reference.html (official docs)
-- pytest monkeypatch — https://docs.pytest.org/en/stable/how-to/monkeypatch.html (official docs)
-- Live codebase analysis: `/Users/annon/projects/rba-hawko-meter/pipeline/` — all modules read, coverage percentages confirmed, import structures verified
-- Live codebase analysis: `/Users/annon/projects/rba-hawko-meter/tests/python/` — conftest.py, existing test files, fixture CSVs verified
+- Direct codebase inspection: `public/index.html`, `public/js/gauge-init.js`, `public/js/interpretations.js`, `public/js/gauges.js`, `public/js/data.js`, `public/js/main.js`, `public/data/status.json`, `tests/dashboard.spec.js`, `tests/phase6-ux.spec.js`
+- Plotly.js changelog: [plotly.com/javascript/version-3-changes](https://plotly.com/javascript/version-3-changes/) — v3 breaking title API changes confirmed
+- Plotly GitHub issues #3984, #2769 — `responsive: true` only responds to `window.resize`; hidden container sizing bug confirmed
+- Google Fonts CSS2 API docs: [developers.google.com/fonts/docs/css2](https://developers.google.com/fonts/docs/css2) — `wght@300..900` variable range syntax verified
+- Tailwind CDN v3 docs: [tailwindcss.com/docs/installation/play-cdn](https://tailwindcss.com/docs/installation/play-cdn) — CDN class scanning limitations confirmed
+- ASIC RG 244 (December 2012, updated 2021) — factual information vs. general advice distinction; hedged language requirements
+- Official Playwright locator docs — `.nth()` flagged as fragile; `.filter({ hasText: ... })` preferred
+- jsDelivr: [cdn.jsdelivr.net/npm/countup.js](https://cdn.jsdelivr.net/npm/countup.js/) — CountUp.js 2.9.0 UMD build confirmed
 
 ### Secondary (MEDIUM confidence)
+- Tailwind community discussion #14210 — dynamic class concatenation not detected by CDN scanner
+- Plotly community forum — `Plotly.Plots.resize(divId)` required after container reparenting
+- CNN Fear & Greed Index — reference for verdict-as-hero design pattern
+- MacroMicro Hawk-Dove Index — competitor feature comparison
+- Toptal dashboard design — above-the-fold hero on mobile must fit within ~350px
 
-- responses + Session/HTTPAdapter: https://github.com/getsentry/responses — intercepts at HTTPAdapter.send(), confirmed Session support
-- pytest-cov configuration: https://pytest-cov.readthedocs.io/en/latest/config.html — addopts integration pattern
-- coverage.py JSON report format: https://coverage.readthedocs.io/en/latest/config.html — `--cov-report=json` supported
-- Web scraper mocking patterns: https://datawookie.dev/blog/2025/01/test-a-web-scraper-using-mocking/ (Jan 2025, practitioner source)
-- pdfplumber BytesIO/mock behaviour: https://github.com/jsvine/pdfplumber/issues/124 (confirms mock approach is correct)
-
-### Tertiary (LOW confidence — needs validation during implementation)
-
-- freezegun `@freeze_time` decorator — widely documented but not yet verified against this specific codebase's `datetime` import patterns; validate before committing to approach
-- `requests-mock` 1.12.1 — considered and deprioritized vs `responses` due to March 2024 last update; if `responses` proves problematic, `requests-mock` is a drop-in alternative
+### Tertiary (noted for completeness)
+- Tailwind CDN v4 config format: [tailkits.com/blog/tailwind-css-v4-cdn-setup](https://tailkits.com/blog/tailwind-css-v4-cdn-setup/) — confirms migration cost; validates stay-on-v3 decision
 
 ---
-
 *Research completed: 2026-02-25*
 *Ready for roadmap: yes*

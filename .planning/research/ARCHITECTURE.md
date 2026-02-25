@@ -1,646 +1,603 @@
 # Architecture Research
 
-**Domain:** Python test suite expansion — scraper mocking, orchestration testing
+**Domain:** Static dashboard frontend — visual/UX overhaul of existing vanilla JS IIFE app
 **Researched:** 2026-02-25
-**Confidence:** HIGH (all findings derived from direct codebase inspection)
+**Confidence:** HIGH (all findings derived from direct codebase inspection — no guesswork)
 
 ## Context: What This Research Covers
 
-This extends the v2.0 ARCHITECTURE.md (test infrastructure: pyproject.toml, conftest, hook, lint) with v3.0 focus: integrating new test modules for the 5 ingest scrapers, `engine.py`, `main.py`, and `http_client.py` into the existing test architecture. No new infrastructure is needed. The question is: what new files are required, how do they use existing fixtures, what mocking patterns apply to each module, and in what order should they be built.
+v4.0 adds three frontend features to an existing 468-line single-file HTML app with IIFE JS modules
+and Tailwind CDN. This document answers four specific questions:
+
+1. Where in the HTML does a hero section live?
+2. How does a verdict explanation component read from status.json?
+3. What CSS patterns work for dark theme polish without a build system?
+4. What is the right build order given shared data dependencies?
+
+All conclusions are drawn from direct inspection of `public/index.html`, `public/js/gauge-init.js`,
+`public/js/interpretations.js`, `public/js/gauges.js`, `public/js/main.js`, `public/js/data.js`,
+and `public/data/status.json`.
 
 ---
 
 ## System Overview
 
-### Existing Architecture (v2.0, unchanged)
+### Current Architecture (v3.0, unchanged by v4.0)
 
 ```
-tests/python/
-├── conftest.py              autouse: isolate_data_dir, block_network
-│                            explicit: fixture_cpi_df, fixture_employment_df,
-│                                      fixture_wages_df, fixture_spending_df,
-│                                      fixture_building_approvals_df,
-│                                      fixture_housing_df, fixture_nab_capacity_df
-├── fixtures/                Static CSVs (version-controlled)
-│   ├── abs_cpi.csv
-│   ├── abs_employment.csv
-│   ├── abs_household_spending.csv
-│   ├── abs_wage_price_index.csv
-│   ├── abs_building_approvals.csv
-│   ├── corelogic_housing.csv
-│   └── nab_capacity.csv
-├── test_smoke.py            Infrastructure smoke tests (autouse verification)
-├── test_zscore.py           Pure math — rolling z-score, MAD, confidence
-├── test_gauge.py            Pure math — gauge scale, zones, hawk score
-├── test_ratios.py           normalize_indicator: load, yoy, filter, resample
-├── test_csv_handler.py      append_to_csv: create, dedup, sort, parents
-├── test_schema.py           status.json contract validation (jsonschema)
-└── test_live_sources.py     @pytest.mark.live — real HTTP calls
+index.html (468 LOC)
+  │
+  ├── <head>
+  │     Tailwind CDN + inline tailwind.config (custom color tokens)
+  │     Decimal.js CDN
+  │     Plotly.js CDN
+  │     <style> block — scrollbar, chart-details media query
+  │
+  ├── <body>
+  │     ├── <aside>   disclaimer-banner (ASIC COMP-03)
+  │     ├── <header>  site title + tagline
+  │     │
+  │     ├── <main>    max-w-6xl mx-auto
+  │     │     ├── #onboarding         <details> explainer
+  │     │     ├── #hawk-o-meter-section   ← HERO GAUGE lives here now
+  │     │     │     ├── #hero-gauge-plot  (Plotly, lg:col-span-3)
+  │     │     │     ├── #asx-futures-container (lg:col-span-2)
+  │     │     │     ├── RBA cash rate card
+  │     │     │     ├── #verdict-container
+  │     │     │     ├── #calculator-jump-link
+  │     │     │     └── #scale-explainer
+  │     │     ├── #countdown-section
+  │     │     ├── chart-details       rate history chart
+  │     │     ├── #individual-gauges-section
+  │     │     ├── #methodology        <details>
+  │     │     └── #calculator-section
+  │     │
+  │     └── "What to do next" section (outside <main>)
+  │
+  ├── <footer id="disclaimer">
+  │
+  └── <script> blocks (in order):
+        data.js → chart.js → countdown.js → calculator.js
+        → main.js → gauges.js → interpretations.js → gauge-init.js
 ```
 
-### v3.0 Target: New Test Files
+### Data Flow (unchanged by v4.0)
 
 ```
-tests/python/
-├── [all existing files unchanged]
-│
-├── fixtures/                [add new fixture files]
-│   ├── asx_futures_api_response.json   Minimal MarkitDigital API JSON
-│   ├── rba_a2_data.csv                 Minimal RBA A2 CSV with metadata header rows
-│   └── nab_article.html                Minimal NAB article HTML with capacity value
-│
-├── test_http_client.py      create_session: retry adapter, user-agent, custom UA
-├── test_ingest_abs.py       fetch_abs_series, _parse_abs_date, fetch_and_save
-├── test_ingest_rba.py       fetch_cash_rate, fetch_and_save
-├── test_ingest_asx.py       _derive_probabilities, _find_meeting_for_contract,
-│                             _get_current_cash_rate, scrape_asx_futures,
-│                             _check_staleness, fetch_and_save
-├── test_ingest_corelogic.py get_candidate_urls, extract_cotality_yoy (mock pdf),
-│                             _current_month_already_scraped, fetch_and_save
-├── test_ingest_nab.py       extract_capacity_from_html, get_pdf_link,
-│                             extract_capacity_from_pdf (mock pdf),
-│                             discover_latest_survey_url, _current_month_already_scraped,
-│                             scrape_nab_capacity, backfill_nab_history, fetch_and_save
-├── test_engine.py           build_gauge_entry, build_asx_futures_entry,
-│                             process_indicator, generate_status, generate_interpretation
-└── test_main.py             run_pipeline tier behavior (critical/important/optional),
-                              result dict structure, sys.exit contracts
+Page load
+    │
+    ▼
+DataModule.fetch("data/status.json")     [gauge-init.js, one fetch, cached]
+    │
+    ├─► GaugesModule.createHeroGauge()   data.overall.hawk_score
+    ├─► InterpretationsModule.renderVerdict()   data.overall
+    ├─► InterpretationsModule.renderASXTable()  data.asx_futures
+    ├─► renderMetricGauges()             data.gauges (all 7 indicators)
+    └─► renderCalculatorBridge()         data.overall.hawk_score
+
+DataModule.fetch("data/rates.json")      [main.js, parallel]
+DataModule.fetch("data/meetings.json")   [main.js, parallel]
 ```
 
-### Integration with Existing Infrastructure
-
-All new test files plug directly into the existing conftest.py autouse fixtures:
-
-- `isolate_data_dir` — already active for every test, patches `pipeline.config.DATA_DIR` to `tmp_path`. Scraper tests writing to `DATA_DIR / "output.csv"` automatically write to `tmp_path`.
-- `block_network` — already active for every non-`@pytest.mark.live` test. All scraper tests must mock the HTTP layer; any accidental real call raises `RuntimeError("Network access blocked in tests.")`.
-- Existing CSV fixture loaders — available for engine.py tests that need to populate `tmp_path` with realistic data.
-
-No changes to `conftest.py` are required for ingest tests. One optional addition for engine tests is described below.
+Key constraint: `DataModule` caches by URL. Any module can call
+`DataModule.fetch("data/status.json")` a second time and get the cached result
+synchronously (as a resolved Promise). No coordination protocol is needed for
+new modules that need status.json data.
 
 ---
 
 ## Component Responsibilities
 
-| New File | Module Under Test | Coverage Targets |
-|----------|------------------|-----------------|
-| `test_http_client.py` | `pipeline/utils/http_client.py` | `create_session`: retry count, backoff, status_forcelist, user-agent header, custom UA override |
-| `test_ingest_abs.py` | `pipeline/ingest/abs_data.py` | `fetch_abs_series`: 200 response, HTTP error, empty response, short response, CSV parse error; `_parse_abs_date`: monthly, quarterly, passthrough; `fetch_and_save`: single series, all series |
-| `test_ingest_rba.py` | `pipeline/ingest/rba_data.py` | `fetch_cash_rate`: header-row skipping, date parsing (dayfirst), range extraction; `fetch_and_save`: row count return |
-| `test_ingest_asx.py` | `pipeline/ingest/asx_futures_scraper.py` | `_derive_probabilities`: cut/hold/hike branches, deadband; `_find_meeting_for_contract`: same-month, nearest-future, no match; `_get_current_cash_rate`: CSV present, CSV missing (fallback); `scrape_asx_futures`: JSON parse, empty items; `_check_staleness`: fresh, 14-day warn, 30-day error; `fetch_and_save`: success, empty df, exception |
-| `test_ingest_corelogic.py` | `pipeline/ingest/corelogic_scraper.py` | `get_candidate_urls`: URL structure; `extract_cotality_yoy`: pattern found, not found; `_current_month_already_scraped`: not exists, empty, already scraped, prior month; `fetch_and_save`: success, no data, exception |
-| `test_ingest_nab.py` | `pipeline/ingest/nab_scraper.py` | `extract_capacity_from_html`: found, not found, US spelling; `get_pdf_link`: found, not found; `extract_capacity_from_pdf`: pattern found, not found; `discover_latest_survey_url`: found, not found; `_current_month_already_scraped`; `fetch_and_save` |
-| `test_engine.py` | `pipeline/normalize/engine.py` | `generate_interpretation`: all indicator/zone combos; `build_gauge_entry`: standard, housing enrichment, business_confidence enrichment; `build_asx_futures_entry`: data present, CSV missing; `process_indicator`: data present, data missing; `generate_status`: end-to-end with fixture CSVs |
-| `test_main.py` | `pipeline/main.py` | `run_pipeline`: critical success, critical failure (sys.exit 1), important failure (continues), optional failure (continues), normalization success, normalization failure, result dict structure |
+| Module | Responsibility | Exposes |
+|--------|---------------|---------|
+| `data.js` (DataModule) | Fetch + cache JSON; showError/showLoading UI helpers | `fetch`, `showError`, `showLoading` |
+| `gauges.js` (GaugesModule) | Plotly gauge rendering; zone colors/labels; display labels | `createHeroGauge`, `createBulletGauge`, `getZoneColor`, `getStanceLabel`, `getDisplayLabel` |
+| `interpretations.js` (InterpretationsModule) | All text rendering: verdict, ASX table, metric cards, staleness | `renderVerdict`, `renderASXTable`, `renderMetricCard`, `getPlainVerdict`, `getWhyItMatters`, `generateMetricInterpretation` |
+| `gauge-init.js` (IIFE, anonymous) | Orchestrator: fetches status.json, calls all render functions in sequence | None (self-executing) |
+| `main.js` (IIFE, anonymous) | Orchestrator: fetches rates.json + meetings.json; initialises calculator; handles resize | None (self-executing) |
+| `calculator.js` (CalculatorModule) | Mortgage math and UI | `init` |
+| `chart.js` (ChartModule) | Plotly rate history chart | `create`, `resize` |
+| `countdown.js` (CountdownModule) | RBA meeting countdown timer | `start` |
+
+---
+
+## Recommended Project Structure
+
+No new directories are needed. v4.0 adds one new JS file and modifies index.html + gauge-init.js.
+
+```
+public/
+├── index.html                  MODIFIED — hero restructure + verdict-explanation div
+├── js/
+│   ├── data.js                 UNCHANGED
+│   ├── gauges.js               UNCHANGED
+│   ├── interpretations.js      MODIFIED — add renderVerdictExplanation()
+│   ├── gauge-init.js           MODIFIED — call renderVerdictExplanation() after gauges render
+│   ├── main.js                 UNCHANGED
+│   ├── calculator.js           UNCHANGED
+│   ├── chart.js                UNCHANGED
+│   └── countdown.js            UNCHANGED
+└── data/
+    └── status.json             UNCHANGED (no schema changes)
+```
 
 ---
 
 ## Architectural Patterns
 
-### Pattern 1: Mock at `create_session`, Not at the Socket
+### Pattern 1: Hero Section Placement — Replace, Don't Precede
 
-The `block_network` autouse fixture already blocks at the socket level. This means any real HTTP call fails loudly. For scraper unit tests, the HTTP layer must be mocked one level up: mock `create_session` to return a `MagicMock` session whose `.get()` returns a controlled `MagicMock` response.
+**What:** The v4.0 hero section (verdict + hawk score dominant) replaces the current
+`#hawk-o-meter-section` content layout, not precedes it. The section already exists at the
+right position in the DOM — it just needs internal restructuring.
 
-**Patch target rule:** Patch the name where it is *used*, not where it is *defined*. Each scraper module does `from pipeline.utils.http_client import create_session`, binding the name in its own module namespace. Patch that bound name.
+**Current layout inside `#hawk-o-meter-section`:**
+```
+grid lg:grid-cols-5
+  col-span-3  →  hero-gauge-plot  (Plotly gauge)
+  col-span-2  →  asx-futures-container + cash rate card
 
-```python
-# Correct — patches the name in the module that uses it
-with patch("pipeline.ingest.abs_data.create_session") as mock_factory:
-    ...
-
-# Wrong — patches the source module; the scraper's bound name is unaffected
-with patch("pipeline.utils.http_client.create_session") as mock_factory:
-    ...
+#verdict-container  (beneath grid, text only, small)
+#calculator-jump-link
+#scale-explainer
 ```
 
-**Minimal mock response pattern:**
-```python
-from unittest.mock import MagicMock, patch
-
-def _make_mock_session(status_code=200, text="", content=b"", json_data=None):
-    """Helper: build a fake requests.Session.get response."""
-    mock_response = MagicMock()
-    mock_response.status_code = status_code
-    mock_response.text = text
-    mock_response.content = content
-    if json_data is not None:
-        mock_response.json.return_value = json_data
-    mock_response.headers = {"content-type": "application/json"}
-    mock_response.raise_for_status.return_value = None
-
-    mock_session = MagicMock()
-    mock_session.get.return_value = mock_response
-
-    return mock_session
-
-
-def test_fetch_abs_series_success(tmp_path, monkeypatch):
-    import pipeline.config
-    monkeypatch.setattr(pipeline.config, "DATA_DIR", tmp_path)
-
-    csv_text = "TIME_PERIOD,OBS_VALUE\n2024-01,120.5\n2024-02,121.0\n"
-    mock_session = _make_mock_session(status_code=200, text=csv_text)
-
-    with patch("pipeline.ingest.abs_data.create_session",
-               return_value=mock_session):
-        from pipeline.ingest.abs_data import fetch_abs_series
-        df = fetch_abs_series("CPI", "all")
-
-    assert len(df) == 2
-    assert "date" in df.columns
-    assert "value" in df.columns
+**v4.0 target layout:**
+```
+#verdict-container   ← PROMOTE to top of section, large typography, full-width
+#hawk-o-meter-section content  ← gauge + side panels remain below
 ```
 
-### Pattern 2: Module-Level Mocking for Orchestration Tests
+**Why replace vs precede:** Adding a new `<section>` above `#hawk-o-meter-section` would
+push the existing gauge content below the fold on mobile AND duplicate the section landmark
+role. The ASIC compliance banner + header + onboarding section already consume vertical space.
+Promoting `#verdict-container` to the top of the existing section preserves the DOM structure
+while achieving the above-the-fold hierarchy.
 
-`main.py` imports entire modules (`rba_data`, `abs_data`, `corelogic_scraper`, `nab_scraper`) and calls `.fetch_and_save()` on them. Tests for `run_pipeline()` mock at the module level, not at `create_session`.
+**Concrete implementation approach:**
+Move `#verdict-container` from its current position (after the 5-column grid) to before
+the grid within the same section. Increase its typography weight and size. The existing
+`id` attribute means gauge-init.js's `InterpretationsModule.renderVerdict('verdict-container', data.overall)`
+continues to work with zero JS changes.
 
-```python
-# tests/python/test_main.py
-from unittest.mock import MagicMock, patch
-import pytest
+**When to use this approach:** Any time a new visual feature targets an already-named
+container that existing JS renders into. The HTML structure owns the DOM position; the JS
+only cares about the element ID.
 
+### Pattern 2: Verdict Explanation — Extend InterpretationsModule, Not a New IIFE
 
-def test_critical_failure_exits_1():
-    """Critical source failure: run_pipeline calls sys.exit(1)."""
-    with patch("pipeline.main.rba_data") as mock_rba, \
-         patch("pipeline.main.abs_data"), \
-         patch("sys.exit") as mock_exit:
-        mock_rba.fetch_and_save.side_effect = Exception("RBA connection refused")
-        from pipeline.main import run_pipeline
-        # run_pipeline catches the exception and calls sys.exit(1)
-        try:
-            run_pipeline()
-        except SystemExit:
-            pass
-        mock_exit.assert_called_once_with(1)
+**What:** The verdict explanation ("why is the score X?") reads `data.gauges` and
+`data.overall.hawk_score` to produce a short list of indicator contributions. This is a
+render function, not an orchestration function.
 
+**Why extend InterpretationsModule rather than a new IIFE:**
+- `data.gauges` is already available in `gauge-init.js`'s `.then()` callback as `data`
+- InterpretationsModule already has `getWhyItMatters(metricId)` and
+  `generateMetricInterpretation(metricId, metricData)` — the explanation needs both
+- A new IIFE would need to make a second `DataModule.fetch("data/status.json")` call
+  (returns cached result, so no network cost, but adds an unnecessary orchestration point)
+- Existing test surface (Playwright) targets InterpretationsModule's rendered output;
+  staying in the same module keeps test targeting consistent
 
-def test_optional_failure_continues():
-    """Optional source failure: run_pipeline returns 'partial' status, not 'failed'."""
-    with patch("pipeline.main.rba_data") as mock_rba, \
-         patch("pipeline.main.abs_data") as mock_abs, \
-         patch("pipeline.main.corelogic_scraper") as mock_core, \
-         patch("pipeline.main.nab_scraper") as mock_nab, \
-         patch("pipeline.normalize.engine.generate_status") as mock_gen:
-        mock_rba.fetch_and_save.return_value = 100
-        mock_abs.fetch_and_save.return_value = {"cpi": 50}
-        mock_core.fetch_and_save.return_value = {"status": "failed", "error": "PDF 404"}
-        mock_nab.fetch_and_save.return_value = {"status": "failed", "error": "no URL"}
-        mock_gen.return_value = {"overall": {"hawk_score": 50.0, "zone_label": "Neutral"}}
+**New function signature:**
+```javascript
+// in interpretations.js
+function renderVerdictExplanation(containerId, gaugesData, overallScore) {
+  // 1. Sort indicators by contribution to score (value * weight, descending)
+  // 2. Pick top 3 hawkish and top 2 dovish drivers
+  // 3. Render a brief "what's pushing the score up/down" list
+  // 4. ASIC constraint: neutral framing — "X is above average" not "X is bad"
+}
 
-        from pipeline.main import run_pipeline
-        result = run_pipeline()
-
-    assert result["status"] == "partial"
+// Expose in the return object
+return {
+  // existing...
+  renderVerdictExplanation: renderVerdictExplanation
+};
 ```
 
-### Pattern 3: PDF Library Mocking Without Fixture PDFs
+**Call site in gauge-init.js:**
+```javascript
+DataModule.fetch('data/status.json')
+  .then(function (data) {
+    // existing calls...
+    GaugesModule.createHeroGauge('hero-gauge-plot', data.overall.hawk_score);
+    InterpretationsModule.renderVerdict('verdict-container', data.overall);
 
-`corelogic_scraper.extract_cotality_yoy` and `nab_scraper.extract_capacity_from_pdf` both use `pdfplumber`. Creating a real binary PDF as a fixture is fragile. Instead, mock `pdfplumber.open` to return a context manager with controlled page text.
+    // NEW — call after gauge data is ready
+    InterpretationsModule.renderVerdictExplanation(
+      'verdict-explanation',
+      data.gauges,
+      data.overall.hawk_score
+    );
 
-```python
-# tests/python/test_ingest_corelogic.py
-from unittest.mock import MagicMock, patch
-
-
-def test_extract_cotality_yoy_pattern_found():
-    """extract_cotality_yoy returns float when 'Australia X% X% X%' pattern found."""
-    mock_page = MagicMock()
-    mock_page.extract_text.return_value = (
-        "Australia 0.8% 2.4% 9.4%\nSome other text\n"
-    )
-    mock_pdf = MagicMock()
-    mock_pdf.pages = [mock_page]
-    mock_pdf.__enter__ = lambda s: mock_pdf
-    mock_pdf.__exit__ = MagicMock(return_value=False)
-
-    with patch("pipeline.ingest.corelogic_scraper.pdfplumber.open",
-               return_value=mock_pdf):
-        from pipeline.ingest.corelogic_scraper import extract_cotality_yoy
-        result = extract_cotality_yoy(b"fake_pdf_bytes")
-
-    assert result == pytest.approx(9.4)
-
-
-def test_extract_cotality_yoy_pattern_not_found():
-    """extract_cotality_yoy returns None when pattern absent from all pages."""
-    mock_page = MagicMock()
-    mock_page.extract_text.return_value = "No matching content here."
-    mock_pdf = MagicMock()
-    mock_pdf.pages = [mock_page]
-    mock_pdf.__enter__ = lambda s: mock_pdf
-    mock_pdf.__exit__ = MagicMock(return_value=False)
-
-    with patch("pipeline.ingest.corelogic_scraper.pdfplumber.open",
-               return_value=mock_pdf):
-        from pipeline.ingest.corelogic_scraper import extract_cotality_yoy
-        result = extract_cotality_yoy(b"fake_pdf_bytes")
-
-    assert result is None
+    // existing calls continue...
+    renderMetricGauges(data.gauges);
+  });
 ```
 
-Note: `corelogic_scraper.py` does `import pdfplumber` inside the function body. The patch target is `pipeline.ingest.corelogic_scraper.pdfplumber` — this works because after the first call, the `pdfplumber` name exists in the module's namespace.
+**status.json fields available for explanation logic:**
+- `data.gauges[id].value` — 0-100 gauge score
+- `data.gauges[id].weight` — contribution weight (0.05–0.25)
+- `data.gauges[id].zone_label` — "Mild hawkish pressure", "Balanced", etc.
+- `data.gauges[id].z_score` — signed deviation; negative = dovish, positive = hawkish
+- `data.gauges[id].raw_value` — actual statistic (3.76% CPI, 5.45% WPI, etc.)
+- `data.gauges[id].confidence` — "HIGH"/"LOW" — respect in UI (show "low confidence" badge)
 
-### Pattern 4: HTML Fixtures as Inline Bytes
+**ASIC constraint for explanation copy:** The existing `getWhyItMatters` and
+`generateMetricInterpretation` functions already use neutral framing. The verdict
+explanation must follow the same pattern: "Wages grew X% — above the historical average"
+is compliant; "Wages are dangerously high" is not.
 
-NAB scraper helper functions (`extract_capacity_from_html`, `get_pdf_link`, `discover_latest_survey_url`) operate on HTML bytes. These are pure transformations — pass minimal HTML bytes inline rather than loading a fixture file.
+### Pattern 3: CSS Polish Without a Build System — Tailwind CDN + Inline Style Block
 
-```python
-# tests/python/test_ingest_nab.py
-import pytest
-from pipeline.ingest.nab_scraper import (
-    extract_capacity_from_html,
-    get_pdf_link,
-)
+**What:** Tailwind CDN (v3 via `cdn.tailwindcss.com`) with an inline `tailwind.config`
+block and a `<style>` block in `<head>`. This is the only mechanism available without
+introducing a build step.
 
-MINIMAL_NAB_HTML_WITH_CAPACITY = b"""
-<html><body>
-<article>
-  <p>The NAB Monthly Business Survey for October 2025 showed
-     capacity utilisation rose to 83.5% nationally.</p>
-  <a href="https://business.nab.com.au/survey-oct-2025.pdf">Download PDF</a>
-</article>
-</body></html>
-"""
-
-MINIMAL_NAB_HTML_NO_CAPACITY = b"""
-<html><body>
-<article><p>No relevant capacity data in this page.</p></article>
-</body></html>
-"""
-
-
-def test_extract_capacity_from_html_finds_value():
-    result = extract_capacity_from_html(MINIMAL_NAB_HTML_WITH_CAPACITY)
-    assert result == pytest.approx(83.5)
-
-
-def test_extract_capacity_from_html_returns_none_when_absent():
-    result = extract_capacity_from_html(MINIMAL_NAB_HTML_NO_CAPACITY)
-    assert result is None
-
-
-def test_get_pdf_link_finds_absolute_url():
-    result = get_pdf_link(MINIMAL_NAB_HTML_WITH_CAPACITY)
-    assert result == "https://business.nab.com.au/survey-oct-2025.pdf"
-
-
-def test_get_pdf_link_returns_none_when_no_pdf():
-    result = get_pdf_link(MINIMAL_NAB_HTML_NO_CAPACITY)
-    assert result is None
+**The existing config block already defines all custom tokens:**
+```javascript
+tailwind.config = {
+  darkMode: 'class',
+  theme: {
+    extend: {
+      colors: {
+        'finance-dark': '#0a0a0a',
+        'finance-gray': '#1a1a1a',
+        'finance-border': '#2d2d2d',
+        'finance-accent': '#60a5fa',
+        'gauge-green': '#10b981',
+        'gauge-amber': '#f59e0b',
+        'gauge-red': '#ef4444'
+      }
+    }
+  }
+}
 ```
 
-### Pattern 5: Engine Tests with Fixture CSV Wiring
+These tokens can be used directly in new HTML with standard Tailwind class syntax.
 
-`generate_status()` reads from `DATA_DIR` (patched to `tmp_path`) and writes to `STATUS_OUTPUT` (NOT patched by autouse — requires explicit patching). Copy fixture CSVs and the real `weights.json` into `tmp_path`.
+**What CDN Tailwind supports (relevant to visual polish):**
 
-```python
-# tests/python/test_engine.py
-import json
-import shutil
-from pathlib import Path
-import pytest
-import pipeline.config
+HIGH confidence (observed in existing codebase):
+- All utility classes: spacing (`p-4`, `mt-6`, `gap-4`), typography (`text-xl`, `font-bold`,
+  `tracking-tight`), colour (`text-gray-200`, `bg-finance-gray`, `border-finance-border`)
+- Responsive prefixes: `sm:`, `md:`, `lg:` — already used throughout
+- State variants: `hover:`, `focus:`, `group-open:` — already used
+- Opacity modifiers: `bg-finance-gray/50`, `border-finance-border/50` — already used
+- Arbitrary values: `h-[500px]` — already used in chart section
 
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
-WEIGHTS_FILE = Path("data/weights.json")  # real file, committed to repo
+**CSS patterns for dark theme visual polish (no build step needed):**
 
+```html
+<!-- Large verdict text — promote hierarchy -->
+<div class="text-3xl sm:text-4xl font-black tracking-tight text-center">
 
-@pytest.fixture
-def engine_data_dir(tmp_path, monkeypatch):
-    """
-    Populate tmp_path with all fixture CSVs and weights.json.
-    Patch STATUS_OUTPUT to tmp_path so generate_status() doesn't
-    write to the real public/data/status.json.
-    """
-    # Copy all fixture CSVs
-    for csv_file in FIXTURES_DIR.glob("*.csv"):
-        shutil.copy(csv_file, tmp_path / csv_file.name)
+<!-- Subtle card with coloured left border (zone indicator) -->
+<div class="bg-finance-gray border border-finance-border border-l-4 border-l-[#60a5fa] rounded-xl p-5">
 
-    # Copy real weights.json (contains indicator weights — required by engine)
-    if WEIGHTS_FILE.exists():
-        shutil.copy(WEIGHTS_FILE, tmp_path / "weights.json")
+<!-- Score emphasis with monospace number rendering -->
+<span class="text-5xl font-bold tabular-nums" style="color: #60a5fa;">
 
-    # Patch DATA_DIR (redundant with autouse but explicit is clearer)
-    monkeypatch.setattr(pipeline.config, "DATA_DIR", tmp_path)
+<!-- Divider line -->
+<hr class="border-finance-border my-6">
 
-    # CRITICAL: patch STATUS_OUTPUT — not covered by isolate_data_dir autouse
-    monkeypatch.setattr(pipeline.config, "STATUS_OUTPUT", tmp_path / "status.json")
+<!-- Muted label / eyebrow text -->
+<p class="text-xs text-gray-500 uppercase tracking-widest mb-2">
 
-    return tmp_path
-
-
-def test_generate_status_produces_valid_output(engine_data_dir):
-    """generate_status writes status.json with correct top-level structure."""
-    from pipeline.normalize.engine import generate_status
-
-    result = generate_status()
-
-    assert "overall" in result
-    assert "gauges" in result
-    assert "metadata" in result
-    assert 0 <= result["overall"]["hawk_score"] <= 100
-    assert result["overall"]["zone"] in ("cold", "cool", "neutral", "warm", "hot")
-
-    # Verify the output file was actually written
-    status_file = engine_data_dir / "status.json"
-    assert status_file.exists()
-    written = json.loads(status_file.read_text())
-    assert written["overall"]["hawk_score"] == result["overall"]["hawk_score"]
+<!-- Progress/contribution bar (pure CSS, no JS) -->
+<div class="h-1.5 rounded-full bg-finance-border overflow-hidden">
+  <div class="h-full rounded-full" style="width: 73%; background: #60a5fa;"></div>
+</div>
 ```
 
-### Pattern 6: Pure Function Tests Need No Mocking
+**What CDN Tailwind does NOT support:**
 
-`_parse_abs_date`, `_derive_probabilities`, `_find_meeting_for_contract`, `get_candidate_urls`, `generate_interpretation`, `build_asx_futures_entry` — these are pure transformations. Test them directly with constructed inputs; no patching required.
+- `@apply` directives in `<style>` blocks — CDN does not process CSS at build time.
+  Use class strings directly on elements instead.
+- Custom animations beyond `animate-pulse`, `animate-spin` — no custom keyframe support
+  without a `<style>` block.
+- JIT-only arbitrary variants like `[&>div]:` — avoid; use standard class composition.
 
-```python
-# tests/python/test_ingest_abs.py
-import pytest
-from pipeline.ingest.abs_data import _parse_abs_date
+**The inline `<style>` block is the escape hatch** for anything Tailwind CDN cannot express:
 
-
-@pytest.mark.parametrize("input_str,expected", [
-    ("2024-01", "2024-01-01"),     # Monthly
-    ("2024-Q1", "2024-01-01"),     # Quarterly Q1
-    ("2024-Q2", "2024-04-01"),     # Quarterly Q2
-    ("2024-Q3", "2024-07-01"),     # Quarterly Q3
-    ("2024-Q4", "2024-10-01"),     # Quarterly Q4
-])
-def test_parse_abs_date(input_str, expected):
-    assert _parse_abs_date(input_str) == expected
-
-
-# tests/python/test_ingest_asx.py
-from pipeline.ingest.asx_futures_scraper import _derive_probabilities
-
-
-@pytest.mark.parametrize("implied,current,expected_direction", [
-    (3.60, 3.85, "cut"),    # 25bp cut: change_bp = -25
-    (3.85, 3.85, "hold"),   # No move: change_bp = 0 (within deadband)
-    (3.87, 3.85, "hold"),   # 2bp: within deadband
-    (4.10, 3.85, "hike"),   # 25bp hike: change_bp = +25
-])
-def test_derive_probabilities_direction(implied, current, expected_direction):
-    change_bp, prob_cut, prob_hold, prob_hike = _derive_probabilities(implied, current)
-    if expected_direction == "cut":
-        assert prob_cut > 0
-        assert prob_hike == 0
-    elif expected_direction == "hold":
-        assert prob_hold == 100
-        assert prob_cut == 0
-        assert prob_hike == 0
-    else:  # hike
-        assert prob_hike > 0
-        assert prob_cut == 0
-    assert prob_cut + prob_hold + prob_hike == 100
+```html
+<style>
+  /* Existing */
+  html { scroll-behavior: smooth; }
+  /* Add for visual polish: */
+  .verdict-hero-card {
+    background: linear-gradient(135deg, #1a1a1a 0%, #0f172a 100%);
+  }
+  .indicator-bar-fill {
+    transition: width 0.6s ease-out;
+  }
+</style>
 ```
+
+**When to use `<style>` vs Tailwind classes:**
+- Transitions/animations: `<style>` block — CDN JIT does not support `transition-[width]`
+- Gradients more complex than `from-/to-` built-ins: `<style>` block
+- `::-webkit-*` pseudo-elements: already in `<style>` block, extend there
+- Everything else: Tailwind classes
+
+### Pattern 4: Script Loading Order — Add New Module Before gauge-init.js
+
+**What:** The existing script loading order at the bottom of `<body>` reflects dependency
+order. Any new module that provides functions called by `gauge-init.js` must load before it.
+Any module that merely reuses `InterpretationsModule` is safe extending that existing file.
+
+**Current order:**
+```html
+<script src="js/data.js"></script>        <!-- DataModule -->
+<script src="js/chart.js"></script>       <!-- ChartModule -->
+<script src="js/countdown.js"></script>   <!-- CountdownModule -->
+<script src="js/calculator.js"></script>  <!-- CalculatorModule -->
+<script src="js/main.js"></script>        <!-- IIFE orchestrator (rates + meetings) -->
+<script src="js/gauges.js"></script>      <!-- GaugesModule -->
+<script src="js/interpretations.js"></script>  <!-- InterpretationsModule -->
+<script src="js/gauge-init.js"></script>  <!-- IIFE orchestrator (status.json) -->
+```
+
+**v4.0 does NOT need a new script tag** if `renderVerdictExplanation` is added to
+`interpretations.js`. The function loads with that existing file. `gauge-init.js` already
+loads after `interpretations.js` and calls into it — this works without order change.
+
+**If a new module IS introduced** (e.g., `verdict-explanation.js`):
+```html
+<!-- Insert before gauge-init.js, after interpretations.js -->
+<script src="js/interpretations.js"></script>
+<script src="js/verdict-explanation.js"></script>  <!-- NEW -->
+<script src="js/gauge-init.js"></script>
+```
+
+This preserves the pattern: library modules (GaugesModule, InterpretationsModule) load
+before orchestrator IIFEs that consume them.
 
 ---
 
 ## Data Flow
 
-### Mock Data Flow for Ingest Tests
+### v4.0 Status.json Consumption Map
 
 ```
-test calls fetch_and_save()
+DataModule.fetch("data/status.json")   [single fetch, cached]
     │
-    ▼
-fetch_and_save() calls scrape_X() / fetch_X()
+    ├── data.overall.hawk_score ─────► GaugesModule.createHeroGauge()
+    │                                  InterpretationsModule.renderVerdict()
+    │                                  renderCalculatorBridge()
     │
-    ▼
-scrape_X() calls create_session()
+    ├── data.overall ─────────────────► InterpretationsModule.renderVerdict()
     │
-    ▼  [MOCKED — patch("pipeline.ingest.X.create_session") returns fake_session]
-fake_session.get(url) returns MagicMock response
-    │   .status_code = 200
-    │   .text = "<controlled CSV/HTML>"
-    │   .content = b"<controlled bytes>"
-    │   .json() = {"data": {"items": [...]}}
-    ▼
-Scraper parses response → builds DataFrame
+    ├── data.asx_futures ─────────────► InterpretationsModule.renderASXTable()
     │
-    ▼
-append_to_csv(tmp_path / "output.csv", df)  [REAL — writes to isolated tmp_path]
+    ├── data.gauges ──────────────────► renderMetricGauges()   [gauge-init.js]
+    │                                   InterpretationsModule.renderMetricCard()
+    │                                                           (called per indicator)
     │
-    ▼
-Test asserts:
-    - return dict: {"status": "success", "rows": N}
-    - CSV file exists at tmp_path / "output.csv"
-    - CSV has expected columns and row count
+    └── data.gauges + data.overall.hawk_score ──► [NEW] InterpretationsModule.renderVerdictExplanation()
 ```
 
-### Isolation Guarantee Layers
+No new data sources. No changes to status.json schema. All v4.0 features consume
+the same data already fetched by gauge-init.js.
+
+### Verdict Explanation Calculation Logic
+
+The explanation must rank indicators by their contribution to the hawk score diverging
+from 50. Contribution = `(value - 50) * weight`. Positive contribution = hawkish pressure.
 
 ```
-Layer 1: Socket level
-    block_network autouse — any real socket.socket() call raises RuntimeError
-    Applied to: ALL tests without @pytest.mark.live
-
-Layer 2: HTTP session level
-    patch("pipeline.ingest.X.create_session") in each ingest test
-    Controls: what session.get(url) returns for each specific test
-
-Layer 3: Data directory level
-    isolate_data_dir autouse — pipeline.config.DATA_DIR = tmp_path
-    Applied to: ALL tests — scraper writes go to tmp_path, never data/
-
-Layer 4: Status output level (engine tests only)
-    Must patch pipeline.config.STATUS_OUTPUT explicitly
-    NOT covered by isolate_data_dir — computed at import time from public/data/
-    Applied to: test_engine.py only
+Example with current status.json:
+  wages:     value=84.8, weight=0.15  → contribution = (84.8-50) * 0.15 = +5.22  (hawkish)
+  inflation: value=30.2, weight=0.25  → contribution = (30.2-50) * 0.25 = -4.95  (dovish)
+  employment:value=33.7, weight=0.15  → contribution = (33.7-50) * 0.15 = -2.45  (dovish)
+  spending:  value=60.4, weight=0.10  → contribution = (60.4-50) * 0.10 = +1.04  (hawkish)
+  ...
 ```
 
-### Key Return Contracts by Module
+Sort by absolute contribution. Top 3 explain the most of the current score.
+Render as: "[Indicator] is [above/below] average — pushing the score [up/down]."
 
-| Module | `fetch_and_save` return type | Success contract | Failure contract |
-|--------|------------------------------|-----------------|-----------------|
-| `rba_data` | `int` | Row count > 0 | Raises exception (critical) |
-| `abs_data` | `dict[str, int]` | `{"cpi": 50, ...}` | Row count = 0 per series |
-| `asx_futures_scraper` | `dict` | `{"status": "success", "rows": N, "meetings": M}` | `{"status": "failed", "error": "..."}` |
-| `corelogic_scraper` | `dict` | `{"status": "success", "rows": N}` | `{"status": "failed", "error": "..."}` |
-| `nab_scraper` | `dict` | `{"status": "success", "rows": N}` | `{"status": "failed", "error": "..."}` |
-
-Tests must assert on the full return contract, not just the presence of a `status` key.
+ASIC-safe framing already exists in `generateMetricInterpretation()` — re-use it,
+don't write new copy from scratch.
 
 ---
 
 ## Build Order
 
-Build new test files in this sequence. Each step builds on patterns established by prior steps.
+Build features in this sequence. Dependencies drive the order.
 
-**Step 1: `test_http_client.py`**
-- Zero dependencies on mocking or pipeline modules.
-- Call `create_session()` with various args; inspect the returned session object.
-- Assert: `session.adapters["https://"].max_retries.total == 3`
-- Assert: `session.headers["User-Agent"]` matches expected string.
-- Establishes pattern: inspecting real objects, not mocking them.
+**Phase 1: HTML Restructure — Hero Section**
 
-**Step 2: `test_ingest_abs.py`**
-- First use of `patch("pipeline.ingest.abs_data.create_session")`.
-- Establishes the `_make_mock_session` helper pattern.
-- Start with pure functions: `_parse_abs_date` (parametrized, no mocking).
-- Then `fetch_abs_series` happy path (200 response, CSV with right columns).
-- Then error paths (non-200 status, empty text, short text, parse error).
-- Then `fetch_and_save` single series and all series.
+Modify `index.html` only. No JS changes.
 
-**Step 3: `test_ingest_rba.py`**
-- Similar pattern to ABS. Key difference: RBA CSV has metadata header rows that must be skipped.
-- Use a realistic fixture `rba_a2_data.csv` with 3-4 header rows before `Series ID` row.
-- Test `fetch_cash_rate` with mock response using this fixture content.
-- Test range extraction (`"17.00 to 17.50"` → `17.50`).
+1. Move `#verdict-container` above the 5-column gauge grid inside `#hawk-o-meter-section`
+2. Increase verdict typography (larger text class, bolder weight)
+3. Add `id="verdict-explanation"` container below the verdict (empty div — JS fills it)
+4. Adjust grid layout if verdict now occupies full width above gauge
 
-**Step 4: `test_ingest_asx.py`**
-- Start with pure functions: `_derive_probabilities` (parametrized, no mocking).
-- Then `_find_meeting_for_contract` (pure, just date logic).
-- Then `_get_current_cash_rate` (reads from `tmp_path / "rba_cash_rate.csv"` — use `isolate_data_dir` + write a CSV to `tmp_path`).
-- Then `scrape_asx_futures` with mocked JSON API response.
-- Then `_check_staleness` with a CSV written to `tmp_path`.
-- Then `fetch_and_save` success, empty df, exception paths.
+Dependency: None. Can be done before any JS work. The existing
+`InterpretationsModule.renderVerdict('verdict-container', ...)` call continues to work
+because the element ID is unchanged.
 
-**Step 5: `test_ingest_corelogic.py`**
-- Start with pure functions: `get_candidate_urls` (no mocking — just asserts URL structure).
-- Then `extract_cotality_yoy` using PDF mocking pattern (Pattern 3 above).
-- Then `_current_month_already_scraped` with various CSV states in `tmp_path`.
-- Then `fetch_and_save` with mock session + mock PDF.
+Verification: Load page — verdict should appear above-the-fold before the gauge.
+`#verdict-explanation` remains empty (intentional until Phase 2).
 
-**Step 6: `test_ingest_nab.py`**
-- Start with pure functions from inline HTML bytes: `extract_capacity_from_html`, `get_pdf_link` (Pattern 4 above).
-- Then `extract_capacity_from_pdf` using PDF mocking pattern.
-- Then `_current_month_already_scraped`.
-- Then `discover_latest_survey_url` with mocked session returning HTML that contains survey URL.
-- Then `fetch_and_save` and `backfill_nab_history`.
-- Most complex module — build last among ingest tests.
+**Phase 2: Verdict Explanation Component**
 
-**Step 7: `test_engine.py`**
-- Add `engine_data_dir` fixture to conftest.py or keep it local to this file.
-- Start with pure functions: `generate_interpretation` (all 8 indicator × 5 zone combos — no data needed).
-- Then `build_asx_futures_entry` with a minimal `asx_futures.csv` in `tmp_path`.
-- Then `build_gauge_entry` with synthetic z-score DataFrame.
-- Then `process_indicator` with fixture CSVs in `tmp_path`.
-- Then `generate_status` end-to-end (requires `engine_data_dir` fixture with all CSVs + weights.json).
+Add `renderVerdictExplanation(containerId, gaugesData, overallScore)` to
+`interpretations.js` and wire the call in `gauge-init.js`.
 
-**Step 8: `test_main.py`**
-- Build last — depends on understanding all scraper return contracts.
-- Mock entire ingest modules at `pipeline.main.*` level.
-- Test tier behavior: critical failure → sys.exit(1), important failure → continues, optional failure → "partial" status.
-- Test normalization success and failure paths.
-- Test result dict structure for all outcomes.
+1. Add `renderVerdictExplanation` function to `interpretations.js` (before the `return` object)
+2. Expose it in `return { ..., renderVerdictExplanation: renderVerdictExplanation }`
+3. In `gauge-init.js` `.then()`, after `renderVerdict`, add:
+   `InterpretationsModule.renderVerdictExplanation('verdict-explanation', data.gauges, data.overall.hawk_score);`
+
+Dependency: Phase 1 must have created `id="verdict-explanation"` in the HTML.
+The function must reference `GaugesModule.getZoneColor()` (already available) for
+colour-coded indicators.
+
+Verification: Score explanation appears below the verdict verdict label with 3-5 indicator
+lines, all using neutral ASIC-safe language. Each line matches the `getWhyItMatters`
+pattern — no financial advice framing.
+
+**Phase 3: Visual Polish**
+
+Modify `index.html` CSS classes and the `<style>` block.
+
+1. Typography hierarchy — section headings, card labels, body text must form a clear scale
+2. Consistent spacing — audit `py-` and `px-` values across all sections; standardise
+3. Colour hierarchy — verdict zone colour (blue/grey/red) should bleed into the hero
+   section treatment (left border, text accent)
+4. Dark theme refinement — card backgrounds, border treatments, separator lines
+
+Dependency: Phases 1 and 2 establish final DOM structure before CSS is tuned. Polish
+after structure is stable to avoid rework.
+
+Verification: Screenshot above-the-fold before/after. Key check: verdict + score visible
+without scrolling on mobile (375px viewport) and desktop (1280px viewport).
 
 ---
 
 ## Integration Points
 
-### New Files Required
+### New vs Modified
 
-| File | Type | Why Needed |
-|------|------|-----------|
-| `tests/python/test_http_client.py` | New test | Zero existing coverage on `create_session` |
-| `tests/python/test_ingest_abs.py` | New test | No unit tests for ABS ingest module |
-| `tests/python/test_ingest_rba.py` | New test | No unit tests for RBA ingest module |
-| `tests/python/test_ingest_asx.py` | New test | No unit tests for ASX scraper |
-| `tests/python/test_ingest_corelogic.py` | New test | No unit tests for CoreLogic scraper |
-| `tests/python/test_ingest_nab.py` | New test | No unit tests for NAB scraper |
-| `tests/python/test_engine.py` | New test | No unit tests for normalization engine |
-| `tests/python/test_main.py` | New test | No unit tests for pipeline orchestrator |
-| `tests/python/fixtures/asx_futures_api_response.json` | New fixture | Provides controlled MarkitDigital API response |
-| `tests/python/fixtures/rba_a2_data.csv` | New fixture | Provides RBA A2 CSV with metadata header rows |
-| `tests/python/fixtures/nab_article.html` | New fixture (optional) | Alternative to inline HTML for complex NAB tests |
+| File | Change Type | What Changes |
+|------|-------------|-------------|
+| `public/index.html` | Modified | Hero section restructure; `#verdict-explanation` div added; CSS class updates for visual polish |
+| `public/js/interpretations.js` | Modified | Add `renderVerdictExplanation()` function; expose in return object |
+| `public/js/gauge-init.js` | Modified | Add `InterpretationsModule.renderVerdictExplanation()` call in `.then()` |
+| `public/js/gauges.js` | Unchanged | Zone colors/labels already support all new UI needs |
+| `public/js/data.js` | Unchanged | Cache hit on status.json — no second fetch needed |
+| `public/js/main.js` | Unchanged | rates.json + meetings.json orchestration unaffected |
+| `public/data/status.json` | Unchanged | All required fields already present: `gauges[id].value`, `.weight`, `.z_score`, `.zone_label`, `.confidence` |
 
-### Files Modified
+### Internal Module Boundaries
 
-| File | Change | Reason |
-|------|--------|--------|
-| `tests/python/conftest.py` | Add `engine_data_dir` fixture (optional) | Shared setup for engine tests; can stay local if not reused |
-| No other existing files | None | The existing autouse infrastructure handles all new tests |
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `gauge-init.js` → `InterpretationsModule` | Direct function call | `renderVerdictExplanation` joins existing call chain in `.then()` |
+| `renderVerdictExplanation` → `GaugesModule` | Direct function call | Uses `GaugesModule.getZoneColor()` for indicator colour coding |
+| `renderVerdictExplanation` → `InterpretationsModule` internals | Internal call | Can call private `generateMetricInterpretation()` and `getWhyItMatters()` since same module |
+| `verdict-explanation` DOM element | Data flows in one direction only | gauge-init.js writes; no other module reads the DOM output |
 
-### Existing Files Unchanged
+### ASIC Compliance Checkpoints
 
-All existing test files (`test_smoke.py`, `test_zscore.py`, `test_gauge.py`, `test_ratios.py`, `test_csv_handler.py`, `test_schema.py`, `test_live_sources.py`) remain unchanged. No existing fixture CSVs need modification.
+All new UI copy must pass these checks (from PROJECT.md constraints):
 
----
-
-## Critical Isolation Gaps
-
-### Gap 1: STATUS_OUTPUT Not Isolated by Autouse
-
-`pipeline.config.STATUS_OUTPUT = Path("public") / "data" / "status.json"` is assigned at import time. The `isolate_data_dir` autouse fixture patches `DATA_DIR` but not `STATUS_OUTPUT`. Any test that calls `generate_status()` will write to the real `public/data/status.json` unless explicitly patched.
-
-**Required fix in `test_engine.py`:**
-```python
-monkeypatch.setattr(pipeline.config, "STATUS_OUTPUT", tmp_path / "status.json")
-```
-
-This can be encapsulated in an `engine_data_dir` fixture to avoid repetition.
-
-### Gap 2: SOURCE_METADATA Paths Are Import-Time Bound
-
-`pipeline.config.SOURCE_METADATA` values contain `Path` objects computed from the original `DATA_DIR` value at import time. If any module reads `SOURCE_METADATA["RBA"]["file_path"]`, it will point to the original `data/` directory, not `tmp_path`. The conftest.py already documents this. For ingest tests, this is not an issue — scrapers read from `pipeline.config.DATA_DIR` at call time (late binding), not from SOURCE_METADATA.
-
-### Gap 3: `_get_rba_meeting_dates` Reads from `public/data/meetings.json`
-
-`asx_futures_scraper._get_rba_meeting_dates()` opens `Path("public/data/meetings.json")` — a hardcoded relative path, not through `DATA_DIR`. Tests for `scrape_asx_futures()` must either:
-- Ensure CWD is the project root when running pytest (already true: `pyproject.toml` at root, `testpaths = ["tests/python"]`), or
-- Patch `_get_rba_meeting_dates` to return a fixed list of meeting dates.
-
-The simpler approach is to patch the function since the test is about the futures scraping logic, not the meeting date loading:
-```python
-with patch("pipeline.ingest.asx_futures_scraper._get_rba_meeting_dates",
-           return_value=["2025-04-01", "2025-05-06"]):
-    ...
-```
+| Rule | What It Means for v4.0 |
+|------|------------------------|
+| Neutral framing | "Wages are growing above average" not "Wages are dangerously high" |
+| No personal financial advice | Verdict explanation describes indicators, not user actions |
+| No predictions | "Economic data is currently showing..." not "Rates WILL rise" |
+| Existing disclaimer visible | Hero restructure must not push ASIC banner off screen |
 
 ---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Patching at the Wrong Module Level
+### Anti-Pattern 1: Adding a New IIFE to Fetch status.json Again
 
-**What people do:** `patch("pipeline.utils.http_client.create_session")` in scraper tests.
-**Why it's wrong:** Scrapers imported `create_session` at module load time via `from pipeline.utils.http_client import create_session`. The name is now bound in the scraper module. Patching the source has no effect.
-**Do this instead:** `patch("pipeline.ingest.abs_data.create_session")` — patch the binding in the consuming module.
+**What people do:** Create `js/verdict-explanation.js` as an IIFE that calls
+`DataModule.fetch('data/status.json')` independently.
 
-### Anti-Pattern 2: Forgetting to Patch STATUS_OUTPUT in Engine Tests
+**Why it's wrong:** DataModule already fetches and caches status.json in gauge-init.js.
+A second fetch call returns the cache immediately but adds an independent execution order —
+if the new IIFE runs before gauge-init.js's `.then()` resolves (a race), the explanation
+could render before the gauge, causing brief empty-state flicker. It also adds a new
+script tag and file to maintain.
 
-**What people do:** Call `generate_status()` in a test that uses `isolate_data_dir`, assuming all file I/O is isolated.
-**Why it's wrong:** `STATUS_OUTPUT` points to `public/data/status.json` — outside `DATA_DIR`. The autouse fixture does not patch it.
-**Do this instead:** Always add `monkeypatch.setattr(pipeline.config, "STATUS_OUTPUT", tmp_path / "status.json")` in engine tests. Or use an `engine_data_dir` fixture that does this.
+**Do this instead:** Add `renderVerdictExplanation` to `interpretations.js` and call
+it from gauge-init.js's existing `.then()` callback where `data` is already available.
+One fetch, one orchestrator, zero race conditions.
 
-### Anti-Pattern 3: Using Binary PDF Fixtures
+### Anti-Pattern 2: Using innerHTML to Build the Explanation
 
-**What people do:** Generate or download a real `.pdf` file, add it to `tests/python/fixtures/`, pass it to `extract_cotality_yoy`.
-**Why it's wrong:** Real PDFs are binary, opaque, platform-sensitive, and fragile. The regex extraction logic is what needs testing, not pdfplumber itself.
-**Do this instead:** Mock `pdfplumber.open` to return a controlled context manager. The test controls exactly what `page.extract_text()` returns.
+**What people do:** `container.innerHTML = '<div class="..."><span>' + text + '</span></div>';`
 
-### Anti-Pattern 4: Testing Only the Return Value of `fetch_and_save`
+**Why it's wrong:** The existing codebase is strict about safe DOM methods
+(`createElement`/`textContent` only — no `innerHTML`). The ESLint config enforces this
+(ESLint v10 flat config, `sourceType: script`). A `no-innerHTML` pattern violation would
+fail linting in the pre-push hook. More importantly: `status.json` data includes
+user-visible text from scraped sources (NAB survey content, CoreLogic labels). Any text
+inserted via `innerHTML` is an XSS vector even in a static app.
 
-**What people do:** `assert result["status"] == "success"` — only checks the return dict.
-**Why it's wrong:** The side effect (writing a CSV) is equally important. A scraper that returns `{"status": "success"}` but writes no file would pass the test.
-**Do this instead:** Also assert the CSV file exists in `tmp_path` with the expected content.
-```python
-assert result["status"] == "success"
-output_file = tmp_path / "asx_futures.csv"
-assert output_file.exists()
-df = pd.read_csv(output_file)
-assert len(df) > 0
-```
+**Do this instead:** Use `createElement`/`textContent`/`appendChild` — the same pattern
+used throughout `interpretations.js`. The `renderMetricCard` function (680 lines in
+interpretations.js) demonstrates the full pattern for a complex card.
 
-### Anti-Pattern 5: Mocking Too Deep in Engine Tests
+### Anti-Pattern 3: Rebuilding Zone Logic in the Explanation Component
 
-**What people do:** Mock `normalize_indicator`, `compute_rolling_zscores`, `compute_hawk_score` inside engine tests to avoid needing real data.
-**Why it's wrong:** These are fast pure functions that are already tested in `test_ratios.py` and `test_zscore.py`. Mocking them adds test complexity without adding confidence.
-**Do this instead:** Wire up the real fixture CSVs and let the full stack run. Engine tests should verify the integration (does the right data flow through?), not re-mock the logic already tested elsewhere.
+**What people do:** Write a new colour/zone lookup inside `renderVerdictExplanation`
+to determine whether an indicator is hawkish or dovish.
+
+**Why it's wrong:** `GaugesModule` already exposes `getZoneColor(value)` and
+`getStanceLabel(value)`. Duplicating this logic creates two sources of truth for zone
+boundaries (the `ZONE_COLORS` array in gauges.js). If zone boundaries are ever adjusted,
+two places need updating.
+
+**Do this instead:** Call `GaugesModule.getZoneColor(metricData.value)` and
+`GaugesModule.getStanceLabel(metricData.value)` directly. They accept any 0-100 value.
+
+### Anti-Pattern 4: Doing Visual Polish Before Structure Is Stable
+
+**What people do:** Apply CSS class changes (spacing, typography, colour hierarchy) to
+`index.html` while the hero section restructure is still in progress.
+
+**Why it's wrong:** If Phase 1 (hero restructure) changes which element holds the verdict
+text, the CSS classes applied in the polish phase target elements that will be moved or
+replaced. Double rework, and it is difficult to review the visual result until layout
+is stable.
+
+**Do this instead:** Complete Phase 1 (HTML structure) and Phase 2 (verdict explanation
+JS + rendering) before Phase 3 (CSS polish). Polish after the final DOM structure is
+confirmed.
+
+### Anti-Pattern 5: Placing the Hero Section Below the Onboarding Accordion
+
+**What people do:** Add a new `<section>` for the hero verdict above `#hawk-o-meter-section`
+but below `#onboarding`, thinking the onboarding can stay in its current above-the-fold position.
+
+**Why it's wrong:** The `#onboarding` section is a `<details>` element that defaults to
+`open`, making it ~100px tall on mobile. It visually competes with the hero verdict for
+above-the-fold dominance. The goal is verdict + score as the dominant above-the-fold element.
+
+**Do this instead:** Either (a) move the verdict to the very top of `#hawk-o-meter-section`
+so it appears first within that section, and accept the onboarding detail sits above it but
+is collapsible — OR (b) change the onboarding accordion to default-closed so users can
+dismiss it. Option (a) is zero-risk; option (b) is a minor UX decision.
+
+---
+
+## Scaling Considerations
+
+This is a static dashboard with no server-side rendering and a fixed data file.
+Scaling concerns are about page load performance, not server capacity.
+
+| Concern | Current State | v4.0 Risk |
+|---------|--------------|-----------|
+| Plotly.js CDN load | ~3.5MB, already loading | No change — no new Plotly usage |
+| Tailwind CDN JIT | Scans DOM for classes at runtime | New classes auto-included if valid utilities |
+| status.json size | ~5KB, one fetch, cached | No change — no new data fields |
+| DOM node count | Moderate — 7 gauge cards + table | Verdict explanation adds ~10-20 nodes |
+| CSS specificity | Tailwind utilities + custom tokens | Risk: arbitrary values override custom tokens — test in browser |
 
 ---
 
 ## Sources
 
-- Direct inspection of `/Users/annon/projects/rba-hawko-meter/pipeline/` source files (all modules read)
-- Direct inspection of `/Users/annon/projects/rba-hawko-meter/tests/python/` (all test files read)
-- `pyproject.toml` — pytest configuration (`testpaths`, `pythonpath`, `markers`, `--strict-markers`)
-- `tests/python/conftest.py` — autouse fixture implementation and documented gaps
-- `.planning/PROJECT.md` — v3.0 milestone goals and key decisions
+- Direct inspection: `public/index.html` (468 LOC) — DOM structure, existing section IDs, script loading order
+- Direct inspection: `public/js/gauge-init.js` (272 LOC) — status.json data flow, all render call sites
+- Direct inspection: `public/js/interpretations.js` (694 LOC) — `renderVerdict`, `renderMetricCard`, `getWhyItMatters`, `generateMetricInterpretation`, `getPlainVerdict`
+- Direct inspection: `public/js/gauges.js` (270 LOC) — `ZONE_COLORS`, `getZoneColor`, `getStanceLabel`, `GaugesModule` public API
+- Direct inspection: `public/js/data.js` (98 LOC) — cache mechanism (URL-keyed `cache` object)
+- Direct inspection: `public/js/main.js` (168 LOC) — script loading and initialization order
+- Direct inspection: `public/data/status.json` — live data schema, all fields available for explanation logic
+- `.planning/PROJECT.md` — ASIC compliance constraints, v4.0 goal statement, out-of-scope items
+- Tailwind CDN documentation — confirmed CDN supports all utility classes but not `@apply` processing
 
 ---
 
-*Architecture research for: v3.0 test coverage expansion — scraper mocking, orchestration testing*
+*Architecture research for: v4.0 Dashboard Visual Overhaul — frontend integration patterns*
 *Researched: 2026-02-25*
