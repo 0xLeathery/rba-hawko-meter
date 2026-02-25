@@ -75,7 +75,10 @@ Plans:
   2. Developer runs `npm run lint:js` and ESLint reports 0 violations across `public/js/` — IIFE `sourceType: 'script'` is configured, Plotly and Decimal globals are declared
   3. Developer runs `npm run lint` and both linters run in sequence and both exit 0
   4. Introducing an unused import in a pipeline file causes `npm run lint:py` to fail with a violation message pointing to the correct file and line
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 13-01-PLAN.md -- Ruff baseline cleanup (auto-fix + manual E501/B904)
+- [ ] 13-02-PLAN.md -- ESLint v10 setup, config, JS cleanup, and npm lint scripts
 
 ### Phase 14: Live Verification
 **Goal**: Developer can confirm the full pipeline works against real external endpoints without touching the unit test suite
@@ -109,6 +112,6 @@ Plans:
 | 10. NAB Capacity Utilisation Gauge | v1.1 | 2/2 | Complete | 2026-02-24 |
 | 11. Test Foundation | v2.0 | Complete    | 2026-02-24 | 2026-02-25 |
 | 12. Python Unit Tests | 2/2 | Complete    | 2026-02-24 | - |
-| 13. Linting Baseline | v2.0 | 0/? | Not started | - |
+| 13. Linting Baseline | v2.0 | 0/2 | Planned | - |
 | 14. Live Verification | v2.0 | 0/? | Not started | - |
 | 15. Pre-Push Hook | v2.0 | 0/? | Not started | - |
