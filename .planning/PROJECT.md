@@ -13,6 +13,17 @@ Empowers laypeople to understand interest rate drivers without relying on media 
 - **Data Integrity:** Strictly NO nominal currency values in gauges to avoid inflation bias; must use ratios/per-capita metrics.
 - **ASIC Compliance:** All language must use neutral framing per RG 244. No personal or general financial advice.
 
+## Current Milestone: v5.0 Direction & Momentum
+
+**Goal:** Transform the dashboard from a point-in-time snapshot into a momentum tracker that shows direction of change, enables organic sharing, and lays the foundation for newsletter-based monetization via mortgage broker affiliate links.
+
+**Target features:**
+- Snapshot archiving + `previous_value` in status.json (pipeline temporal layer)
+- Delta badges on indicator cards showing direction of change
+- Sparklines from existing `history` arrays on indicator cards
+- OG meta tags + share button for organic distribution
+- Historical hawk score chart
+
 ## Scope
 - **Backend:** Python-based ETL pipeline (ingest → normalize → Z-score → status.json).
 - **Frontend:** Static HTML/JS dashboard using Plotly.js for gauges, Tailwind CSS, Decimal.js for calculator, CountUp.js for score animation.
@@ -59,7 +70,7 @@ Empowers laypeople to understand interest rate drivers without relying on media 
 
 ### Active
 
-(No active requirements — define next milestone with `/gsd:new-milestone`)
+(Defining requirements for v5.0 Direction & Momentum — see REQUIREMENTS.md)
 
 ### Out of Scope
 | Feature | Reason |
@@ -136,4 +147,4 @@ Automated data updates: weekly pipeline (Monday) + daily ASX futures (weekdays) 
 3. **Accurate:** ✓ All metrics normalized via ratios/Z-scores, no nominal currency values.
 
 ---
-*Last updated: 2026-02-26 after v4.0 milestone*
+*Last updated: 2026-02-26 after v5.0 milestone started*
