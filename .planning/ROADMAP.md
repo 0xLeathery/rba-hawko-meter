@@ -132,6 +132,10 @@ Plans:
   2. Live tests pass with `isolate_data_dir` fixture correctly redirecting ingestor writes to tmp_path
   3. `npm run verify` chain includes `verify_summary.py` execution
   4. `npm run verify` completes all three tiers (fast tests + live pytest + Playwright) without DATA_DIR assertion failures
+**Plans**: 2 plans
+Plans:
+- [ ] 17-01-PLAN.md -- Fix DATA_DIR late-binding in all 7 Python modules + env var override
+- [ ] 17-02-PLAN.md -- Wire verify_summary.py into npm verify chain + add individual tier scripts
 
 ## Progress
 
@@ -147,4 +151,4 @@ Plans:
 | 14. Live Verification | 1/1 | Complete    | 2026-02-25 | - |
 | 15. Pre-Push Hook | 1/1 | Complete    | 2026-02-25 | - |
 | 16. Verify Linting Baseline | 1/1 | Complete    | 2026-02-25 | - |
-| 17. Fix DATA_DIR & verify Chain | v2.0 | 0/0 | Pending | - |
+| 17. Fix DATA_DIR & verify Chain | v2.0 | 0/2 | Pending | - |
