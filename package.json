@@ -11,8 +11,8 @@
     "lint:js": "npx eslint public/js/",
     "lint": "npm run lint:py && npm run lint:js",
     "test:python:live": "python -m pytest tests/python/ -m live -v",
-    "test:fast": "npm run lint && python -m pytest tests/python/ -m \"not live\"",
-    "verify:fast": "npm run lint && python -m pytest tests/python/ -m \"not live\"",
+    "test:fast": "npm run lint && python -m pytest tests/python/ -m \"not live\" && python scripts/check_coverage.py --min 85",
+    "verify:fast": "npm run lint && python -m pytest tests/python/ -m \"not live\" && python scripts/check_coverage.py --min 85",
     "verify:live": "python -m pytest tests/python/ -m live -v",
     "verify:playwright": "npx playwright test",
     "verify": "npm run verify:fast && npm run verify:live && npm run verify:playwright && python scripts/verify_summary.py"

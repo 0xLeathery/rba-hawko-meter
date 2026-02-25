@@ -369,3 +369,166 @@ def test_normalize_indicator_direct_normalization(tmp_path, monkeypatch):
     # The fixture has values around 81-84 (NAB capacity utilisation %)
     assert result["value"].min() > 70.0
     assert result["value"].max() < 90.0
+
+
+def test_normalize_indicator_none_csv_file():
+    """Config with csv_file=None returns None without error."""
+    result = normalize_indicator(
+        "inflation",
+        {
+            "csv_file": None,
+            "normalize": "yoy_pct_change",
+            "frequency": "monthly",
+            "yoy_periods": 12,
+        },
+    )
+    assert result is None
+
+
+def test_normalize_indicator_all_zero_values_returns_none(tmp_path, monkeypatch):
+    """CSV with all-zero values returns None (filtered out by filter_valid_data)."""
+    import pipeline.config
+    monkeypatch.setattr(pipeline.config, "DATA_DIR", tmp_path)
+
+    csv_path = tmp_path / "zeros.csv"
+    csv_path.write_text(
+        "date,value\n"
+        "2020-01-01,0.0\n"
+        "2020-04-01,0.0\n"
+        "2020-07-01,0.0\n"
+    )
+
+    result = normalize_indicator(
+        "test",
+        {
+            "csv_file": "zeros.csv",
+            "normalize": "yoy_pct_change",
+            "frequency": "quarterly",
+            "yoy_periods": 4,
+        },
+    )
+    assert result is None
+
+
+def test_normalize_indicator_empty_after_yoy(tmp_path, monkeypatch):
+    """CSV with too few rows for yoy_periods produces empty result → None."""
+    import pipeline.config
+    monkeypatch.setattr(pipeline.config, "DATA_DIR", tmp_path)
+
+    # Only 3 rows, yoy_periods=4 → all NaN after shift → empty after dropna
+    csv_path = tmp_path / "short.csv"
+    csv_path.write_text(
+        "date,value\n"
+        "2020-01-01,100.0\n"
+        "2020-04-01,101.0\n"
+        "2020-07-01,102.0\n"
+    )
+
+    result = normalize_indicator(
+        "wages",
+        {
+            "csv_file": "short.csv",
+            "normalize": "yoy_pct_change",
+            "frequency": "quarterly",
+            "yoy_periods": 4,
+        },
+    )
+    assert result is None
+
+
+# =============================================================================
+# load_asx_futures_csv
+# =============================================================================
+
+
+from pipeline.normalize.ratios import load_asx_futures_csv  # noqa: E402
+
+
+def test_load_asx_futures_csv_missing_file(tmp_path):
+    """Missing CSV returns None."""
+    result = load_asx_futures_csv(tmp_path / "nonexistent.csv")
+    assert result is None
+
+
+def test_load_asx_futures_csv_empty_file(tmp_path):
+    """Empty (0-byte) CSV returns None."""
+    path = tmp_path / "asx.csv"
+    path.write_bytes(b"")
+    result = load_asx_futures_csv(path)
+    assert result is None
+
+
+def test_load_asx_futures_csv_header_only(tmp_path):
+    """CSV with header only returns None."""
+    path = tmp_path / "asx.csv"
+    path.write_text(
+        "date,meeting_date,implied_rate,change_bp,"
+        "probability_cut,probability_hold,probability_hike\n"
+    )
+    result = load_asx_futures_csv(path)
+    assert result is None
+
+
+def test_load_asx_futures_csv_happy_path(tmp_path):
+    """Valid ASX CSV returns dict with required keys."""
+    # Two rows: one past meeting, one future meeting (far in the future)
+    path = tmp_path / "asx.csv"
+    path.write_text(
+        "date,meeting_date,implied_rate,change_bp,"
+        "probability_cut,probability_hold,probability_hike\n"
+        "2026-02-20,2099-04-01,3.85,-25.0,80.0,18.0,2.0\n"
+        "2026-02-20,2099-05-06,3.75,-35.0,85.0,13.0,2.0\n"
+    )
+    result = load_asx_futures_csv(path)
+
+    assert result is not None
+    for key in [
+        "data_date",
+        "meeting_date",
+        "implied_rate",
+        "change_bp",
+        "probability_cut",
+        "probability_hold",
+        "probability_hike",
+        "meetings",
+    ]:
+        assert key in result, f"Missing key: {key}"
+
+    assert result["data_date"] == "2026-02-20"
+    assert isinstance(result["meetings"], list)
+
+
+def test_load_asx_futures_csv_all_past_meetings_uses_latest_as_fallback(tmp_path):
+    """When all meeting dates are in the past, uses latest meeting row."""
+    path = tmp_path / "asx.csv"
+    path.write_text(
+        "date,meeting_date,implied_rate,change_bp,"
+        "probability_cut,probability_hold,probability_hike\n"
+        "2020-01-01,2020-02-01,0.75,0.0,5.0,90.0,5.0\n"
+        "2020-01-01,2020-03-01,0.50,-25.0,80.0,18.0,2.0\n"
+    )
+    result = load_asx_futures_csv(path)
+
+    # Should return data (fallback to past meeting) not None
+    assert result is not None
+    assert result["data_date"] == "2020-01-01"
+
+
+def test_load_asx_futures_csv_meetings_list_max_4(tmp_path):
+    """Meetings list is capped at 4 entries."""
+    # 6 future meetings — only 4 should be returned
+    rows = "\n".join(
+        f"2026-02-20,2099-0{i+1}-01,3.85,-10.0,70.0,25.0,5.0"
+        for i in range(6)
+    )
+    path = tmp_path / "asx.csv"
+    path.write_text(
+        "date,meeting_date,implied_rate,change_bp,"
+        "probability_cut,probability_hold,probability_hike\n"
+        + rows
+        + "\n"
+    )
+    result = load_asx_futures_csv(path)
+
+    assert result is not None
+    assert len(result["meetings"]) <= 4

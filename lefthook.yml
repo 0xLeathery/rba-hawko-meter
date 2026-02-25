@@ -15,6 +15,6 @@ pre-push:
       timeout: "30s"
       fail_text: "Push blocked: JS lint errors found. Run npm run test:fast to see details."
     unit-tests:
-      run: pytest tests/python/ -m "not live"
-      timeout: "30s"
-      fail_text: "Push blocked: Unit tests failed. Run npm run test:fast to see details."
+      run: pytest tests/python/ -m "not live" && python scripts/check_coverage.py --min 85
+      timeout: "45s"
+      fail_text: "Push blocked: Unit tests or coverage check failed. Run npm run test:fast to see details."

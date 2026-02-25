@@ -11,6 +11,7 @@ Covers:
 All tests are pure math — no network access, no disk I/O to the live data/ folder.
 """
 
+import json
 import math
 
 import pytest
@@ -19,6 +20,7 @@ from pipeline.normalize.gauge import (
     classify_zone,
     compute_hawk_score,
     generate_verdict,
+    load_weights,
     zscore_to_gauge,
 )
 
@@ -210,6 +212,85 @@ def test_compute_hawk_score_clamped_to_range():
         f"Result {result} is outside [0.0, 100.0] range"
     )
     assert result == pytest.approx(100.0)
+
+
+# =============================================================================
+# generate_verdict
+# =============================================================================
+
+
+# =============================================================================
+# load_weights
+# =============================================================================
+
+
+def test_load_weights_happy_path(tmp_path):
+    """Valid weights.json loads and returns dict."""
+    weights = {
+        "inflation": {"weight": 0.5, "polarity": 1},
+        "wages": {"weight": 0.5, "polarity": 1},
+    }
+    weights_path = tmp_path / "weights.json"
+    weights_path.write_text(json.dumps(weights))
+
+    result = load_weights(weights_path)
+
+    assert "inflation" in result
+    assert "wages" in result
+    assert result["inflation"]["weight"] == 0.5
+
+
+def test_load_weights_sums_to_near_one(tmp_path):
+    """Weights summing to exactly 1.0 are accepted."""
+    weights = {
+        "a": {"weight": 0.4, "polarity": 1},
+        "b": {"weight": 0.3, "polarity": 1},
+        "c": {"weight": 0.3, "polarity": 1},
+    }
+    weights_path = tmp_path / "weights.json"
+    weights_path.write_text(json.dumps(weights))
+
+    result = load_weights(weights_path)
+    assert len(result) == 3
+
+
+def test_load_weights_raises_on_zero_weight(tmp_path):
+    """Zero weight raises ValueError."""
+    weights = {
+        "inflation": {"weight": 0.0, "polarity": 1},
+        "wages": {"weight": 1.0, "polarity": 1},
+    }
+    weights_path = tmp_path / "weights.json"
+    weights_path.write_text(json.dumps(weights))
+
+    with pytest.raises(ValueError, match="positive"):
+        load_weights(weights_path)
+
+
+def test_load_weights_raises_on_negative_weight(tmp_path):
+    """Negative weight raises ValueError."""
+    weights = {
+        "inflation": {"weight": -0.5, "polarity": 1},
+        "wages": {"weight": 1.5, "polarity": 1},
+    }
+    weights_path = tmp_path / "weights.json"
+    weights_path.write_text(json.dumps(weights))
+
+    with pytest.raises(ValueError, match="positive"):
+        load_weights(weights_path)
+
+
+def test_load_weights_raises_when_sum_far_from_one(tmp_path):
+    """Weights summing far from 1.0 raises ValueError."""
+    weights = {
+        "inflation": {"weight": 0.3, "polarity": 1},
+        "wages": {"weight": 0.3, "polarity": 1},
+    }
+    weights_path = tmp_path / "weights.json"
+    weights_path.write_text(json.dumps(weights))
+
+    with pytest.raises(ValueError, match="sum"):
+        load_weights(weights_path)
 
 
 # =============================================================================
