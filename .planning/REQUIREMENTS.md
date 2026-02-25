@@ -18,10 +18,10 @@ Requirements for v4.0 Dashboard Visual Overhaul milestone. Each maps to roadmap 
 
 ### Verdict Explanation
 
-- [ ] **EXPL-01**: User sees a plain-English list of the top hawkish indicators driving the score up (top 3 by contribution)
-- [ ] **EXPL-02**: User sees a plain-English list of the top dovish indicators driving the score down (top 2 by contribution)
-- [ ] **EXPL-03**: Neutral indicators (near 50, low contribution) are omitted from the explanation section to avoid clutter
-- [ ] **EXPL-04**: All explanation copy uses ASIC-compliant hedged language ("tends to", "historically associated with", "the data is consistent with") — no predictions or recommendations
+- [x] **EXPL-01**: User sees a plain-English list of the top hawkish indicators driving the score up (top 3 by contribution)
+- [x] **EXPL-02**: User sees a plain-English list of the top dovish indicators driving the score down (top 2 by contribution)
+- [x] **EXPL-03**: Neutral indicators (near 50, low contribution) are omitted from the explanation section to avoid clutter
+- [x] **EXPL-04**: All explanation copy uses ASIC-compliant hedged language ("tends to", "historically associated with", "the data is consistent with") — no predictions or recommendations
 
 ### Visual Polish
 
@@ -71,10 +71,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HERO-04 | Phase 21 | Done |
 | HERO-05 | Phase 21 | Done |
 | HERO-06 | Phase 21 | Done |
-| EXPL-01 | Phase 22 | Pending |
-| EXPL-02 | Phase 22 | Pending |
-| EXPL-03 | Phase 22 | Pending |
-| EXPL-04 | Phase 22 | Pending |
+| EXPL-01 | Phase 22 | Done |
+| EXPL-02 | Phase 22 | Done |
+| EXPL-03 | Phase 22 | Done |
+| EXPL-04 | Phase 22 | Done |
 | POLX-01 | Phase 23 | Pending |
 | POLX-02 | Phase 23 | Pending |
 | POLX-03 | Phase 23 | Pending |

@@ -76,10 +76,10 @@ Plans:
   2. User sees a plain-English list of the top 2 dovish indicators pulling the score down — neutral indicators are absent from both lists
   3. All explanation copy uses hedged language ("tends to", "historically associated with", "the data is consistent with") with no predictive statements or recommendations
   4. The explanation section updates correctly with real data from status.json and uses zone colours via element.style (not Tailwind class concatenation)
-**Plans**: TBD
+**Plans**: 1 plan, 1 wave
 
 Plans:
-- [ ] 22-01: renderVerdictExplanation() in interpretations.js, wire in gauge-init.js
+- [x] 22-01: renderVerdictExplanation() in interpretations.js, wire in gauge-init.js
 
 ### Phase 23: Visual Polish and Animations
 **Goal**: Users experience a visually cohesive dashboard with consistent typography, spacing, and colour hierarchy, plus animated entry effects on the hero score and gauge
@@ -113,6 +113,6 @@ Plans:
 | 18. Test Infrastructure | v3.0 | 2/2 | Complete | 2026-02-25 |
 | 19. Ingest Module Tests | v3.0 | 2/2 | Complete | 2026-02-25 |
 | 20. Orchestration Tests and Enforcement | v3.0 | 2/2 | Complete | 2026-02-25 |
-| 21. Hero HTML Restructure | v4.0 | 1/1 | Complete | 2026-02-26 |
-| 22. Verdict Explanation Component | v4.0 | 0/1 | Not started | - |
+| 21. Hero HTML Restructure | v4.0 | Complete    | 2026-02-25 | 2026-02-26 |
+| 22. Verdict Explanation Component | v4.0 | 1/1 | Complete | 2026-02-26 |
 | 23. Visual Polish and Animations | v4.0 | 0/1 | Not started | - |
