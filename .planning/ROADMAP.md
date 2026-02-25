@@ -40,7 +40,7 @@ Delivered: Test foundation (pyproject.toml + isolated fixtures), 60+ pytest unit
 
 **Milestone Goal:** 85%+ per-module coverage across all `pipeline/` modules, closing the gap on ingest, orchestration, and normalization layers via mocked unit tests and an enforced coverage gate.
 
-- [ ] **Phase 18: Test Infrastructure** — Wire pytest-cov into addopts, add pytest-mock and responses deps, create scraper fixture files, and write the per-module coverage check script
+- [x] **Phase 18: Test Infrastructure** — Wire pytest-cov into addopts, add pytest-mock and responses deps, create scraper fixture files, and write the per-module coverage check script (completed 2026-02-25)
 - [ ] **Phase 19: Ingest Module Tests** — Unit tests for all 6 ingest/utility modules (abs_data, rba_data, asx_futures_scraper, corelogic_scraper, nab_scraper, http_client) reaching 85%+ each
 - [ ] **Phase 20: Orchestration Tests and Enforcement** — Unit tests for engine.py and main.py at 85%+, coverage check wired into npm scripts and pre-push hook
 
@@ -107,6 +107,6 @@ Plans:
 | 15. Pre-Push Hook | v2.0 | 1/1 | Complete | 2026-02-25 |
 | 16. Verify Linting Baseline | v2.0 | 1/1 | Complete | 2026-02-25 |
 | 17. Fix DATA_DIR & Verify Chain | v2.0 | 2/2 | Complete | 2026-02-25 |
-| 18. Test Infrastructure | 1/2 | In Progress|  | - |
+| 18. Test Infrastructure | 2/2 | Complete   | 2026-02-25 | - |
 | 19. Ingest Module Tests | v3.0 | 0/2 | Not started | - |
 | 20. Orchestration Tests and Enforcement | v3.0 | 0/2 | Not started | - |
