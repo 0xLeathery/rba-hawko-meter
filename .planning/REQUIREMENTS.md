@@ -25,15 +25,15 @@ Requirements for v4.0 Dashboard Visual Overhaul milestone. Each maps to roadmap 
 
 ### Visual Polish
 
-- [ ] **POLX-01**: User perceives a consistent typography hierarchy across the dashboard: large verdict/score in hero, clear secondary labels, readable body text, subtle metadata
-- [ ] **POLX-02**: Zone colour (blue/grey/red) is applied consistently and only to: verdict label, hero card border, and explanation section headings — no other elements
-- [ ] **POLX-03**: User perceives consistent spacing and padding across all dashboard sections (no tight or misaligned elements)
-- [ ] **POLX-04**: User on a 375px-wide phone sees the hero verdict and score above the fold with no layout congestion
+- [x] **POLX-01**: User perceives a consistent typography hierarchy across the dashboard: large verdict/score in hero, clear secondary labels, readable body text, subtle metadata
+- [x] **POLX-02**: Zone colour (blue/grey/red) is applied consistently and only to: verdict label, hero card border, and explanation section headings — no other elements
+- [x] **POLX-03**: User perceives consistent spacing and padding across all dashboard sections (no tight or misaligned elements)
+- [x] **POLX-04**: User on a 375px-wide phone sees the hero verdict and score above the fold with no layout congestion
 
 ### Animations
 
-- [ ] **ANIM-01**: User sees the hawk score count up from 0 to the live value on page load using CountUp.js 2.9.0 (with `prefers-reduced-motion` guard for accessibility)
-- [ ] **ANIM-02**: User sees the Plotly hawk gauge sweep from 0 to the live score on page load via `requestAnimationFrame` workaround (with `prefers-reduced-motion` guard)
+- [x] **ANIM-01**: User sees the hawk score count up from 0 to the live value on page load using CountUp.js 2.9.0 (with `prefers-reduced-motion` guard for accessibility)
+- [x] **ANIM-02**: User sees the Plotly hawk gauge sweep from 0 to the live score on page load via `requestAnimationFrame` workaround (with `prefers-reduced-motion` guard)
 
 ## Future Requirements
 
@@ -75,12 +75,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXPL-02 | Phase 22 | Done |
 | EXPL-03 | Phase 22 | Done |
 | EXPL-04 | Phase 22 | Done |
-| POLX-01 | Phase 23 | Pending |
-| POLX-02 | Phase 23 | Pending |
-| POLX-03 | Phase 23 | Pending |
-| POLX-04 | Phase 23 | Pending |
-| ANIM-01 | Phase 23 | Pending |
-| ANIM-02 | Phase 23 | Pending |
+| POLX-01 | Phase 23 | Done |
+| POLX-02 | Phase 23 | Done |
+| POLX-03 | Phase 23 | Done |
+| POLX-04 | Phase 23 | Done |
+| ANIM-01 | Phase 23 | Done |
+| ANIM-02 | Phase 23 | Done |
 
 **Coverage:**
 - v4.0 requirements: 16 total
