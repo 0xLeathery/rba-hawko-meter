@@ -118,6 +118,9 @@ Plans:
   2. `npm run lint:js` reports 0 ESLint violations across `public/js/`
   3. `npm run lint` runs both linters in sequence and both exit 0
   4. VERIFICATION.md exists for Phase 13 confirming all 4 LINT requirements satisfied
+**Plans**: 1 plan
+Plans:
+- [ ] 16-01-PLAN.md -- Run lint verification + violation detection test, write 13-VERIFICATION.md
 
 ### Phase 17: Fix DATA_DIR Wiring & npm verify Chain
 **Goal**: `npm run verify` runs all three tiers (fast + live + Playwright) without DATA_DIR assertion failures, and verify_summary.py is included in automation
@@ -143,5 +146,5 @@ Plans:
 | 13. Linting Baseline | v2.0 | 2/2 | Complete | 2026-02-25 |
 | 14. Live Verification | 1/1 | Complete    | 2026-02-25 | - |
 | 15. Pre-Push Hook | 1/1 | Complete    | 2026-02-25 | - |
-| 16. Verify Linting Baseline | v2.0 | 0/0 | Pending | - |
+| 16. Verify Linting Baseline | v2.0 | 0/1 | Planned | - |
 | 17. Fix DATA_DIR & verify Chain | v2.0 | 0/0 | Pending | - |
