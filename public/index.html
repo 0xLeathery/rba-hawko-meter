@@ -41,6 +41,9 @@
   <!-- Plotly.js via CDN -->
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 
+  <!-- CountUp.js for score animation (Phase 23: ANIM-01) -->
+  <script src="https://cdn.jsdelivr.net/npm/countup.js@2.9.0/dist/countUp.umd.min.js"></script>
+
   <style>
     /* Smooth scrolling */
     html { scroll-behavior: smooth; }
@@ -118,7 +121,7 @@
     </section>
 
     <!-- Hero Section: Hawk-O-Meter Gauge + Hero Card + ASX Futures + Cash Rate -->
-    <section id="hawk-o-meter-section" aria-label="Overview" class="mb-8">
+    <section id="hawk-o-meter-section" aria-label="Overview">
       <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
         <div class="lg:col-span-3 min-w-0">
           <div id="hero-gauge-plot" class="w-full overflow-hidden" style="min-height: 280px; min-width: 0;">
@@ -129,7 +132,7 @@
         </div>
         <div class="lg:col-span-2 order-first lg:order-none space-y-4">
           <div id="hero-card" class="bg-finance-gray rounded-xl p-6 border border-finance-border border-t-4 border-transparent">
-            <div id="verdict-container" class="text-center text-lg">
+            <div id="verdict-container" class="text-center text-2xl sm:text-3xl">
               <span class="text-gray-500">Loading verdict...</span>
             </div>
             <p id="hawk-score-display" class="text-5xl sm:text-6xl font-bold text-white tabular-nums text-center mt-4">
