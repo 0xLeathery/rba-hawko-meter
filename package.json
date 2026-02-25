@@ -4,16 +4,19 @@
   "private": true,
   "description": "RBA Hawk-O-Meter — Interest Rate Dashboard",
   "scripts": {
+    "postinstall": "lefthook install",
     "test": "npx playwright test",
     "test:headed": "npx playwright test --headed",
     "lint:py": "ruff check pipeline/ tests/",
-    "lint:js": "eslint public/js/",
+    "lint:js": "npx eslint public/js/",
     "test:python:live": "python -m pytest tests/python/ -m live -v",
-    "verify": "python pipeline/main.py && python scripts/verify_summary.py",
-    "lint": "npm run lint:py && npm run lint:js"
+    "verify": "npm run test:fast && python -m pytest tests/python/ -m live -v && npx playwright test",
+    "lint": "npm run lint:py && npm run lint:js",
+    "test:fast": "npm run lint && pytest tests/python/ -m \"not live\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@evilmartians/lefthook": "^2.1.1",
     "@playwright/test": "^1.50.0",
     "eslint": "^10.0.2",
     "globals": "^17.3.0"

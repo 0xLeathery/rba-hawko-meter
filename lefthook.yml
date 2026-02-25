@@ -1,0 +1,20 @@
+# Show only failure output — silent on success
+output:
+  - failure
+  - execution_out
+
+pre-push:
+  parallel: true
+  commands:
+    lint-py:
+      run: ruff check pipeline/ tests/
+      timeout: "30s"
+      fail_text: "Push blocked: Python lint errors found. Run npm run test:fast to see details."
+    lint-js:
+      run: npx eslint public/js/
+      timeout: "30s"
+      fail_text: "Push blocked: JS lint errors found. Run npm run test:fast to see details."
+    unit-tests:
+      run: pytest tests/python/ -m "not live"
+      timeout: "30s"
+      fail_text: "Push blocked: Unit tests failed. Run npm run test:fast to see details."
