@@ -349,33 +349,33 @@ class TestInjectDeltas:
         inflation = sample_status["gauges"]["inflation"]
         assert inflation["previous_value"] == 28.0
         assert inflation["delta"] == 2.2
-        assert "direction" in inflation
+        assert "delta_direction" in inflation
 
     def test_direction_up(self, sample_status, previous_status):
-        """Positive delta yields direction='up'."""
+        """Positive delta yields delta_direction='up'."""
         inject_deltas(sample_status, previous_status)
 
         inflation = sample_status["gauges"]["inflation"]
         # 30.2 - 28.0 = 2.2 (positive)
-        assert inflation["direction"] == "up"
+        assert inflation["delta_direction"] == "up"
 
     def test_direction_down(self, sample_status, previous_status):
-        """Negative delta yields direction='down'."""
+        """Negative delta yields delta_direction='down'."""
         # Make current lower than previous for wages
         sample_status["gauges"]["wages"]["value"] = 80.0
         inject_deltas(sample_status, previous_status)
 
         wages = sample_status["gauges"]["wages"]
         # 80.0 - 84.8 = -4.8 (negative)
-        assert wages["direction"] == "down"
+        assert wages["delta_direction"] == "down"
 
     def test_direction_unchanged(self, sample_status, previous_status):
-        """Zero delta yields direction='unchanged'."""
+        """Zero delta yields delta_direction='unchanged'."""
         inject_deltas(sample_status, previous_status)
 
         wages = sample_status["gauges"]["wages"]
         # 84.8 - 84.8 = 0.0
-        assert wages["direction"] == "unchanged"
+        assert wages["delta_direction"] == "unchanged"
 
     def test_new_indicator(self, sample_status, previous_status):
         """Gauge exists in current but not previous — no delta fields."""
@@ -389,7 +389,7 @@ class TestInjectDeltas:
         housing = sample_status["gauges"]["housing"]
         assert "previous_value" not in housing
         assert "delta" not in housing
-        assert "direction" not in housing
+        assert "delta_direction" not in housing
 
     def test_rounding(self, sample_status, previous_status):
         """Deltas are rounded to 1 decimal place."""

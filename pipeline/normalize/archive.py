@@ -154,9 +154,11 @@ def inject_deltas(status_dict, previous_snapshot):
         gauge["previous_value"] = prev_value
         gauge["delta"] = delta
 
+        # Use delta_direction (not direction) to avoid collision with
+        # business_confidence's existing direction field (RISING/FALLING/STEADY)
         if delta > 0:
-            gauge["direction"] = "up"
+            gauge["delta_direction"] = "up"
         elif delta < 0:
-            gauge["direction"] = "down"
+            gauge["delta_direction"] = "down"
         else:
-            gauge["direction"] = "unchanged"
+            gauge["delta_direction"] = "unchanged"
