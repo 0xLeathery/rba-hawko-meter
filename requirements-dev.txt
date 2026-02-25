@@ -1,5 +1,8 @@
 # Development dependencies — install with: pip install -r requirements-dev.txt
 # Production dependencies are in requirements.txt
 pytest>=9.0.2
+pytest-cov>=4.0
+pytest-mock>=3.15
+responses>=0.26
 ruff>=0.15.2
 jsonschema>=4.23,<5.0

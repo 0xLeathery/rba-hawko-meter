@@ -7,7 +7,12 @@
 minversion = "6.0"
 testpaths = ["tests/python"]
 pythonpath = ["."]
-addopts = ["--strict-markers"]
+addopts = [
+    "--strict-markers",
+    "--cov=pipeline",
+    "--cov-report=term-missing",
+    "--cov-report=json:.coverage.json",
+]
 markers = [
     "live: marks tests that require live network access (deselect with '-m \"not live\"')",
 ]
