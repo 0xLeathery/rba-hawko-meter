@@ -17,7 +17,8 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from dateutil.relativedelta import relativedelta
 
-from pipeline.config import BROWSER_USER_AGENT, DATA_DIR, DEFAULT_TIMEOUT
+import pipeline.config
+from pipeline.config import BROWSER_USER_AGENT, DEFAULT_TIMEOUT
 from pipeline.utils.csv_handler import append_to_csv
 from pipeline.utils.http_client import create_session
 
@@ -187,7 +188,7 @@ def backfill_nab_history(session, months: int = 12) -> int:
 
     Returns the number of months successfully scraped and appended.
     """
-    output_path = DATA_DIR / OUTPUT_FILE
+    output_path = pipeline.config.DATA_DIR / OUTPUT_FILE
     now = datetime.now()
     scraped = 0
 
@@ -267,7 +268,7 @@ def scrape_nab_capacity() -> pd.DataFrame:
 
     Date field: first of the reference month (e.g. 2026-01-01 for Jan 2026 data).
     """
-    output_path = DATA_DIR / OUTPUT_FILE
+    output_path = pipeline.config.DATA_DIR / OUTPUT_FILE
     if _current_month_already_scraped(output_path):
         return pd.DataFrame(columns=['date', 'value', 'source'])
 
@@ -354,11 +355,12 @@ def fetch_and_save() -> dict[str, str | int]:
 
     NEVER raises. Returns status dict: {'status': 'success'/'failed', ...}.
     """
+    logger.info("DATA_DIR: %s", pipeline.config.DATA_DIR)
     try:
         df = scrape_nab_capacity()
         if df.empty:
             # Check if data exists from backfill — if so, this is not a failure
-            output_path = DATA_DIR / OUTPUT_FILE
+            output_path = pipeline.config.DATA_DIR / OUTPUT_FILE
             if output_path.exists():
                 try:
                     existing = pd.read_csv(output_path)
@@ -367,7 +369,7 @@ def fetch_and_save() -> dict[str, str | int]:
                 except Exception:
                     pass
             return {'status': 'failed', 'error': 'No data extracted'}
-        output_path = DATA_DIR / OUTPUT_FILE
+        output_path = pipeline.config.DATA_DIR / OUTPUT_FILE
         row_count = append_to_csv(output_path, df, date_column='date')
         return {'status': 'success', 'rows': row_count}
     except Exception as e:

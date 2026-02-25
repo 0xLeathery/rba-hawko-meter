@@ -19,10 +19,10 @@ from pathlib import Path
 
 import pandas as pd
 
+import pipeline.config
 from pipeline.config import (
     ASX_FUTURES_URLS,
     BROWSER_USER_AGENT,
-    DATA_DIR,
     DEFAULT_TIMEOUT,
 )
 from pipeline.utils.http_client import create_session
@@ -39,7 +39,7 @@ def _get_current_cash_rate() -> float:
         Current cash rate as a percentage (e.g., 3.85).
         Falls back to 4.35 if the file is missing or unreadable.
     """
-    csv_path = DATA_DIR / "rba_cash_rate.csv"
+    csv_path = pipeline.config.DATA_DIR / "rba_cash_rate.csv"
     try:
         df = pd.read_csv(csv_path)
         df['date'] = pd.to_datetime(df['date'])
@@ -264,6 +264,7 @@ def fetch_and_save() -> dict[str, str | int]:
     Returns:
         Dict with 'status' key ('success' or 'failed') and additional info.
     """
+    logger.info("DATA_DIR: %s", pipeline.config.DATA_DIR)
     try:
         df = scrape_asx_futures()
 
@@ -275,7 +276,7 @@ def fetch_and_save() -> dict[str, str | int]:
             }
 
         # Write to CSV with composite-key deduplication
-        output_path = DATA_DIR / "asx_futures.csv"
+        output_path = pipeline.config.DATA_DIR / "asx_futures.csv"
 
         if output_path.exists() and output_path.stat().st_size > 0:
             try:
@@ -327,7 +328,7 @@ if __name__ == '__main__':
 
     if result['status'] == 'success':
         try:
-            df = pd.read_csv(DATA_DIR / "asx_futures.csv")
+            df = pd.read_csv(pipeline.config.DATA_DIR / "asx_futures.csv")
             print("\nData sample (first 5 rows):")
             print(df.head())
         except Exception as e:

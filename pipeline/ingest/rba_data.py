@@ -4,12 +4,16 @@ Fetches cash rate target from RBA statistical tables.
 """
 
 import io
+import logging
 
 import pandas as pd
 
-from pipeline.config import DATA_DIR, DEFAULT_TIMEOUT, RBA_BASE_URL, RBA_CONFIG
+import pipeline.config
+from pipeline.config import DEFAULT_TIMEOUT, RBA_BASE_URL, RBA_CONFIG
 from pipeline.utils.csv_handler import append_to_csv
 from pipeline.utils.http_client import create_session
+
+logger = logging.getLogger(__name__)
 
 
 def fetch_cash_rate() -> pd.DataFrame:
@@ -86,9 +90,10 @@ def fetch_and_save() -> int:
     Returns:
         Number of rows written
     """
+    logger.info("DATA_DIR: %s", pipeline.config.DATA_DIR)
     df = fetch_cash_rate()
 
-    output_path = DATA_DIR / RBA_CONFIG["cash_rate"]["output_file"]
+    output_path = pipeline.config.DATA_DIR / RBA_CONFIG["cash_rate"]["output_file"]
     row_count = append_to_csv(output_path, df)
 
     return row_count

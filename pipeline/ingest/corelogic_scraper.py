@@ -15,7 +15,8 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 
-from pipeline.config import BROWSER_USER_AGENT, DATA_DIR, DEFAULT_TIMEOUT
+import pipeline.config
+from pipeline.config import BROWSER_USER_AGENT, DEFAULT_TIMEOUT
 from pipeline.utils.csv_handler import append_to_csv
 from pipeline.utils.http_client import create_session
 
@@ -164,7 +165,7 @@ def scrape_cotality() -> pd.DataFrame:
     Returns:
         DataFrame with one row [date, value, source, series_id] or empty DataFrame.
     """
-    output_path = DATA_DIR / OUTPUT_FILE
+    output_path = pipeline.config.DATA_DIR / OUTPUT_FILE
 
     # Idempotency: skip if current month already scraped
     if _current_month_already_scraped(output_path):
@@ -224,6 +225,7 @@ def fetch_and_save() -> dict[str, str | int]:
     Returns:
         Dict with 'status' key ('success' or 'failed') and additional info
     """
+    logger.info("DATA_DIR: %s", pipeline.config.DATA_DIR)
     try:
         df = scrape_cotality()
 
@@ -237,7 +239,7 @@ def fetch_and_save() -> dict[str, str | int]:
                 'error': 'No new Cotality data extracted'
             }
 
-        output_path = DATA_DIR / OUTPUT_FILE
+        output_path = pipeline.config.DATA_DIR / OUTPUT_FILE
         row_count = append_to_csv(output_path, df, date_column='date')
 
         logger.info(f"Cotality data saved: {row_count} total rows in {OUTPUT_FILE}")

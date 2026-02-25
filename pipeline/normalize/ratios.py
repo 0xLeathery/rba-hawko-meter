@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from pipeline.config import DATA_DIR
+import pipeline.config
 
 
 def load_indicator_csv(csv_path):
@@ -122,7 +122,7 @@ def normalize_indicator(name, config):
     if csv_file is None:
         return None
 
-    csv_path = DATA_DIR / csv_file
+    csv_path = pipeline.config.DATA_DIR / csv_file
 
     # Hybrid source detection: if the CSV has a 'source' column with mixed sources,
     # separate rows that store pre-computed YoY % (e.g. Cotality HVI) from rows

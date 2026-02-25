@@ -3,10 +3,11 @@ Central configuration for RBA Hawk-O-Meter data pipeline.
 Defines data source URLs, API parameters, file paths, and metadata.
 """
 
+import os
 from pathlib import Path
 
-# Data output directory
-DATA_DIR = Path("data")
+# Data output directory — supports DATA_DIR env var override for testing/CI
+DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))
 
 # HTTP client configuration
 DEFAULT_TIMEOUT = 30  # seconds

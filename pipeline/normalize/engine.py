@@ -12,8 +12,8 @@ Usage:
 import json
 from datetime import datetime
 
+import pipeline.config
 from pipeline.config import (
-    DATA_DIR,
     INDICATOR_CONFIG,
     OPTIONAL_INDICATOR_CONFIG,
     STATUS_OUTPUT,
@@ -149,7 +149,7 @@ def build_gauge_entry(name, latest_row, z_df, weight_config, config=None):
     stale_display = None
     if name == 'housing':
         import pandas as _pd
-        csv_path = DATA_DIR / "corelogic_housing.csv"
+        csv_path = pipeline.config.DATA_DIR / "corelogic_housing.csv"
         if csv_path.exists():
             raw_df = _pd.read_csv(csv_path)
             if 'source' in raw_df.columns and len(raw_df) > 0:
@@ -185,7 +185,7 @@ def build_gauge_entry(name, latest_row, z_df, weight_config, config=None):
     if name == 'business_confidence':
         import pandas as _pd
 
-        from pipeline.config import DATA_DIR as _DATA_DIR
+        _DATA_DIR = pipeline.config.DATA_DIR
         _config = config or {}
         csv_path = _DATA_DIR / _config.get('csv_file', '')
         if csv_path.exists():
@@ -225,7 +225,7 @@ def build_asx_futures_entry():
     Returns the status.json asx_futures contract dict, or None if data
     unavailable.
     """
-    csv_path = DATA_DIR / "asx_futures.csv"
+    csv_path = pipeline.config.DATA_DIR / "asx_futures.csv"
     data = load_asx_futures_csv(csv_path)
     if data is None:
         return None

@@ -3,20 +3,23 @@ ABS (Australian Bureau of Statistics) data ingestor.
 Fetches economic indicators via ABS Data API (SDMX 2.1).
 """
 
+import logging
 import sys
 
 import pandas as pd
 import requests
 
+import pipeline.config
 from pipeline.config import (
     ABS_API_BASE,
     ABS_CONFIG,
-    DATA_DIR,
     DEFAULT_TIMEOUT,
     TIMEOUT_OVERRIDES,
 )
 from pipeline.utils.csv_handler import append_to_csv
 from pipeline.utils.http_client import create_session
+
+logger = logging.getLogger(__name__)
 
 
 def fetch_abs_series(
@@ -281,6 +284,7 @@ def fetch_and_save(series: str = None) -> dict:
     Returns:
         Dict mapping series name to row count
     """
+    logger.info("DATA_DIR: %s", pipeline.config.DATA_DIR)
     results = {}
 
     if series:
@@ -293,7 +297,7 @@ def fetch_and_save(series: str = None) -> dict:
 
         fetch_func, output_file = FETCHERS[series]
         df = fetch_func()
-        output_path = DATA_DIR / output_file
+        output_path = pipeline.config.DATA_DIR / output_file
         row_count = append_to_csv(output_path, df)
         results[series] = row_count
     else:
@@ -302,7 +306,7 @@ def fetch_and_save(series: str = None) -> dict:
             print(f"\n--- Fetching {name} ---")
             try:
                 df = fetch_func()
-                output_path = DATA_DIR / output_file
+                output_path = pipeline.config.DATA_DIR / output_file
                 row_count = append_to_csv(output_path, df)
                 results[name] = row_count
             except requests.exceptions.ChunkedEncodingError as e:

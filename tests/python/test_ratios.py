@@ -296,14 +296,22 @@ def test_normalize_indicator_hybrid_cotality_abs_path(tmp_path, monkeypatch):
     import pipeline.config
     monkeypatch.setattr(pipeline.config, "DATA_DIR", tmp_path)
 
-    # Build a mixed-source CSV: 4 ABS quarterly index rows + 1 Cotality HVI row
+    # Build a mixed-source CSV: 8 ABS quarterly index rows + 1 Cotality HVI row.
+    # Need >= 5 quarterly rows for yoy_periods=4 to produce at least 1 valid row
+    # (shift(4) on 4 rows yields all NaN; 5th row is the first with a valid ratio).
+    # Row 4 YoY = 105/100 - 1 = 5.0%, Row 5 YoY = 110/105 - 1 = 4.76%,
+    # Row 6 YoY = 115/110 - 1 = 4.55%, Row 7 YoY = 120/115 - 1 = 4.35%
     csv_path = tmp_path / "corelogic_housing.csv"
     csv_content = (
         "date,value,source\n"
-        "2020-03-31,100.0,ABS\n"
-        "2021-03-31,105.0,ABS\n"
-        "2022-03-31,110.0,ABS\n"
-        "2023-03-31,115.0,ABS\n"
+        "2019-03-31,100.0,ABS\n"
+        "2019-06-30,105.0,ABS\n"
+        "2019-09-30,110.0,ABS\n"
+        "2019-12-31,115.0,ABS\n"
+        "2020-03-31,105.0,ABS\n"
+        "2020-06-30,110.25,ABS\n"
+        "2020-09-30,115.5,ABS\n"
+        "2020-12-31,120.75,ABS\n"
         "2024-01-31,9.4,Cotality HVI\n"
     )
     csv_path.write_text(csv_content)
