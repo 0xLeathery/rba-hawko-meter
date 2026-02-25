@@ -34,7 +34,7 @@ Delivered: ASX futures multi-meeting probability table, ABS RPPI + Cotality HVI 
 - [x] **Phase 14: Live Verification** — On-demand end-to-end verification against real APIs and live scrapers (completed 2026-02-25)
 - [x] **Phase 15: Pre-Push Hook** — Automated fast gate via lefthook + unified npm scripts (completed 2026-02-25)
 - [x] **Phase 16: Verify Linting Baseline** — Independent verification of Phase 13 linting work (gap closure) (completed 2026-02-25)
-- [ ] **Phase 17: Fix DATA_DIR Wiring & npm verify Chain** — Fix import-time binding bug + restore verify_summary.py (gap closure)
+- [x] **Phase 17: Fix DATA_DIR Wiring & npm verify Chain** — Fix import-time binding bug + restore verify_summary.py (gap closure) (completed 2026-02-25)
 
 ## Phase Details
 
@@ -151,4 +151,4 @@ Plans:
 | 14. Live Verification | 1/1 | Complete    | 2026-02-25 | - |
 | 15. Pre-Push Hook | 1/1 | Complete    | 2026-02-25 | - |
 | 16. Verify Linting Baseline | 1/1 | Complete    | 2026-02-25 | - |
-| 17. Fix DATA_DIR & verify Chain | v2.0 | 0/2 | Pending | - |
+| 17. Fix DATA_DIR & verify Chain | 2/2 | Complete   | 2026-02-25 | - |

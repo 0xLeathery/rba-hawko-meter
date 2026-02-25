@@ -5,18 +5,18 @@
 See: .planning/PROJECT.md (updated 2026-02-24)
 
 **Core value:** "Data, not opinion." Empowers laypeople to understand interest rate drivers without relying on media sensationalism or biased advice.
-**Current focus:** v2.0 Local CI & Test Infrastructure — Phase 15: Pre-Push Hook (COMPLETE)
+**Current focus:** v2.0 Local CI & Test Infrastructure — Phase 17: Fix DATA_DIR & npm verify Chain (COMPLETE)
 
 ## Current Position
 
-Phase: 15 (Pre-Push Hook)
-Plan: 01 complete
-Status: Phase 15 complete — v2.0 all phases complete
-Last activity: 2026-02-25 — Phase 15 complete (lefthook pre-push hook, test:fast + verify npm scripts)
+Phase: 17 (Fix DATA_DIR Wiring & npm verify Chain)
+Plan: 02 complete
+Status: Phase 17 complete — v2.0 gap closure phases complete
+Last activity: 2026-02-25 — Phase 17 complete (DATA_DIR late-binding fix + verify_summary.py wiring)
 
 ```
 v2.0 Progress: [██████████] 100%
-Phase 11 [✓] Phase 12 [✓] Phase 13 [✓] Phase 14 [✓] Phase 15 [✓]
+Phase 11 [✓] Phase 12 [✓] Phase 13 [✓] Phase 14 [✓] Phase 15 [✓] Phase 16 [✓] Phase 17 [✓]
 ```
 
 ## Performance Metrics
@@ -88,9 +88,17 @@ Archived to PROJECT.md Key Decisions table. All v1.0 and v1.1 decisions preserve
 - npm test:fast = lint + pytest non-live; npm verify = test:fast + live + playwright (three-tier sequence)
 - npx eslint in both lefthook.yml and lint:js for consistent local binary resolution
 
+**v2.0 decisions (Phase 17):**
+- All ingestors and normalize modules use `pipeline.config.DATA_DIR` at call time (late-bound) instead of `from pipeline.config import DATA_DIR` (import-time bound)
+- `DATA_DIR` supports environment variable override: `DATA_DIR=/custom/path`
+- Each ingestor's `fetch_and_save()` logs DATA_DIR at startup for debugging
+- `npm run verify` chain: verify:fast && verify:live && verify:playwright && verify_summary.py
+- Individual tier scripts available: verify:fast, verify:live, verify:playwright
+- test:fast and verify:fast are intentionally identical for backward compatibility with lefthook
+
 ### Critical Context for v2.0
 
-- `DATA_DIR = Path("data")` in `pipeline/config.py` is a relative path — all tests must patch this via autouse fixture or they silently read/write live CSV files
+- `DATA_DIR = Path(os.environ.get("DATA_DIR", "data"))` in `pipeline/config.py` — supports env var override; all modules use late-bound `pipeline.config.DATA_DIR` access
 - ESLint v10 uses flat config (`eslint.config.js`) only — no `.eslintrc` supported; must use `sourceType: 'script'` for IIFE modules in `public/js/`
 - Ruff baseline audit must run before hook is enabled — first run on unaudited codebase will produce violations; do a one-time `ruff check --fix` baseline commit first
 - Live tests (`@pytest.mark.live`) must never run in the pre-push hook — only in `npm run verify` on demand
