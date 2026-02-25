@@ -91,38 +91,38 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SNAP-01 | — | Pending |
-| SNAP-02 | — | Pending |
-| SNAP-03 | — | Pending |
-| SNAP-04 | — | Pending |
-| SNAP-05 | — | Pending |
-| DELT-01 | — | Pending |
-| DELT-02 | — | Pending |
-| DELT-03 | — | Pending |
-| DELT-04 | — | Pending |
-| SPRK-01 | — | Pending |
-| SPRK-02 | — | Pending |
-| SPRK-03 | — | Pending |
-| SPRK-04 | — | Pending |
-| SHARE-01 | — | Pending |
-| SHARE-02 | — | Pending |
-| SHARE-03 | — | Pending |
-| SHARE-04 | — | Pending |
-| HIST-01 | — | Pending |
-| HIST-02 | — | Pending |
-| HIST-03 | — | Pending |
-| NARR-01 | — | Pending |
-| NARR-02 | — | Pending |
-| NEWS-01 | — | Pending |
-| NEWS-02 | — | Pending |
-| NEWS-03 | — | Pending |
-| NEWS-04 | — | Pending |
+| SNAP-01 | Phase 24 | Pending |
+| SNAP-02 | Phase 24 | Pending |
+| SNAP-03 | Phase 24 | Pending |
+| SNAP-04 | Phase 24 | Pending |
+| SNAP-05 | Phase 24 | Pending |
+| DELT-01 | Phase 25 | Pending |
+| DELT-02 | Phase 25 | Pending |
+| DELT-03 | Phase 25 | Pending |
+| DELT-04 | Phase 25 | Pending |
+| SPRK-01 | Phase 25 | Pending |
+| SPRK-02 | Phase 25 | Pending |
+| SPRK-03 | Phase 25 | Pending |
+| SPRK-04 | Phase 25 | Pending |
+| SHARE-01 | Phase 26 | Pending |
+| SHARE-02 | Phase 26 | Pending |
+| SHARE-03 | Phase 26 | Pending |
+| SHARE-04 | Phase 26 | Pending |
+| HIST-01 | Phase 27 | Pending |
+| HIST-02 | Phase 27 | Pending |
+| HIST-03 | Phase 27 | Pending |
+| NARR-01 | Phase 27 | Pending |
+| NARR-02 | Phase 27 | Pending |
+| NEWS-01 | Phase 28 | Pending |
+| NEWS-02 | Phase 28 | Pending |
+| NEWS-03 | Phase 28 | Pending |
+| NEWS-04 | Phase 28 | Pending |
 
 **Coverage:**
 - v5.0 requirements: 26 total
-- Mapped to phases: 0
-- Unmapped: 26
+- Mapped to phases: 26
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-26*
-*Last updated: 2026-02-26 after initial definition*
+*Last updated: 2026-02-26 — traceability populated after roadmap creation*

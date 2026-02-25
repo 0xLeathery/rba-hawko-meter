@@ -7,6 +7,7 @@
 - ✅ **v2.0 Local CI & Test Infrastructure** — Phases 11-17 (shipped 2026-02-25)
 - ✅ **v3.0 Full Test Coverage** — Phases 18-20 (shipped 2026-02-25)
 - ✅ **v4.0 Dashboard Visual Overhaul** — Phases 21-23 (shipped 2026-02-26)
+- 🚧 **v5.0 Direction & Momentum** — Phases 24-28 (in progress)
 
 ## Phases
 
@@ -55,6 +56,90 @@ Delivered: Hero section DOM restructure with Inter font and zone-coloured border
 
 </details>
 
+### 🚧 v5.0 Direction & Momentum (In Progress)
+
+**Milestone Goal:** Transform the dashboard from a point-in-time snapshot into a momentum tracker that shows direction of change, enables organic sharing, and lays the foundation for newsletter-based monetization.
+
+- [ ] **Phase 24: Pipeline Temporal Layer** - Archive snapshots and inject delta fields into status.json
+- [ ] **Phase 25: Indicator Card UI** - Delta badges and sparklines on every indicator card
+- [ ] **Phase 26: Social Sharing** - OG meta tags and share button for organic distribution
+- [ ] **Phase 27: Historical Chart + Narrative** - Hawk score history chart and weekly change summary
+- [ ] **Phase 28: Newsletter Capture + Delivery** - Email signup form and automated weekly digest
+
+## Phase Details
+
+### Phase 24: Pipeline Temporal Layer
+**Goal**: status.json contains direction-of-change data that all frontend momentum features can consume
+**Depends on**: Phase 23 (v4.0 complete)
+**Requirements**: SNAP-01, SNAP-02, SNAP-03, SNAP-04, SNAP-05
+**Success Criteria** (what must be TRUE):
+  1. After each weekly pipeline run, a dated snapshot file appears in public/data/snapshots/ and index.json is updated
+  2. Each gauge entry in status.json contains previous_value, delta, and direction fields populated from the prior week's snapshot
+  3. The overall block in status.json contains previous_hawk_score and hawk_score_delta
+  4. On the first pipeline run (no prior snapshot), all delta fields are absent and the frontend handles this gracefully with no badge shown
+  5. pipeline/normalize/archive.py has unit test coverage at 85%+ enforced by the existing coverage gate
+**Plans**: TBD
+
+Plans:
+- [ ] 24-01: TBD
+
+### Phase 25: Indicator Card UI
+**Goal**: Every indicator card shows direction of change and recent trend history at a glance
+**Depends on**: Phase 24
+**Requirements**: DELT-01, DELT-02, DELT-03, DELT-04, SPRK-01, SPRK-02, SPRK-03, SPRK-04
+**Success Criteria** (what must be TRUE):
+  1. Each indicator card displays a directional badge (up/down/neutral) with magnitude when the delta is 5 or more gauge points
+  2. The hero section displays the hawk score delta since the previous pipeline run
+  3. Indicator cards with no previous value show no badge — they do not show an error or placeholder
+  4. Each indicator card displays a Canvas 2D sparkline drawn from the existing history[] array, coloured by zone
+  5. Indicators with fewer than 3 history points display "Building history..." text in place of the sparkline
+**Plans**: TBD
+
+Plans:
+- [ ] 25-01: TBD
+
+### Phase 26: Social Sharing
+**Goal**: Users can share the dashboard and link previews display a branded card on all platforms
+**Depends on**: Phase 24 (for stable URL; OG tags themselves are independent)
+**Requirements**: SHARE-01, SHARE-02, SHARE-03, SHARE-04
+**Success Criteria** (what must be TRUE):
+  1. Pasting the dashboard URL into Facebook, LinkedIn, or iMessage shows a branded 1200x630 preview card with title and description
+  2. Pasting the URL into Twitter/X shows a Twitter Card preview with title and description
+  3. Tapping the share button on a mobile browser triggers the native share sheet
+  4. Tapping the share button on a desktop browser copies the URL to the clipboard and shows a brief toast confirmation
+**Plans**: TBD
+
+Plans:
+- [ ] 26-01: TBD
+
+### Phase 27: Historical Chart + Narrative
+**Goal**: Users can see how hawk score pressure has changed over time and read a factual summary of what moved this week
+**Depends on**: Phase 24
+**Requirements**: HIST-01, HIST-02, HIST-03, NARR-01, NARR-02
+**Success Criteria** (what must be TRUE):
+  1. The dashboard displays a Plotly line chart of weekly hawk score values with zone colour bands in the background
+  2. When fewer than 4 snapshot data points exist, the chart container shows "Building history — check back next week" instead of a chart
+  3. status.json contains a change_summary array of factual, template-generated sentences describing what moved since the previous pipeline run
+  4. The dashboard renders a "What changed this week" section populated from change_summary, visible below the hero
+**Plans**: TBD
+
+Plans:
+- [ ] 27-01: TBD
+
+### Phase 28: Newsletter Capture + Delivery
+**Goal**: Interested users can subscribe to a weekly data digest that delivers automatically after each pipeline run
+**Depends on**: Phase 26 (share button establishes organic traffic before asking for subscriptions)
+**Requirements**: NEWS-01, NEWS-02, NEWS-03, NEWS-04
+**Success Criteria** (what must be TRUE):
+  1. The dashboard displays an email signup form that submits via Netlify Forms with an unchecked consent checkbox by default
+  2. Submitting the form redirects the user to a confirmation page; the submission appears in the Netlify Forms dashboard
+  3. MailerLite is configured with double opt-in so subscribers receive a confirmation email before being added to the list
+  4. A weekly digest email template in MailerLite auto-assembles hawk score, zone, top movers, and change narrative from status.json data
+**Plans**: TBD
+
+Plans:
+- [ ] 28-01: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -76,3 +161,8 @@ Delivered: Hero section DOM restructure with Inter font and zone-coloured border
 | 21. Hero HTML Restructure | v4.0 | 1/1 | Complete | 2026-02-26 |
 | 22. Verdict Explanation Component | v4.0 | 1/1 | Complete | 2026-02-26 |
 | 23. Visual Polish and Animations | v4.0 | 1/1 | Complete | 2026-02-26 |
+| 24. Pipeline Temporal Layer | v5.0 | 0/? | Not started | - |
+| 25. Indicator Card UI | v5.0 | 0/? | Not started | - |
+| 26. Social Sharing | v5.0 | 0/? | Not started | - |
+| 27. Historical Chart + Narrative | v5.0 | 0/? | Not started | - |
+| 28. Newsletter Capture + Delivery | v5.0 | 0/? | Not started | - |
