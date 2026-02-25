@@ -1,603 +1,844 @@
 # Architecture Research
 
-**Domain:** Static dashboard frontend — visual/UX overhaul of existing vanilla JS IIFE app
-**Researched:** 2026-02-25
-**Confidence:** HIGH (all findings derived from direct codebase inspection — no guesswork)
-
-## Context: What This Research Covers
-
-v4.0 adds three frontend features to an existing 468-line single-file HTML app with IIFE JS modules
-and Tailwind CDN. This document answers four specific questions:
-
-1. Where in the HTML does a hero section live?
-2. How does a verdict explanation component read from status.json?
-3. What CSS patterns work for dark theme polish without a build system?
-4. What is the right build order given shared data dependencies?
-
-All conclusions are drawn from direct inspection of `public/index.html`, `public/js/gauge-init.js`,
-`public/js/interpretations.js`, `public/js/gauges.js`, `public/js/main.js`, `public/js/data.js`,
-and `public/data/status.json`.
+**Domain:** Snapshot archiving, delta/momentum tracking, sparklines, and social sharing on an existing Python pipeline + Vanilla JS + Netlify dashboard
+**Researched:** 2026-02-26
+**Confidence:** HIGH (all findings derived from direct codebase inspection + first-principles analysis of the existing architecture; no guesswork)
 
 ---
 
-## System Overview
-
-### Current Architecture (v3.0, unchanged by v4.0)
+## System Overview (Existing v4.0)
 
 ```
-index.html (468 LOC)
-  │
-  ├── <head>
-  │     Tailwind CDN + inline tailwind.config (custom color tokens)
-  │     Decimal.js CDN
-  │     Plotly.js CDN
-  │     <style> block — scrollbar, chart-details media query
-  │
-  ├── <body>
-  │     ├── <aside>   disclaimer-banner (ASIC COMP-03)
-  │     ├── <header>  site title + tagline
-  │     │
-  │     ├── <main>    max-w-6xl mx-auto
-  │     │     ├── #onboarding         <details> explainer
-  │     │     ├── #hawk-o-meter-section   ← HERO GAUGE lives here now
-  │     │     │     ├── #hero-gauge-plot  (Plotly, lg:col-span-3)
-  │     │     │     ├── #asx-futures-container (lg:col-span-2)
-  │     │     │     ├── RBA cash rate card
-  │     │     │     ├── #verdict-container
-  │     │     │     ├── #calculator-jump-link
-  │     │     │     └── #scale-explainer
-  │     │     ├── #countdown-section
-  │     │     ├── chart-details       rate history chart
-  │     │     ├── #individual-gauges-section
-  │     │     ├── #methodology        <details>
-  │     │     └── #calculator-section
-  │     │
-  │     └── "What to do next" section (outside <main>)
-  │
-  ├── <footer id="disclaimer">
-  │
-  └── <script> blocks (in order):
-        data.js → chart.js → countdown.js → calculator.js
-        → main.js → gauges.js → interpretations.js → gauge-init.js
+┌─────────────────────────────────────────────────────────────────────┐
+│                     GitHub Actions (scheduled)                       │
+│  ┌──────────────────┐             ┌──────────────────────────────┐  │
+│  │ weekly-pipeline  │             │  daily-asx-futures           │  │
+│  │ (Mon 2:07 UTC)   │             │  (weekdays)                  │  │
+│  └────────┬─────────┘             └───────────────┬──────────────┘  │
+└───────────┼───────────────────────────────────────┼─────────────────┘
+            │ python -m pipeline.main                │ asx_futures_scraper
+            ▼                                        ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                          Python Pipeline                             │
+│                                                                      │
+│  pipeline/ingest/           pipeline/normalize/                     │
+│  ┌──────────────────┐       ┌──────────────────┐   ┌────────────┐  │
+│  │ abs_data.py      │──────▶│ ratios.py        │──▶│ engine.py  │  │
+│  │ rba_data.py      │       │ zscore.py        │   │            │  │
+│  │ asx_futures_     │       │ gauge.py         │   └─────┬──────┘  │
+│  │   scraper.py     │       └──────────────────┘         │          │
+│  │ corelogic_       │                                     │          │
+│  │   scraper.py     │  ──────────────────────────────────┘          │
+│  │ nab_scraper.py   │                                                │
+│  └──────────────────┘                                                │
+│          │                                                            │
+│          ▼                                                            │
+│  data/*.csv (append-only, deduplicated per-source)                   │
+│          ▼ engine.py writes                                           │
+│  public/data/status.json  (complete pipeline output, ~5KB)           │
+└─────────────────────────────────────────────────────────────────────┘
+            │
+            │ git commit → Netlify auto-deploy
+            ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Netlify CDN (static)                          │
+│                                                                      │
+│  public/index.html                                                   │
+│  public/js/                                                          │
+│  ┌────────────┐  ┌───────────┐  ┌────────────────────┐  ┌────────┐ │
+│  │gauge-init  │  │gauges.js  │  │interpretations.js  │  │data.js │ │
+│  │.js (orch.) │  │(Plotly)   │  │(text/card render)  │  │(cache) │ │
+│  └────────────┘  └───────────┘  └────────────────────┘  └────────┘ │
+│                                                                      │
+│  Fetches: public/data/status.json at page load (DataModule.fetch)   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Data Flow (unchanged by v4.0)
+### Component Responsibilities
+
+| Component | Responsibility | Location |
+|-----------|----------------|----------|
+| `pipeline/ingest/*.py` | Fetch raw data from ABS/RBA/ASX/scrapers, append to CSV | `data/*.csv` |
+| `pipeline/normalize/ratios.py` | YoY % normalization, CSV to DataFrame | In-memory |
+| `pipeline/normalize/zscore.py` | Rolling Z-scores (10yr window, robust median/MAD) | In-memory |
+| `pipeline/normalize/gauge.py` | Z-score to 0-100 gauge value, zone classification, hawk score | In-memory |
+| `pipeline/normalize/engine.py` | Orchestrates all indicators, writes `status.json` | `public/data/status.json` |
+| `public/js/data.js` | `DataModule.fetch()` with caching, error/loading state | Browser |
+| `public/js/gauge-init.js` | Main orchestrator: fetches status.json, calls all renderers | Browser |
+| `public/js/gauges.js` | `GaugesModule`: Plotly hero/bullet gauge rendering | Browser |
+| `public/js/interpretations.js` | `InterpretationsModule`: verdict, ASX table, metric cards | Browser |
+
+---
+
+## V5.0 Feature Integration Architecture
+
+### New Features and Where They Fit
 
 ```
-Page load
+┌────────────────────────────────────────────────────────────────────┐
+│                   V5.0 ADDITIONS (highlighted)                      │
+│                                                                     │
+│  NEW: pipeline/normalize/archive.py                                │
+│    snapshot_current(status) → public/data/snapshots/YYYY-MM-DD.json│
+│    read_previous_snapshot() → dict | None                           │
+│            │                                                         │
+│            │ previous_value injected                                 │
+│            ▼                                                         │
+│  MODIFIED: pipeline/normalize/engine.py                            │
+│    build_gauge_entry() gains previous_value, delta, direction       │
+│    generate_status() calls archive.py before writing status.json   │
+│            │                                                         │
+│            ▼                                                         │
+│  MODIFIED: public/data/status.json                                 │
+│    per-gauge: + previous_value, delta, direction (optional fields)  │
+│    overall:  + previous_hawk_score, hawk_score_delta                │
+│    snapshots: public/data/snapshots/YYYY-MM-DD.json (new)          │
+│              public/data/snapshots/index.json (new)                 │
+│            │                                                         │
+│            ▼                                                         │
+│  MODIFIED: public/js/interpretations.js                            │
+│    renderMetricCard() gains delta badge + canvas slot for sparkline │
+│                                                                     │
+│  NEW: public/js/sparklines.js                                      │
+│    SparklinesModule.render(canvasId, historyArray, color)          │
+│    Canvas 2D API, no CDN dependency                                 │
+│                                                                     │
+│  NEW: public/js/share.js                                           │
+│    ShareModule.share(score, verdict)                                │
+│    Web Share API with clipboard fallback                            │
+│                                                                     │
+│  MODIFIED: public/index.html                                       │
+│    + static OG/Twitter meta tags                                    │
+│    + share button in hero card                                      │
+│    + newsletter Netlify Form                                        │
+│    + <script> tags for new JS modules                               │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Feature 1: Snapshot Archiving + `previous_value`
+
+### Storage Decision: Git-Committed JSON Snapshot Files
+
+**Use one file per pipeline run in `public/data/snapshots/YYYY-MM-DD.json`, committed to git.**
+
+Why not alternatives:
+
+| Option | Verdict | Reason |
+|--------|---------|--------|
+| Git-committed per-date snapshot files | **USE THIS** | Zero infrastructure cost; Netlify serves as static files; history preserved in git; fits existing commit pattern; no merge conflicts |
+| Append to a single `hawk_score_history.json` | Avoid | Grows unbounded; git merge conflicts if GHA re-triggered; harder to query a specific date |
+| External DB (Supabase, PlanetScale) | Avoid | Introduces paid dependency and network call at pipeline time; violates zero-cost constraint |
+| Rely only on existing CSV data | Avoid | CSVs store raw values; reconstructing prior gauge score requires re-running full Z-score normalization pipeline — slow and fragile |
+
+**Snapshot file structure** (`public/data/snapshots/2026-02-17.json`):
+
+```json
+{
+  "date": "2026-02-17",
+  "hawk_score": 48.3,
+  "gauges": {
+    "inflation":          { "value": 32.1, "raw_value": 3.9 },
+    "wages":              { "value": 82.0, "raw_value": 5.2 },
+    "employment":         { "value": 35.0, "raw_value": 1.1 },
+    "spending":           { "value": 58.5, "raw_value": 4.8 },
+    "building_approvals": { "value": 55.2, "raw_value": 3.1 },
+    "housing":            { "value": 61.0, "raw_value": 9.1 },
+    "business_confidence":{ "value": 70.0, "raw_value": 83.0 }
+  }
+}
+```
+
+Keep snapshots minimal: gauge values (0-100) and raw_value only. Full status.json remains the source of truth for current rendering. This keeps snapshot files under 500 bytes each.
+
+**Snapshot index file** (`public/data/snapshots/index.json`):
+
+```json
+["2026-02-24", "2026-02-17", "2026-02-10", "2026-02-03"]
+```
+
+Written by `archive.py` each run (most-recent-first). Frontend uses this to know which dates are available for the historical hawk score chart without directory listing (Netlify does not expose directory indexes).
+
+### New Python Module: `pipeline/normalize/archive.py`
+
+```python
+"""
+Snapshot archival for v5.0 direction/momentum tracking.
+
+Writes a minimal gauge snapshot on each pipeline run and
+reads the most recent prior snapshot for previous_value computation.
+"""
+
+import json
+from datetime import date
+from pathlib import Path
+
+import pipeline.config
+
+SNAPSHOTS_DIR = Path("public/data/snapshots")
+INDEX_FILE = SNAPSHOTS_DIR / "index.json"
+
+
+def snapshot_current(status: dict) -> None:
+    """Write today's minimal snapshot and update index.json."""
+    SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
+    today = date.today().isoformat()  # "2026-02-24"
+
+    minimal = {
+        "date": today,
+        "hawk_score": status["overall"]["hawk_score"],
+        "gauges": {
+            name: {
+                "value": g["value"],
+                "raw_value": g["raw_value"],
+            }
+            for name, g in status.get("gauges", {}).items()
+        },
+    }
+
+    snap_path = SNAPSHOTS_DIR / f"{today}.json"
+    with open(snap_path, "w") as f:
+        json.dump(minimal, f, indent=2)
+
+    # Update index (prepend today, deduplicate, keep most recent 52)
+    existing = _read_index()
+    updated = [today] + [d for d in existing if d != today]
+    updated = updated[:52]
+    with open(INDEX_FILE, "w") as f:
+        json.dump(updated, f)
+
+
+def read_previous_snapshot(min_age_days: int = 5) -> dict | None:
+    """
+    Read the most recent snapshot that is at least min_age_days old.
+
+    The age guard prevents same-week double-runs from treating the
+    current week's snapshot as "previous". Returns None if no
+    qualifying snapshot exists.
+    """
+    index = _read_index()
+    today = date.today()
+    for date_str in index:
+        snap_date = date.fromisoformat(date_str)
+        if (today - snap_date).days >= min_age_days:
+            snap_path = SNAPSHOTS_DIR / f"{date_str}.json"
+            if snap_path.exists():
+                with open(snap_path) as f:
+                    return json.load(f)
+    return None
+
+
+def _read_index() -> list:
+    if INDEX_FILE.exists():
+        with open(INDEX_FILE) as f:
+            return json.load(f)
+    return []
+```
+
+### Modified: `pipeline/normalize/engine.py`
+
+`generate_status()` reads the prior snapshot before the main indicator loop and passes it into `build_gauge_entry()`:
+
+```python
+# At the top of generate_status():
+from pipeline.normalize.archive import read_previous_snapshot, snapshot_current
+prev_snap = read_previous_snapshot()
+prev_gauges = prev_snap.get("gauges", {}) if prev_snap else {}
+
+# Inside process_indicator() call chain → build_gauge_entry() signature change:
+entry = build_gauge_entry(name, latest, df, weight_config,
+                          config=config, prev_gauges=prev_gauges)
+
+# In build_gauge_entry():
+prev = prev_gauges.get(name)
+if prev is not None:
+    delta = round(gauge_value - prev["value"], 1)
+    entry["previous_value"] = prev["value"]
+    entry["delta"] = delta
+    if abs(delta) <= 2.0:
+        entry["direction"] = "STEADY"
+    elif delta > 0:
+        entry["direction"] = "RISING"
+    else:
+        entry["direction"] = "FALLING"
+
+# At the end of generate_status(), after writing status.json:
+snapshot_current(status)
+```
+
+Overall section gets similar treatment:
+
+```python
+if prev_snap is not None:
+    status["overall"]["previous_hawk_score"] = prev_snap["hawk_score"]
+    status["overall"]["hawk_score_delta"] = round(
+        hawk_score - prev_snap["hawk_score"], 1
+    )
+```
+
+### Modified: `public/data/status.json` Contract
+
+Per-gauge additions (all optional — absent on first pipeline run before any snapshot exists):
+
+```json
+"inflation": {
+  "value": 30.2,
+  "previous_value": 32.1,
+  "delta": -1.9,
+  "direction": "FALLING",
+  "history": [100.0, 100.0, 87.2, 39.0, 10.3, 0.0, 26.4, 30.2]
+}
+```
+
+Overall section addition:
+
+```json
+"overall": {
+  "hawk_score": 52.0,
+  "previous_hawk_score": 48.3,
+  "hawk_score_delta": 3.7
+}
+```
+
+The existing `history` arrays (up to 12 values) in each gauge entry are untouched — they power sparklines without any pipeline modification.
+
+---
+
+## Feature 2: Delta Badges on Indicator Cards
+
+### Existing Card DOM Structure
+
+`InterpretationsModule.renderMetricCard()` in `interpretations.js` builds cards into `#metric-gauges-grid`. Each card's internal structure (as built by `renderMetricCard`):
+
+```
+div.card (bg-finance-gray, rounded-lg, p-4, border, etc.)
+  div.header-row (flex items-center justify-between mb-2)
+    h4.label (font-semibold, indicator name)
+    span.weight-badge (text-xs, "X% weight")
+  div#gauge-{metricId}          ← Plotly bullet gauge target
+  p.interpretation-text
+  p.staleness-text
+  p.why-it-matters (optional)
+```
+
+### Delta Badge Integration Point
+
+The delta badge slots into the header row between the label and weight badge:
+
+```
+div.header-row
+  h4.label
+  span.delta-badge   ← NEW: "+2.1" / "-1.9" / "—"
+  span.weight-badge
+```
+
+The Plotly gauge `div#gauge-{metricId}` must retain its current DOM position and element reference for the existing double-rAF resize pattern to continue working.
+
+**Implementation constraints:**
+
+- Create with `createElement`/`textContent` (ESLint enforces no-innerHTML)
+- Color via `element.style.color` with hardcoded hex — never concatenated Tailwind class strings
+  - RISING: `#10b981` (green)
+  - FALLING: `#ef4444` (red)
+  - STEADY: `#9ca3af` (gray-400)
+- Arrow characters: `\u25b2` (up triangle), `\u25bc` (down triangle), `\u2014` (em-dash for STEADY)
+- Badge text format: `+2.1` / `-1.9` / `—` (no "pts" suffix — keeps badge compact on mobile)
+- `flex-shrink-0` on the badge prevents wrapping that would break the header row layout
+
+**Direction threshold:** 2.0 gauge points. Below 2.0 absolute delta = STEADY. This prevents badge noise from floating-point churn between pipeline runs. Defined as a constant in `engine.py` and mirrored in badge rendering logic.
+
+**Graceful degradation:** When `metricData.delta == null` (no prior snapshot), the badge is not created — the header row shows only label and weight badge as before.
+
+---
+
+## Feature 3: Sparklines on Indicator Cards
+
+### Existing `history` Array (No Pipeline Changes Needed)
+
+Each gauge entry in status.json already has a `history` array of up to 12 gauge values (0-100 scale), built in `build_gauge_entry()` from the last 12 valid Z-score rows. Sparklines can use this directly — no pipeline modification required.
+
+### Sparkline Implementation: Canvas 2D API, No CDN
+
+Use the native Canvas 2D API. No library needed. Reasons:
+
+- History arrays are small (max 12 values) — no need for a full charting library
+- The visual is a simple static line — no tooltip, zoom, or animation needed
+- Adding a CDN library (Chart.js, uPlot) introduces a new external dependency and violates the minimal-CDN philosophy
+- Canvas API is universally supported in all modern browsers
+
+**New module:** `public/js/sparklines.js`
+
+```javascript
+var SparklinesModule = (function () {
+  'use strict';
+
+  /**
+   * Render a sparkline into a canvas element.
+   * @param {string} canvasId - ID of the canvas element
+   * @param {number[]} values - Gauge values (0-100)
+   * @param {string} color - Hex color for the line
+   */
+  function render(canvasId, values, color) {
+    var canvas = document.getElementById(canvasId);
+    if (!canvas || !canvas.getContext) return;
+    if (!values || values.length < 2) return;
+
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width;
+    var h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    var min = Math.min.apply(null, values);
+    var max = Math.max.apply(null, values);
+    var range = max - min || 1;  // guard against flat lines
+
+    ctx.beginPath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+
+    values.forEach(function (v, i) {
+      var x = (i / (values.length - 1)) * w;
+      var y = h - ((v - min) / range) * (h - 4) - 2;  // 2px padding top/bottom
+      if (i === 0) { ctx.moveTo(x, y); } else { ctx.lineTo(x, y); }
+    });
+    ctx.stroke();
+  }
+
+  return { render: render };
+})();
+```
+
+**Card DOM addition in `renderMetricCard()`:**
+
+```
+div.card
+  div.header-row
+    h4.label
+    span.delta-badge
+    span.weight-badge
+  canvas#sparkline-{metricId}   ← NEW: width="80" height="28"
+  div#gauge-{metricId}          ← Plotly bullet gauge (unchanged position)
+  p.interpretation-text
+  ...
+```
+
+The canvas element is placed above the Plotly gauge div so it renders immediately without interfering with the double-rAF resize chain. Canvas size is set with inline `width` and `height` HTML attributes (not CSS `width/height`) to ensure correct pixel dimensions independent of device pixel ratio.
+
+**Wiring in `gauge-init.js`:** After `GaugesModule.createBulletGauge()` inside the `requestAnimationFrame` call:
+
+```javascript
+requestAnimationFrame(function () {
+  GaugesModule.createBulletGauge('gauge-' + metricId, metricData);
+  // NEW: sparkline immediately after bullet gauge creation
+  SparklinesModule.render(
+    'sparkline-' + metricId,
+    metricData.history,
+    GaugesModule.getZoneColor(metricData.value)
+  );
+});
+```
+
+The sparkline color matches the current zone color, giving a visual cue about where the indicator sits in context of its 12-period trend.
+
+**prefers-reduced-motion:** Sparklines are static (no animation), so no guard is needed.
+
+---
+
+## Feature 4: Historical Hawk Score Chart
+
+### Data Source: Snapshot Files
+
+The existing `history` arrays cover per-indicator gauge values but not the overall hawk score trend over time. The snapshot files written by `archive.py` contain `hawk_score` per date.
+
+**Data flow for historical chart:**
+
+```
+Page load (parallel with status.json fetch)
     │
-    ▼
-DataModule.fetch("data/status.json")     [gauge-init.js, one fetch, cached]
+    ├─ fetch("data/snapshots/index.json")
+    │     → ["2026-02-24", "2026-02-17", "2026-02-10", ...]
     │
-    ├─► GaugesModule.createHeroGauge()   data.overall.hawk_score
-    ├─► InterpretationsModule.renderVerdict()   data.overall
-    ├─► InterpretationsModule.renderASXTable()  data.asx_futures
-    ├─► renderMetricGauges()             data.gauges (all 7 indicators)
-    └─► renderCalculatorBridge()         data.overall.hawk_score
-
-DataModule.fetch("data/rates.json")      [main.js, parallel]
-DataModule.fetch("data/meetings.json")   [main.js, parallel]
+    ├─ fetch last 26 entries from index (6 months)
+    │     → Promise.all([fetch("data/snapshots/2026-02-24.json"), ...])
+    │
+    └─ extract { date, hawk_score } per snapshot
+         → Plotly line chart in chart.js
 ```
 
-Key constraint: `DataModule` caches by URL. Any module can call
-`DataModule.fetch("data/status.json")` a second time and get the cached result
-synchronously (as a resolved Promise). No coordination protocol is needed for
-new modules that need status.json data.
+**Why last 26 only:** After 1 year, weekly snapshots accumulate to 52 files. Fetching all 52 on every page load would be 52 separate HTTP requests. Fetch only the last 26 (6 months). Add a "load more" button later if demand warrants.
+
+**Implementation:** Add `renderHawkScoreHistory(containerId, snapshots)` to `chart.js` alongside the existing `renderCashRateChart()`. Both are Plotly line charts. No new module needed — `ChartModule` is the natural home.
+
+**Fallback:** If `index.json` is absent (first pipeline run before any snapshot is written), the historical chart section is hidden. This matches existing missing-data patterns (e.g., placeholder cards for missing indicators).
 
 ---
 
-## Component Responsibilities
+## Feature 5: OG Meta Tags + Share Button
 
-| Module | Responsibility | Exposes |
-|--------|---------------|---------|
-| `data.js` (DataModule) | Fetch + cache JSON; showError/showLoading UI helpers | `fetch`, `showError`, `showLoading` |
-| `gauges.js` (GaugesModule) | Plotly gauge rendering; zone colors/labels; display labels | `createHeroGauge`, `createBulletGauge`, `getZoneColor`, `getStanceLabel`, `getDisplayLabel` |
-| `interpretations.js` (InterpretationsModule) | All text rendering: verdict, ASX table, metric cards, staleness | `renderVerdict`, `renderASXTable`, `renderMetricCard`, `getPlainVerdict`, `getWhyItMatters`, `generateMetricInterpretation` |
-| `gauge-init.js` (IIFE, anonymous) | Orchestrator: fetches status.json, calls all render functions in sequence | None (self-executing) |
-| `main.js` (IIFE, anonymous) | Orchestrator: fetches rates.json + meetings.json; initialises calculator; handles resize | None (self-executing) |
-| `calculator.js` (CalculatorModule) | Mortgage math and UI | `init` |
-| `chart.js` (ChartModule) | Plotly rate history chart | `create`, `resize` |
-| `countdown.js` (CountdownModule) | RBA meeting countdown timer | `start` |
+### OG Meta Tags: Static Defaults in HTML
+
+Netlify is a pure static host. Social crawlers (Twitter/X, Facebook, LinkedIn, Slack) consume OG tags at HTML parse time, before JavaScript executes. JavaScript-overwritten meta tag values are not visible to most OG crawlers.
+
+**Approach:** Write meaningful static OG defaults in `<head>` of `index.html`:
+
+```html
+<meta property="og:title" content="RBA Hawk-O-Meter — Are Australian rates going up?">
+<meta property="og:description" content="Live economic dashboard tracking whether the RBA is likely to raise, cut, or hold interest rates. Updated weekly. No opinion — just data.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://hawkometer.com.au/">
+<meta property="og:image" content="https://hawkometer.com.au/og-image.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="RBA Hawk-O-Meter">
+<meta name="twitter:description" content="Live tracker of RBA rate pressure. Updated weekly. Data, not opinion.">
+<meta name="twitter:image" content="https://hawkometer.com.au/og-image.png">
+```
+
+**OG image:** A static 1200x630 PNG committed as `public/og-image.png`. This is the most reliable approach — no server-side rendering, no external service needed. Design a minimal card showing the Hawk-O-Meter name, the 0-100 dial concept, and the tagline. Update manually when branding changes.
+
+Dynamic OG image generation (Puppeteer via Netlify Functions, Vercel OG, Cloudinary) requires either a paid Netlify tier or an external paid service. Out of scope for v5.0 given the zero-cost constraint.
+
+**Optional JS override:** After status.json loads, JS can update `og:description` with the current hawk score — useful when the page URL is shared from within a mobile browser (some share sheets re-read meta). This does not affect crawler previews.
+
+### Share Button: Web Share API + Clipboard Fallback
+
+**New module:** `public/js/share.js`
+
+```javascript
+var ShareModule = (function () {
+  'use strict';
+
+  var BTN_TEXT_DEFAULT = 'Share';
+  var BTN_TEXT_COPIED  = 'Link copied!';
+
+  /**
+   * Trigger native share sheet or copy URL to clipboard.
+   * @param {string} btnId - ID of the share button element (for feedback)
+   * @param {number} score - Current hawk score
+   * @param {string} verdict - Short verdict string
+   */
+  function share(btnId, score, verdict) {
+    var url   = window.location.href;
+    var title = 'RBA Hawk\u2011O\u2011Meter';
+    var text  = 'Hawk-O-Meter: '
+      + Math.round(score) + '/100 \u2014 '
+      + verdict + '. Track Australian rate pressure:';
+
+    if (navigator.share) {
+      navigator.share({ title: title, text: text, url: url })
+        .catch(function () { /* user dismissed — no action needed */ });
+    } else {
+      navigator.clipboard.writeText(url)
+        .then(function () { _showFeedback(btnId); })
+        .catch(function () { /* clipboard permission denied */ });
+    }
+  }
+
+  function _showFeedback(btnId) {
+    var btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.textContent = BTN_TEXT_COPIED;
+    setTimeout(function () {
+      btn.textContent = BTN_TEXT_DEFAULT;
+    }, 2000);
+  }
+
+  return { share: share };
+})();
+```
+
+**Button creation in `gauge-init.js`:** Created with `createElement`/`textContent`, placed in the hero card after the freshness badge. The button calls `ShareModule.share('share-btn', data.overall.hawk_score, stanceLabel)`.
+
+**Browser support:** `navigator.share` is available in Chrome 93+, Safari 15+, iOS Safari 14+ (confirmed HIGH confidence — MDN). Desktop Firefox and older Edge fall back to clipboard copy. Both paths are graceful.
+
+**IIFE module loading order in `index.html`:** `share.js` is loaded before `gauge-init.js` (same pattern as all other modules):
+
+```html
+<script src="js/share.js"></script>          <!-- NEW before gauge-init -->
+<script src="js/sparklines.js"></script>     <!-- NEW before gauge-init -->
+<script src="js/gauge-init.js"></script>
+```
 
 ---
 
-## Recommended Project Structure
+## Feature 6: Newsletter Email Capture
 
-No new directories are needed. v4.0 adds one new JS file and modifies index.html + gauge-init.js.
+### Architecture Constraint: No Server
+
+The existing stack has no server-side component. Email capture without a backend requires an external service or Netlify Forms.
+
+**Recommended approach: Netlify Forms.** Zero cost, zero JS required, zero external service dependency.
+
+```html
+<form name="newsletter" netloc="newsletter"
+      method="POST" data-netlify="true"
+      netlify-honeypot="bot-field"
+      action="/thanks.html">
+  <input type="hidden" name="form-name" value="newsletter">
+  <p hidden><input name="bot-field"></p>
+  <input type="email" name="email"
+         placeholder="your@email.com" required>
+  <button type="submit">Get weekly updates</button>
+</form>
+```
+
+Netlify detects `data-netlify="true"` at deploy time and handles the form backend automatically. Submissions appear in the Netlify Dashboard under Forms. No JS needed — native HTML POST.
+
+**Limitation:** Netlify Forms free tier caps at 100 submissions/month. Above that, the form silently stops accepting. For higher volume: add Beehiiv or Mailchimp API integration via a JS `fetch()` POST to their public API endpoint (no server proxy needed for those services).
+
+**`/thanks.html`:** Create a simple static thank-you page (`public/thanks.html`) so users get confirmation on submission rather than the Netlify generic page.
+
+**Form placement:** Below the hero section, above the indicator grid — highest-intent position for users who have just understood the rate outlook and want to stay informed.
+
+---
+
+## Data Flow: `previous_value` from Archive to Frontend
 
 ```
-public/
-├── index.html                  MODIFIED — hero restructure + verdict-explanation div
-├── js/
-│   ├── data.js                 UNCHANGED
-│   ├── gauges.js               UNCHANGED
-│   ├── interpretations.js      MODIFIED — add renderVerdictExplanation()
-│   ├── gauge-init.js           MODIFIED — call renderVerdictExplanation() after gauges render
-│   ├── main.js                 UNCHANGED
-│   ├── calculator.js           UNCHANGED
-│   ├── chart.js                UNCHANGED
-│   └── countdown.js            UNCHANGED
-└── data/
-    └── status.json             UNCHANGED (no schema changes)
+Weekly GitHub Actions pipeline run
+    │
+    1. ingest/*.py runs → data/*.csv updated
+    │
+    2. pipeline/normalize/engine.py:
+    │     a. archive.read_previous_snapshot(min_age_days=5)
+    │           → reads public/data/snapshots/2026-02-17.json (most recent qualifying)
+    │           → returns { hawk_score: 48.3, gauges: { inflation: { value: 32.1 }, ... } }
+    │
+    │     b. For each indicator:
+    │           process_indicator() → build_gauge_entry() receives prev_gauges[name]
+    │           → adds previous_value, delta, direction to entry
+    │
+    │     c. generate_status() writes public/data/status.json
+    │           (now includes optional previous_value/delta/direction per gauge)
+    │
+    │     d. archive.snapshot_current(status)
+    │           → writes public/data/snapshots/2026-02-24.json
+    │           → updates public/data/snapshots/index.json
+    │
+    3. git-auto-commit-action commits:
+    │     data/*.csv
+    │     public/data/status.json
+    │     public/data/snapshots/2026-02-24.json   ← NEW
+    │     public/data/snapshots/index.json        ← NEW
+    │
+    4. Netlify deploys static files
+    │
+    5. Browser (user visits page):
+         DataModule.fetch("data/status.json")
+           → delta/direction fields available in per-gauge data
+           → interpretations.js renders delta badge per card
+           → sparklines.js renders history[] per card
+         DataModule.fetch("data/snapshots/index.json")    ← NEW fetch
+           → last 26 dates loaded
+           → chart.js renders historical hawk score chart
 ```
+
+---
+
+## Component Inventory: New vs Modified
+
+### New Components
+
+| Component | File | Type | Responsibility |
+|-----------|------|------|----------------|
+| `archive.py` | `pipeline/normalize/archive.py` | New Python module | Read/write minimal snapshots; provide `previous_value` to engine |
+| `SparklinesModule` | `public/js/sparklines.js` | New JS IIFE module | Canvas 2D sparkline from `history[]` array |
+| `ShareModule` | `public/js/share.js` | New JS IIFE module | Web Share API + clipboard fallback |
+| OG image | `public/og-image.png` | New static asset | Social preview card (1200x630 PNG) |
+| Thanks page | `public/thanks.html` | New static page | Newsletter form confirmation |
+
+### Modified Components
+
+| Component | File | What Changes |
+|-----------|------|--------------|
+| `engine.py` | `pipeline/normalize/engine.py` | Import archive.py; call `read_previous_snapshot()` before loop; add delta/direction to `build_gauge_entry()`; call `snapshot_current()` after writing status.json |
+| `status.json` | `public/data/status.json` | Optional new fields: `previous_value`, `delta`, `direction` per gauge; `previous_hawk_score`, `hawk_score_delta` in overall |
+| `interpretations.js` | `public/js/interpretations.js` | `renderMetricCard()` adds delta badge element + canvas element for sparkline |
+| `gauge-init.js` | `public/js/gauge-init.js` | Wire `SparklinesModule.render()` after bullet gauge; create share button; fetch `index.json` for historical chart |
+| `chart.js` | `public/js/chart.js` | Add `renderHawkScoreHistory(containerId, snapshots)` function |
+| `index.html` | `public/index.html` | Add static OG/Twitter meta tags; add `<script>` tags for `sparklines.js` and `share.js`; add newsletter form; add share button anchor in hero; add historical chart container |
+| `weekly-pipeline.yml` | `.github/workflows/weekly-pipeline.yml` | Add `public/data/snapshots/` to `file_pattern` in `git-auto-commit-action` step |
 
 ---
 
 ## Architectural Patterns
 
-### Pattern 1: Hero Section Placement — Replace, Don't Precede
+### Pattern 1: Optional Fields in status.json
 
-**What:** The v4.0 hero section (verdict + hawk score dominant) replaces the current
-`#hawk-o-meter-section` content layout, not precedes it. The section already exists at the
-right position in the DOM — it just needs internal restructuring.
+New fields (`previous_value`, `delta`, `direction`) are added as optional to each gauge entry. The engine writes them only when a prior snapshot exists. Frontend tests for existence before rendering:
 
-**Current layout inside `#hawk-o-meter-section`:**
-```
-grid lg:grid-cols-5
-  col-span-3  →  hero-gauge-plot  (Plotly gauge)
-  col-span-2  →  asx-futures-container + cash rate card
-
-#verdict-container  (beneath grid, text only, small)
-#calculator-jump-link
-#scale-explainer
-```
-
-**v4.0 target layout:**
-```
-#verdict-container   ← PROMOTE to top of section, large typography, full-width
-#hawk-o-meter-section content  ← gauge + side panels remain below
-```
-
-**Why replace vs precede:** Adding a new `<section>` above `#hawk-o-meter-section` would
-push the existing gauge content below the fold on mobile AND duplicate the section landmark
-role. The ASIC compliance banner + header + onboarding section already consume vertical space.
-Promoting `#verdict-container` to the top of the existing section preserves the DOM structure
-while achieving the above-the-fold hierarchy.
-
-**Concrete implementation approach:**
-Move `#verdict-container` from its current position (after the 5-column grid) to before
-the grid within the same section. Increase its typography weight and size. The existing
-`id` attribute means gauge-init.js's `InterpretationsModule.renderVerdict('verdict-container', data.overall)`
-continues to work with zero JS changes.
-
-**When to use this approach:** Any time a new visual feature targets an already-named
-container that existing JS renders into. The HTML structure owns the DOM position; the JS
-only cares about the element ID.
-
-### Pattern 2: Verdict Explanation — Extend InterpretationsModule, Not a New IIFE
-
-**What:** The verdict explanation ("why is the score X?") reads `data.gauges` and
-`data.overall.hawk_score` to produce a short list of indicator contributions. This is a
-render function, not an orchestration function.
-
-**Why extend InterpretationsModule rather than a new IIFE:**
-- `data.gauges` is already available in `gauge-init.js`'s `.then()` callback as `data`
-- InterpretationsModule already has `getWhyItMatters(metricId)` and
-  `generateMetricInterpretation(metricId, metricData)` — the explanation needs both
-- A new IIFE would need to make a second `DataModule.fetch("data/status.json")` call
-  (returns cached result, so no network cost, but adds an unnecessary orchestration point)
-- Existing test surface (Playwright) targets InterpretationsModule's rendered output;
-  staying in the same module keeps test targeting consistent
-
-**New function signature:**
 ```javascript
-// in interpretations.js
-function renderVerdictExplanation(containerId, gaugesData, overallScore) {
-  // 1. Sort indicators by contribution to score (value * weight, descending)
-  // 2. Pick top 3 hawkish and top 2 dovish drivers
-  // 3. Render a brief "what's pushing the score up/down" list
-  // 4. ASIC constraint: neutral framing — "X is above average" not "X is bad"
-}
-
-// Expose in the return object
-return {
-  // existing...
-  renderVerdictExplanation: renderVerdictExplanation
-};
-```
-
-**Call site in gauge-init.js:**
-```javascript
-DataModule.fetch('data/status.json')
-  .then(function (data) {
-    // existing calls...
-    GaugesModule.createHeroGauge('hero-gauge-plot', data.overall.hawk_score);
-    InterpretationsModule.renderVerdict('verdict-container', data.overall);
-
-    // NEW — call after gauge data is ready
-    InterpretationsModule.renderVerdictExplanation(
-      'verdict-explanation',
-      data.gauges,
-      data.overall.hawk_score
-    );
-
-    // existing calls continue...
-    renderMetricGauges(data.gauges);
-  });
-```
-
-**status.json fields available for explanation logic:**
-- `data.gauges[id].value` — 0-100 gauge score
-- `data.gauges[id].weight` — contribution weight (0.05–0.25)
-- `data.gauges[id].zone_label` — "Mild hawkish pressure", "Balanced", etc.
-- `data.gauges[id].z_score` — signed deviation; negative = dovish, positive = hawkish
-- `data.gauges[id].raw_value` — actual statistic (3.76% CPI, 5.45% WPI, etc.)
-- `data.gauges[id].confidence` — "HIGH"/"LOW" — respect in UI (show "low confidence" badge)
-
-**ASIC constraint for explanation copy:** The existing `getWhyItMatters` and
-`generateMetricInterpretation` functions already use neutral framing. The verdict
-explanation must follow the same pattern: "Wages grew X% — above the historical average"
-is compliant; "Wages are dangerously high" is not.
-
-### Pattern 3: CSS Polish Without a Build System — Tailwind CDN + Inline Style Block
-
-**What:** Tailwind CDN (v3 via `cdn.tailwindcss.com`) with an inline `tailwind.config`
-block and a `<style>` block in `<head>`. This is the only mechanism available without
-introducing a build step.
-
-**The existing config block already defines all custom tokens:**
-```javascript
-tailwind.config = {
-  darkMode: 'class',
-  theme: {
-    extend: {
-      colors: {
-        'finance-dark': '#0a0a0a',
-        'finance-gray': '#1a1a1a',
-        'finance-border': '#2d2d2d',
-        'finance-accent': '#60a5fa',
-        'gauge-green': '#10b981',
-        'gauge-amber': '#f59e0b',
-        'gauge-red': '#ef4444'
-      }
-    }
-  }
+if (metricData.delta != null) {
+  // render delta badge
 }
 ```
 
-These tokens can be used directly in new HTML with standard Tailwind class syntax.
+This makes the first pipeline run safe — no snapshot exists yet, no badge renders. Badges appear from the second run onward.
 
-**What CDN Tailwind supports (relevant to visual polish):**
+### Pattern 2: Minimal Snapshot Schema
 
-HIGH confidence (observed in existing codebase):
-- All utility classes: spacing (`p-4`, `mt-6`, `gap-4`), typography (`text-xl`, `font-bold`,
-  `tracking-tight`), colour (`text-gray-200`, `bg-finance-gray`, `border-finance-border`)
-- Responsive prefixes: `sm:`, `md:`, `lg:` — already used throughout
-- State variants: `hover:`, `focus:`, `group-open:` — already used
-- Opacity modifiers: `bg-finance-gray/50`, `border-finance-border/50` — already used
-- Arbitrary values: `h-[500px]` — already used in chart section
+Snapshots store only `hawk_score` and per-indicator `{ value, raw_value }` — not the full status.json (~5KB). Full status.json is the source of truth for current rendering. Minimal snapshots (~400 bytes each) are the source of truth for historical comparison only.
 
-**CSS patterns for dark theme visual polish (no build step needed):**
+### Pattern 3: IIFE Module for New JS Features
 
-```html
-<!-- Large verdict text — promote hierarchy -->
-<div class="text-3xl sm:text-4xl font-black tracking-tight text-center">
+Both `SparklinesModule` and `ShareModule` follow the existing `var ModuleName = (function() { 'use strict'; ... return { ... }; })();` pattern. Global variable, IIFE wrapper, explicit return object. Consistent with `GaugesModule`, `InterpretationsModule`, `DataModule`.
 
-<!-- Subtle card with coloured left border (zone indicator) -->
-<div class="bg-finance-gray border border-finance-border border-l-4 border-l-[#60a5fa] rounded-xl p-5">
+### Pattern 4: Canvas for Micro-Charts
 
-<!-- Score emphasis with monospace number rendering -->
-<span class="text-5xl font-bold tabular-nums" style="color: #60a5fa;">
-
-<!-- Divider line -->
-<hr class="border-finance-border my-6">
-
-<!-- Muted label / eyebrow text -->
-<p class="text-xs text-gray-500 uppercase tracking-widest mb-2">
-
-<!-- Progress/contribution bar (pure CSS, no JS) -->
-<div class="h-1.5 rounded-full bg-finance-border overflow-hidden">
-  <div class="h-full rounded-full" style="width: 73%; background: #60a5fa;"></div>
-</div>
-```
-
-**What CDN Tailwind does NOT support:**
-
-- `@apply` directives in `<style>` blocks — CDN does not process CSS at build time.
-  Use class strings directly on elements instead.
-- Custom animations beyond `animate-pulse`, `animate-spin` — no custom keyframe support
-  without a `<style>` block.
-- JIT-only arbitrary variants like `[&>div]:` — avoid; use standard class composition.
-
-**The inline `<style>` block is the escape hatch** for anything Tailwind CDN cannot express:
-
-```html
-<style>
-  /* Existing */
-  html { scroll-behavior: smooth; }
-  /* Add for visual polish: */
-  .verdict-hero-card {
-    background: linear-gradient(135deg, #1a1a1a 0%, #0f172a 100%);
-  }
-  .indicator-bar-fill {
-    transition: width 0.6s ease-out;
-  }
-</style>
-```
-
-**When to use `<style>` vs Tailwind classes:**
-- Transitions/animations: `<style>` block — CDN JIT does not support `transition-[width]`
-- Gradients more complex than `from-/to-` built-ins: `<style>` block
-- `::-webkit-*` pseudo-elements: already in `<style>` block, extend there
-- Everything else: Tailwind classes
-
-### Pattern 4: Script Loading Order — Add New Module Before gauge-init.js
-
-**What:** The existing script loading order at the bottom of `<body>` reflects dependency
-order. Any new module that provides functions called by `gauge-init.js` must load before it.
-Any module that merely reuses `InterpretationsModule` is safe extending that existing file.
-
-**Current order:**
-```html
-<script src="js/data.js"></script>        <!-- DataModule -->
-<script src="js/chart.js"></script>       <!-- ChartModule -->
-<script src="js/countdown.js"></script>   <!-- CountdownModule -->
-<script src="js/calculator.js"></script>  <!-- CalculatorModule -->
-<script src="js/main.js"></script>        <!-- IIFE orchestrator (rates + meetings) -->
-<script src="js/gauges.js"></script>      <!-- GaugesModule -->
-<script src="js/interpretations.js"></script>  <!-- InterpretationsModule -->
-<script src="js/gauge-init.js"></script>  <!-- IIFE orchestrator (status.json) -->
-```
-
-**v4.0 does NOT need a new script tag** if `renderVerdictExplanation` is added to
-`interpretations.js`. The function loads with that existing file. `gauge-init.js` already
-loads after `interpretations.js` and calls into it — this works without order change.
-
-**If a new module IS introduced** (e.g., `verdict-explanation.js`):
-```html
-<!-- Insert before gauge-init.js, after interpretations.js -->
-<script src="js/interpretations.js"></script>
-<script src="js/verdict-explanation.js"></script>  <!-- NEW -->
-<script src="js/gauge-init.js"></script>
-```
-
-This preserves the pattern: library modules (GaugesModule, InterpretationsModule) load
-before orchestrator IIFEs that consume them.
-
----
-
-## Data Flow
-
-### v4.0 Status.json Consumption Map
-
-```
-DataModule.fetch("data/status.json")   [single fetch, cached]
-    │
-    ├── data.overall.hawk_score ─────► GaugesModule.createHeroGauge()
-    │                                  InterpretationsModule.renderVerdict()
-    │                                  renderCalculatorBridge()
-    │
-    ├── data.overall ─────────────────► InterpretationsModule.renderVerdict()
-    │
-    ├── data.asx_futures ─────────────► InterpretationsModule.renderASXTable()
-    │
-    ├── data.gauges ──────────────────► renderMetricGauges()   [gauge-init.js]
-    │                                   InterpretationsModule.renderMetricCard()
-    │                                                           (called per indicator)
-    │
-    └── data.gauges + data.overall.hawk_score ──► [NEW] InterpretationsModule.renderVerdictExplanation()
-```
-
-No new data sources. No changes to status.json schema. All v4.0 features consume
-the same data already fetched by gauge-init.js.
-
-### Verdict Explanation Calculation Logic
-
-The explanation must rank indicators by their contribution to the hawk score diverging
-from 50. Contribution = `(value - 50) * weight`. Positive contribution = hawkish pressure.
-
-```
-Example with current status.json:
-  wages:     value=84.8, weight=0.15  → contribution = (84.8-50) * 0.15 = +5.22  (hawkish)
-  inflation: value=30.2, weight=0.25  → contribution = (30.2-50) * 0.25 = -4.95  (dovish)
-  employment:value=33.7, weight=0.15  → contribution = (33.7-50) * 0.15 = -2.45  (dovish)
-  spending:  value=60.4, weight=0.10  → contribution = (60.4-50) * 0.10 = +1.04  (hawkish)
-  ...
-```
-
-Sort by absolute contribution. Top 3 explain the most of the current score.
-Render as: "[Indicator] is [above/below] average — pushing the score [up/down]."
-
-ASIC-safe framing already exists in `generateMetricInterpretation()` — re-use it,
-don't write new copy from scratch.
-
----
-
-## Build Order
-
-Build features in this sequence. Dependencies drive the order.
-
-**Phase 1: HTML Restructure — Hero Section**
-
-Modify `index.html` only. No JS changes.
-
-1. Move `#verdict-container` above the 5-column gauge grid inside `#hawk-o-meter-section`
-2. Increase verdict typography (larger text class, bolder weight)
-3. Add `id="verdict-explanation"` container below the verdict (empty div — JS fills it)
-4. Adjust grid layout if verdict now occupies full width above gauge
-
-Dependency: None. Can be done before any JS work. The existing
-`InterpretationsModule.renderVerdict('verdict-container', ...)` call continues to work
-because the element ID is unchanged.
-
-Verification: Load page — verdict should appear above-the-fold before the gauge.
-`#verdict-explanation` remains empty (intentional until Phase 2).
-
-**Phase 2: Verdict Explanation Component**
-
-Add `renderVerdictExplanation(containerId, gaugesData, overallScore)` to
-`interpretations.js` and wire the call in `gauge-init.js`.
-
-1. Add `renderVerdictExplanation` function to `interpretations.js` (before the `return` object)
-2. Expose it in `return { ..., renderVerdictExplanation: renderVerdictExplanation }`
-3. In `gauge-init.js` `.then()`, after `renderVerdict`, add:
-   `InterpretationsModule.renderVerdictExplanation('verdict-explanation', data.gauges, data.overall.hawk_score);`
-
-Dependency: Phase 1 must have created `id="verdict-explanation"` in the HTML.
-The function must reference `GaugesModule.getZoneColor()` (already available) for
-colour-coded indicators.
-
-Verification: Score explanation appears below the verdict verdict label with 3-5 indicator
-lines, all using neutral ASIC-safe language. Each line matches the `getWhyItMatters`
-pattern — no financial advice framing.
-
-**Phase 3: Visual Polish**
-
-Modify `index.html` CSS classes and the `<style>` block.
-
-1. Typography hierarchy — section headings, card labels, body text must form a clear scale
-2. Consistent spacing — audit `py-` and `px-` values across all sections; standardise
-3. Colour hierarchy — verdict zone colour (blue/grey/red) should bleed into the hero
-   section treatment (left border, text accent)
-4. Dark theme refinement — card backgrounds, border treatments, separator lines
-
-Dependency: Phases 1 and 2 establish final DOM structure before CSS is tuned. Polish
-after structure is stable to avoid rework.
-
-Verification: Screenshot above-the-fold before/after. Key check: verdict + score visible
-without scrolling on mobile (375px viewport) and desktop (1280px viewport).
-
----
-
-## Integration Points
-
-### New vs Modified
-
-| File | Change Type | What Changes |
-|------|-------------|-------------|
-| `public/index.html` | Modified | Hero section restructure; `#verdict-explanation` div added; CSS class updates for visual polish |
-| `public/js/interpretations.js` | Modified | Add `renderVerdictExplanation()` function; expose in return object |
-| `public/js/gauge-init.js` | Modified | Add `InterpretationsModule.renderVerdictExplanation()` call in `.then()` |
-| `public/js/gauges.js` | Unchanged | Zone colors/labels already support all new UI needs |
-| `public/js/data.js` | Unchanged | Cache hit on status.json — no second fetch needed |
-| `public/js/main.js` | Unchanged | rates.json + meetings.json orchestration unaffected |
-| `public/data/status.json` | Unchanged | All required fields already present: `gauges[id].value`, `.weight`, `.z_score`, `.zone_label`, `.confidence` |
-
-### Internal Module Boundaries
-
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| `gauge-init.js` → `InterpretationsModule` | Direct function call | `renderVerdictExplanation` joins existing call chain in `.then()` |
-| `renderVerdictExplanation` → `GaugesModule` | Direct function call | Uses `GaugesModule.getZoneColor()` for indicator colour coding |
-| `renderVerdictExplanation` → `InterpretationsModule` internals | Internal call | Can call private `generateMetricInterpretation()` and `getWhyItMatters()` since same module |
-| `verdict-explanation` DOM element | Data flows in one direction only | gauge-init.js writes; no other module reads the DOM output |
-
-### ASIC Compliance Checkpoints
-
-All new UI copy must pass these checks (from PROJECT.md constraints):
-
-| Rule | What It Means for v4.0 |
-|------|------------------------|
-| Neutral framing | "Wages are growing above average" not "Wages are dangerously high" |
-| No personal financial advice | Verdict explanation describes indicators, not user actions |
-| No predictions | "Economic data is currently showing..." not "Rates WILL rise" |
-| Existing disclaimer visible | Hero restructure must not push ASIC banner off screen |
+Use native Canvas 2D API for sparklines rather than importing a charting library. Acceptable for 12-point static sparklines on indicator cards. Would need reconsideration if interactivity (hover tooltips) were required.
 
 ---
 
 ## Anti-Patterns
 
-### Anti-Pattern 1: Adding a New IIFE to Fetch status.json Again
+### Anti-Pattern 1: Appending to a Single `hawk_score_history.json`
 
-**What people do:** Create `js/verdict-explanation.js` as an IIFE that calls
-`DataModule.fetch('data/status.json')` independently.
+**What people do:** Write a single JSON array that grows by one entry per week (`history.json`).
 
-**Why it's wrong:** DataModule already fetches and caches status.json in gauge-init.js.
-A second fetch call returns the cache immediately but adds an independent execution order —
-if the new IIFE runs before gauge-init.js's `.then()` resolves (a race), the explanation
-could render before the gauge, causing brief empty-state flicker. It also adds a new
-script tag and file to maintain.
+**Why it's wrong:** Git merge conflicts if the GHA workflow runs concurrently or is re-triggered manually. File grows without bound. Harder to query by date than reading a single `snapshots/YYYY-MM-DD.json`. A corrupt append breaks the entire history.
 
-**Do this instead:** Add `renderVerdictExplanation` to `interpretations.js` and call
-it from gauge-init.js's existing `.then()` callback where `data` is already available.
-One fetch, one orchestrator, zero race conditions.
+**Do this instead:** One file per snapshot date in `public/data/snapshots/`, with `index.json` listing available dates. Each file is immutable once written.
 
-### Anti-Pattern 2: Using innerHTML to Build the Explanation
+### Anti-Pattern 2: innerHTML for Delta Badge or Share Button
 
-**What people do:** `container.innerHTML = '<div class="..."><span>' + text + '</span></div>';`
+**What people do:** `element.innerHTML = '<span class="text-green-400">' + delta + '</span>'` for brevity.
 
-**Why it's wrong:** The existing codebase is strict about safe DOM methods
-(`createElement`/`textContent` only — no `innerHTML`). The ESLint config enforces this
-(ESLint v10 flat config, `sourceType: script`). A `no-innerHTML` pattern violation would
-fail linting in the pre-push hook. More importantly: `status.json` data includes
-user-visible text from scraped sources (NAB survey content, CoreLogic labels). Any text
-inserted via `innerHTML` is an XSS vector even in a static app.
+**Why it's wrong:** ESLint v10 flat config in this codebase enforces `no-restricted-syntax` against innerHTML. Causes lint failure in the pre-push hook. Also an XSS risk: `metricData.delta` is pipeline-computed (safe), but consistent safe-DOM discipline avoids future mistakes.
 
-**Do this instead:** Use `createElement`/`textContent`/`appendChild` — the same pattern
-used throughout `interpretations.js`. The `renderMetricCard` function (680 lines in
-interpretations.js) demonstrates the full pattern for a complex card.
+**Do this instead:** `createElement`/`textContent`/`style.color`/`appendChild`. Arrow Unicode literals: `'\u25b2'` (up), `'\u25bc'` (down), `'\u2014'` (steady).
 
-### Anti-Pattern 3: Rebuilding Zone Logic in the Explanation Component
+### Anti-Pattern 3: Fetching All Snapshot Files on Page Load
 
-**What people do:** Write a new colour/zone lookup inside `renderVerdictExplanation`
-to determine whether an indicator is hawkish or dovish.
+**What people do:** Fetch every snapshot file to build the historical hawk score chart.
 
-**Why it's wrong:** `GaugesModule` already exposes `getZoneColor(value)` and
-`getStanceLabel(value)`. Duplicating this logic creates two sources of truth for zone
-boundaries (the `ZONE_COLORS` array in gauges.js). If zone boundaries are ever adjusted,
-two places need updating.
+**Why it's wrong:** After 1 year of weekly runs, that is 52 HTTP requests on page load. Each is a separate TCP round-trip on Netlify CDN.
 
-**Do this instead:** Call `GaugesModule.getZoneColor(metricData.value)` and
-`GaugesModule.getStanceLabel(metricData.value)` directly. They accept any 0-100 value.
+**Do this instead:** Fetch `index.json`, then only the last 26 entries (6 months) via `Promise.all()`. Add "Load more" button later if users request it.
 
-### Anti-Pattern 4: Doing Visual Polish Before Structure Is Stable
+### Anti-Pattern 4: Dynamic OG Image Generation
 
-**What people do:** Apply CSS class changes (spacing, typography, colour hierarchy) to
-`index.html` while the hero section restructure is still in progress.
+**What people do:** Use Netlify Functions + Puppeteer or a third-party API to render a dashboard screenshot as the OG image per request.
 
-**Why it's wrong:** If Phase 1 (hero restructure) changes which element holds the verdict
-text, the CSS classes applied in the polish phase target elements that will be moved or
-replaced. Double rework, and it is difficult to review the visual result until layout
-is stable.
+**Why it's wrong:** Netlify Functions require a paid tier for meaningful usage (free tier limits are very low). External OG image services (Vercel OG, Cloudinary) introduce a paid dependency. Complexity is high for marginal benefit.
 
-**Do this instead:** Complete Phase 1 (HTML structure) and Phase 2 (verdict explanation
-JS + rendering) before Phase 3 (CSS polish). Polish after the final DOM structure is
-confirmed.
+**Do this instead:** A static 1200x630 PNG committed as `public/og-image.png`. Update it when the visual design changes significantly (quarterly at most).
 
-### Anti-Pattern 5: Placing the Hero Section Below the Onboarding Accordion
+### Anti-Pattern 5: Concatenated Tailwind Class Strings for Delta Badge Color
 
-**What people do:** Add a new `<section>` for the hero verdict above `#hawk-o-meter-section`
-but below `#onboarding`, thinking the onboarding can stay in its current above-the-fold position.
+**What people do:** `element.className = 'text-' + (delta > 0 ? 'green' : 'red') + '-400'`.
 
-**Why it's wrong:** The `#onboarding` section is a `<details>` element that defaults to
-`open`, making it ~100px tall on mobile. It visually competes with the hero verdict for
-above-the-fold dominance. The goal is verdict + score as the dominant above-the-fold element.
+**Why it's wrong:** Tailwind CDN silently drops classes whose names are assembled at runtime. The class is not present in the scanned/purged output. This is a documented pitfall in this codebase (KEY DECISION in PROJECT.md).
 
-**Do this instead:** Either (a) move the verdict to the very top of `#hawk-o-meter-section`
-so it appears first within that section, and accept the onboarding detail sits above it but
-is collapsible — OR (b) change the onboarding accordion to default-closed so users can
-dismiss it. Option (a) is zero-risk; option (b) is a minor UX decision.
+**Do this instead:** `element.style.color = delta > 0 ? '#10b981' : '#ef4444'` — hardcoded hex, applied via `element.style`. Same pattern used throughout `gauge-init.js` for zone border colors.
+
+---
+
+## Suggested Build Order (Dependencies First)
+
+```
+Phase 1 — Pipeline temporal layer (no frontend changes)
+    NEW: archive.py (snapshot_current, read_previous_snapshot)
+    MOD: engine.py (inject previous_value/delta/direction into build_gauge_entry)
+    MOD: weekly-pipeline.yml (add snapshots/ to file_pattern)
+    Tests: archive.py unit tests; updated engine.py tests for new fields
+    Output: status.json gains optional delta fields; first snapshot written
+    Depends on: nothing (pure Python addition)
+
+Phase 2 — Delta badges (depends on Phase 1's status.json contract)
+    MOD: interpretations.js (renderMetricCard adds delta badge)
+    MOD: gauge-init.js (passes metricData.delta to renderMetricCard)
+    Test: Playwright — delta badge visible when delta != null; absent otherwise
+    Depends on: Phase 1 (status.json must have delta field)
+
+Phase 3 — Sparklines (no pipeline dependency — history[] already exists)
+    NEW: sparklines.js (SparklinesModule)
+    MOD: index.html (add <script src="js/sparklines.js"> before gauge-init.js)
+    MOD: interpretations.js (renderMetricCard adds canvas element above gauge div)
+    MOD: gauge-init.js (call SparklinesModule.render after createBulletGauge)
+    Test: Playwright — canvas element present; non-zero pixels drawn
+    Depends on: Phase 2 (card DOM structure finalized)
+
+Phase 4 — Historical hawk score chart (depends on Phase 1 snapshots)
+    MOD: chart.js (add renderHawkScoreHistory function)
+    MOD: gauge-init.js (fetch index.json + last 26 snapshots)
+    MOD: index.html (add historical chart container)
+    Test: Playwright — chart container visible after data loads; hidden if index.json absent
+    Depends on: Phase 1 (snapshots must exist); can run in parallel with Phase 2/3
+
+Phase 5 — OG meta + share button (no pipeline dependency)
+    NEW: og-image.png (1200x630 static PNG, designed externally)
+    NEW: share.js (ShareModule)
+    MOD: index.html (static OG/Twitter meta tags; <script src="js/share.js">)
+    MOD: gauge-init.js (create share button in hero card)
+    Test: Check meta tag presence in HTML source; manual share test on mobile
+    Depends on: nothing pipeline-related; can run in parallel with any phase
+
+Phase 6 — Newsletter form (no pipeline or JS dependency)
+    NEW: public/thanks.html (form confirmation page)
+    MOD: index.html (Netlify Form markup below hero)
+    Test: Manual form submission on Netlify preview deploy
+    Depends on: nothing; can run at any point
+```
+
+---
+
+## Integration Points
+
+### Pipeline to Frontend
+
+| Pipeline Output | Frontend Consumer | Notes |
+|-----------------|-------------------|-------|
+| `public/data/status.json` | `DataModule.fetch()` in `data.js` | Unchanged fetch path; new optional fields consumed by `gauge-init.js` and `interpretations.js` |
+| `public/data/snapshots/index.json` | `gauge-init.js` (new parallel fetch) | Fetched only when historical chart container is in DOM |
+| `public/data/snapshots/YYYY-MM-DD.json` | `gauge-init.js` / `chart.js` | Fetched for last 26 dates from index via `Promise.all()` |
+
+### GitHub Actions to Netlify
+
+| File Pattern | Trigger | Change |
+|--------------|---------|--------|
+| `data/*.csv` | Existing weekly + daily | No change |
+| `public/data/status.json` | Existing weekly + daily | No change |
+| `public/data/snapshots/*.json` | Weekly only | Add to `file_pattern` in `weekly-pipeline.yml` |
+| `public/data/snapshots/index.json` | Weekly only | Same |
+
+### External Services
+
+| Service | Integration Pattern | Cost | Notes |
+|---------|---------------------|------|-------|
+| Netlify Forms | HTML `data-netlify` attribute | Free (100/month) | No JS; built-in spam protection via honeypot |
+| Web Share API | `navigator.share()` browser-native | Free | No external service |
+| `navigator.clipboard` | Clipboard API (share fallback) | Free | Requires HTTPS (Netlify provides) |
 
 ---
 
 ## Scaling Considerations
 
-This is a static dashboard with no server-side rendering and a fixed data file.
-Scaling concerns are about page load performance, not server capacity.
-
-| Concern | Current State | v4.0 Risk |
-|---------|--------------|-----------|
-| Plotly.js CDN load | ~3.5MB, already loading | No change — no new Plotly usage |
-| Tailwind CDN JIT | Scans DOM for classes at runtime | New classes auto-included if valid utilities |
-| status.json size | ~5KB, one fetch, cached | No change — no new data fields |
-| DOM node count | Moderate — 7 gauge cards + table | Verdict explanation adds ~10-20 nodes |
-| CSS specificity | Tailwind utilities + custom tokens | Risk: arbitrary values override custom tokens — test in browser |
+| Scale | Architecture Adjustment |
+|-------|-------------------------|
+| 0-10k weekly visitors | No changes needed; Netlify CDN handles static files |
+| 10k-100k weekly | Combine last-N snapshots into a single `public/data/hawk_score_chart.json` to reduce HTTP round-trips; `archive.py` rebuilds this file on each run |
+| 100k+ weekly | Consider Netlify Edge Functions for dynamic OG image; pre-rendered static pages per week |
+| Newsletter > 100 subs/month | Migrate from Netlify Forms to Beehiiv/Mailchimp API; add lightweight Netlify Function as proxy to protect API key |
 
 ---
 
 ## Sources
 
-- Direct inspection: `public/index.html` (468 LOC) — DOM structure, existing section IDs, script loading order
-- Direct inspection: `public/js/gauge-init.js` (272 LOC) — status.json data flow, all render call sites
-- Direct inspection: `public/js/interpretations.js` (694 LOC) — `renderVerdict`, `renderMetricCard`, `getWhyItMatters`, `generateMetricInterpretation`, `getPlainVerdict`
-- Direct inspection: `public/js/gauges.js` (270 LOC) — `ZONE_COLORS`, `getZoneColor`, `getStanceLabel`, `GaugesModule` public API
-- Direct inspection: `public/js/data.js` (98 LOC) — cache mechanism (URL-keyed `cache` object)
-- Direct inspection: `public/js/main.js` (168 LOC) — script loading and initialization order
-- Direct inspection: `public/data/status.json` — live data schema, all fields available for explanation logic
-- `.planning/PROJECT.md` — ASIC compliance constraints, v4.0 goal statement, out-of-scope items
-- Tailwind CDN documentation — confirmed CDN supports all utility classes but not `@apply` processing
+- Direct inspection: `pipeline/normalize/engine.py` — `build_gauge_entry()`, `generate_status()`, `history` array construction
+- Direct inspection: `public/data/status.json` — live schema, all existing fields including `history[]` arrays
+- Direct inspection: `public/js/gauge-init.js` — orchestration pattern, double-rAF pattern, `DataModule.fetch()` cache
+- Direct inspection: `public/js/interpretations.js` — `renderMetricCard()` DOM structure, no-innerHTML discipline
+- Direct inspection: `public/js/gauges.js` — `ZONE_COLORS`, `getZoneColor()` API
+- Direct inspection: `.github/workflows/weekly-pipeline.yml` — `git-auto-commit-action` `file_pattern`
+- Direct inspection: `pipeline/config.py` — `STATUS_OUTPUT`, `DATA_DIR`, all path constants
+- PROJECT.md — zero-cost constraint, no-build-system constraint, ASIC compliance requirements, Tailwind CDN class-drop pitfall
+- Netlify Forms docs: https://docs.netlify.com/forms/setup/ (HIGH confidence — long-standing Netlify feature)
+- Web Share API MDN: https://developer.mozilla.org/en-US/docs/Web/API/Web_Share_API (HIGH confidence — widely supported)
+- Open Graph protocol: https://ogp.me/ (HIGH confidence — static HTML meta tags)
+- Canvas 2D API MDN: https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D (HIGH confidence — browser-native)
 
 ---
 
-*Architecture research for: v4.0 Dashboard Visual Overhaul — frontend integration patterns*
-*Researched: 2026-02-25*
+*Architecture research for: v5.0 Direction & Momentum — snapshot archiving, delta badges, sparklines, OG sharing, and newsletter integration into RBA Hawk-O-Meter*
+*Researched: 2026-02-26*

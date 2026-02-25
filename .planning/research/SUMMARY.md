@@ -1,196 +1,200 @@
 # Project Research Summary
 
-**Project:** RBA Hawk-O-Meter — v4.0 Dashboard Visual Overhaul
-**Domain:** Static financial/economic data dashboard — frontend UX overhaul of existing vanilla JS app
-**Researched:** 2026-02-25
+**Project:** RBA Hawk-O-Meter — v5.0 Direction & Momentum
+**Domain:** Australian economic data dashboard — momentum tracking, social sharing, newsletter monetization
+**Researched:** 2026-02-26
 **Confidence:** HIGH
 
 ## Executive Summary
 
-The RBA Hawk-O-Meter v4.0 milestone is a pure frontend visual overhaul of a fully-shipped v3.0 dashboard. The project uses a no-build-step architecture (Tailwind CDN, Plotly.js CDN, vanilla JS IIFE modules) that is already mature and well-validated. The three milestone deliverables — hero section redesign, verdict explanation section, and visual polish — are all achievable using existing data structures and utility functions with no changes to the Python pipeline, status.json schema, or any backend infrastructure. The recommended approach is strictly additive: restructure one HTML section, extend one existing JS module, and tune CSS classes.
+v5.0 adds direction and momentum signals to a live, working dashboard. The milestone has two distinct layers: a pipeline temporal layer (snapshot archiving and `previous_value` injection) that all delta-related features depend on, and a frontend presentation layer (delta badges, sparklines, historical chart, OG sharing, newsletter capture) that consumes the new data. The critical insight from research is that **snapshot archiving is the single unblocking dependency** — every meaningful new feature either requires it or is enhanced by it. The one exception is sparklines, which can ship immediately using the `history[]` arrays already present in `status.json`, and OG tags + share button, which are pure frontend additions.
 
-The recommended implementation sequence is HTML restructure first, JS logic second, CSS polish third. This order is dictated by the architectural constraint that the DOM must be stable before CSS is tuned to avoid rework, and by the Plotly.js sizing constraint that gauge containers must be in their final layout before `Plotly.newPlot()` is called. The single optional dependency addition is Inter font via Google Fonts CDN (already referenced in the Plotly font stack but never loaded), plus CountUp.js 2.9.0 as an optional delight feature for the score counter animation.
+The recommended approach is to build the pipeline temporal layer first, then the frontend features in dependency order. No new major libraries are required: sparklines use the Canvas 2D API (hand-rolled, no CDN), the historical hawk score chart reuses the existing Plotly.js instance, the share button uses the native Web Share API, and snapshot archiving uses only Python stdlib. The newsletter capture uses Netlify Forms (free, zero JS) for MVP with MailerLite as the delivery platform. The stack remains entirely within the established no-build-system, CDN-only, vanilla JS IIFE pattern — no npm, no bundler, no new frameworks.
 
-The key risks are all well-understood and have clear mitigations: Plotly gauge zero-width rendering after DOM restructure (prevent with `requestAnimationFrame` + explicit resize call), Tailwind CDN silently dropping dynamically concatenated class names (prevent by using complete literal strings or `element.style` with hex values), ASIC compliance violations in verdict explanation copy (prevent with hedged factual-information framing), and Playwright test brittleness from nth-index selectors (prevent by running the suite after every structural HTML change). All risks are LOW-MEDIUM recovery cost if caught early.
-
----
+The key risks are: (1) git repository bloat if snapshot files are committed naively — use a JSONL append pattern or per-file snapshots with a hard 52-entry cap; (2) Plotly performance collapse if sparklines reuse Plotly — use Canvas 2D API strictly (page already has 8 Plotly charts; adding 7 more causes Firefox freeze); (3) ASIC compliance exposure if affiliate monetization ships without legal review — defer affiliate links to a gated future decision with legal sign-off; (4) Australian Spam Act violations if newsletter capture launches with a pre-ticked consent checkbox or without a functional unsubscribe link — these are binary compliance requirements enforced by ACMA with fines up to $2.1M per subsequent breach.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The existing stack requires no significant changes for v4.0. All tooling — Tailwind CDN v3, Plotly.js 2.35.2, Decimal.js, vanilla JS IIFE modules — must stay at current versions. Tailwind v4 CDN uses a fundamentally incompatible configuration format, and Plotly v3 has breaking changes to `title` handling that would require auditing every layout call with no feature benefit for this milestone.
+v5.0 requires zero new major library dependencies for its core features. All new JS is hand-rolled vanilla in the existing IIFE pattern. The Python pipeline is extended with one new stdlib-only module (`archive.py`). MailerLite (free plan: 500 subscribers, 12,000 emails/month) is recommended over Buttondown for newsletter delivery because it offers API access on the free plan and a higher email-volume ceiling. Netlify Forms handles the email capture form at zero cost for MVP (100 submissions/month free tier).
 
-Two additions are recommended: Inter via Google Fonts CDN (already declared in `getDarkLayout()`'s font stack but never actually loaded, causing Windows browsers to fall back to Segoe UI), and CountUp.js 2.9.0 UMD from jsDelivr (optional — creates the most impactful UX moment of the hero redesign). All hero animations use native CSS `@keyframes` in the existing `<style>` block — no animation library needed.
+The one optional future addition is Pillow (Python, `>=11.0,<12.0`) for dynamic OG image generation from the pipeline — viable but deferred to v5.x since a static branded PNG is sufficient for v5.0 launch. Note: FEATURES.md recommended `@fnando/sparkline` but STACK.md correctly identifies it as ESM-only (incompatible with the no-bundler architecture); Canvas 2D is the confirmed approach.
 
-**Core technologies:**
-- Tailwind CDN v3 (`cdn.tailwindcss.com`): utility-first CSS — stay on v3; v4 CDN is incompatible with existing JS config object
-- Plotly.js 2.35.2 (`cdn.plot.ly`): gauge and chart rendering — stay pinned; v3 has breaking title API changes with no feature benefit for this milestone
-- Inter (Google Fonts CDN): typography — ADD via preconnect + link tag; already referenced in Plotly font stack, just never loaded
-- CountUp.js 2.9.0 (jsDelivr UMD): hero score count-up animation — ADD as optional; 5.83KB, MIT, handles edge cases correctly; replaceable with ~25 lines of vanilla `requestAnimationFrame`
-- Native CSS `@keyframes`: hero entry animations — no library needed; two keyframe definitions (`fadeSlideIn`, `fadeIn`) cover all animation needs
+**Core technologies (new additions only):**
+- `pipeline/normalize/archive.py` (new Python module): snapshot archiving and `previous_value` injection — stdlib only (`json`, `pathlib`, `datetime`), zero new dependencies
+- `public/js/sparklines.js` (new IIFE): Canvas 2D API sparklines — browser-native, zero CDN dependency
+- `public/js/share.js` (new IIFE): Web Share API + `navigator.clipboard` fallback — browser-native, zero CDN dependency
+- MailerLite embed JS snippet: newsletter delivery — free plan, copy-paste HTML/JS, no API key exposed in frontend
+- Netlify Forms: email capture — `data-netlify="true"` HTML attribute, zero JS, 100 submissions/month free
+- Plotly.js 2.35.2 (existing, no change): reused for historical hawk score chart
+
+**What NOT to add:**
+- `@fnando/sparkline` — ESM-only; no UMD/IIFE build; incompatible with no-build-system architecture
+- Plotly instances for sparklines — 15+ Plotly charts causes page freeze; WebGL cap is 8 instances
+- Netlify Edge Functions for dynamic OG images — requires paid tier; overkill for weekly-updating metric
+- Any npm package — no build system; npm packages are not loadable without a bundler
+- Mailchimp — free plan slashed to 500 contacts/500 emails/month as of January 26, 2026; not viable
 
 ### Expected Features
 
-The feature research establishes a clear P1/P2/P3 hierarchy. All P1 features are pure frontend additions requiring zero backend or schema changes. The single differentiating feature — the verdict explanation section showing what is driving the score — has no comparable equivalent in CNN Fear & Greed or the MacroMicro Hawk-Dove Index.
+Research confirms the feature set is well-scoped with clear priority ordering. No competitor (Finder, Canstar/RateCity, Mozo, Craggle, ASX Rate Tracker) offers a composite pressure score, auto-generated factual narrative summaries, or a weekly data-driven digest — these three together are the genuine differentiating position.
 
-**Must have (table stakes — v4.0 P1):**
-- Verdict label as visual hero (large, zone-coloured, above-the-fold) — the primary UX purpose of the milestone
-- Score immediately legible as a number with context — users cannot interpret a gauge needle alone
-- Scale explainer physically adjacent to the verdict — currently can scroll below fold on mobile
-- Data freshness badge inside the hero card — users must know if the score is current before trusting it
-- Consistent zone colour across hero verdict, card accent border, and explanation headings — colour vocabulary collapses if inconsistent
-- Graceful loading states with no layout shift — `min-height: 280px` on gauge container must be preserved
+**Must have (table stakes for v5.0):**
+- OG meta tags (`og:title`, `og:description`, `og:image`, `og:url`, Twitter Card) — without these, every shared link is a bare URL; table stakes for any shareable web tool
+- Share button (`navigator.share()` + clipboard fallback) — standard on any information tool; zero third-party scripts
+- Sparklines on indicator cards — industry-standard on financial data UIs; `history[]` arrays already exist in `status.json`; ships with no pipeline changes
+- Delta badges on indicator cards (▲/▼/— + magnitude) — requires `previous_value` from pipeline archive; must be threshold-gated at `|delta| >= 5` to suppress noise
 
-**Should have (differentiators — v4.0 P1/P2):**
-- Verdict explanation section: two plain-English lists of "pushing rates up" and "pulling rates down" indicators — the feature no competitor offers
-- Hero card with zone-coloured accent border — reinforces verdict at the card boundary level
-- Gauge entrance animation (sweep from 0 to score) — P2, after P1 features verified; requires `requestAnimationFrame` workaround since Plotly indicator gauges do not animate natively
+**Should have (competitive differentiators):**
+- Historical hawk score chart (Plotly.js line chart over weekly snapshots) — unique in the competitor landscape; gates on 4+ weeks of archived data
+- "What changed this week" auto-generated narrative summary (template-based Python, no LLM) — auto-generated factual diff shipped as `change_summary[]` in status.json
+- Newsletter signup form + weekly digest delivery (MailerLite) — niche data-driven newsletter; differentiates on neutrality and zero editorial overhead
 
-**Defer (v4.x or v5+):**
-- Indicator direction delta badges — requires `previous_value` field in status.json; backend pipeline change, not frontend work
-- Historical hawk score chart — requires archiving status.json snapshots; no current archive mechanism
-- Dark/light theme toggle — requires dual Tailwind class definitions and Plotly style rewrites across every module; high complexity for low value against the finance-terminal aesthetic
-- Real-time polling — ABS/RBA data is monthly/quarterly; polling is theatre
+**Defer to v5.x+:**
+- Affiliate/monetization CTA — requires ASIC legal review; meaningful only once newsletter audience is established
+- Dynamic OG image generation (Pillow) — static PNG sufficient for v5.0; revisit when branding stabilises
+- Twitter/X bot auto-posting — API write access costs $100/month minimum in 2026
+- Push notifications — requires service worker + VAPID backend; high friction, low open rate vs email
 
 ### Architecture Approach
 
-v4.0 adds no new directories, no new JS modules, and no new data sources. Three files change: `public/index.html` (hero section restructure + `#verdict-explanation` div), `public/js/interpretations.js` (add `renderVerdictExplanation()` + expose in return object), and `public/js/gauge-init.js` (add one function call in the existing `.then()` callback). Everything else is unchanged.
+v5.0 follows a clean extension of the existing architecture. The Python pipeline gains one new module (`archive.py`) and one modification to `engine.py`. The frontend gains two new IIFE modules (`sparklines.js`, `share.js`) and targeted modifications to `interpretations.js`, `gauge-init.js`, and `chart.js`. The `status.json` contract gains optional new fields (`previous_value`, `delta`, `direction` per gauge; `previous_hawk_score`, `hawk_score_delta` in overall) that are absent on the first pipeline run, ensuring graceful degradation from day one. All new frontend modules follow the existing `var ModuleName = (function() { 'use strict'; ... })();` pattern with no exceptions.
 
-The key architectural insight from direct codebase inspection is that `DataModule` already caches `status.json` by URL — any module can call `DataModule.fetch("data/status.json")` and get the cached result as a resolved Promise with no network cost and no coordination protocol. This means `renderVerdictExplanation` does not need its own data fetch; it receives `data.gauges` and `data.overall.hawk_score` directly from gauge-init.js's existing `.then()` callback, where the data is already available.
+**Major components (new/modified):**
+1. `pipeline/normalize/archive.py` (new) — writes `public/data/snapshots/YYYY-MM-DD.json` per weekly run; maintains `public/data/snapshots/index.json`; reads prior snapshot for `previous_value` computation via `read_previous_snapshot(min_age_days=5)` guard
+2. `pipeline/normalize/engine.py` (modified) — imports archive.py; injects `previous_value`, `delta`, `direction` into each gauge entry before writing status.json; calls `snapshot_current()` after
+3. `public/js/sparklines.js` (new IIFE) — Canvas 2D sparklines from `history[]` arrays; called from `gauge-init.js` after bullet gauge creation in the existing rAF chain
+4. `public/js/share.js` (new IIFE) — Web Share API + clipboard fallback; button created via `createElement`/`textContent`
+5. `public/js/chart.js` (modified) — adds `renderHawkScoreHistory()` function fetching `index.json` + last 26 snapshot files via `Promise.all()`
+6. `public/index.html` (modified) — static OG/Twitter meta tags; Netlify Form markup; `<script>` tags for new modules; historical chart container
 
-**Major components and v4.0 change surface:**
-1. `public/index.html` — MODIFIED: promote `#verdict-container` above the 5-column gauge grid; add `#verdict-explanation` container; add Inter font link tags; add `@keyframes` to `<style>` block; extend `tailwind.config` with `fontFamily.sans`
-2. `public/js/interpretations.js` (InterpretationsModule) — MODIFIED: add `renderVerdictExplanation(containerId, gaugesData, overallScore)`; expose in return object; reuse `getWhyItMatters()` and `generateMetricInterpretation()` for ASIC-safe copy
-3. `public/js/gauge-init.js` — MODIFIED: add one call to `InterpretationsModule.renderVerdictExplanation()` after `renderVerdict()` in the existing `.then()` callback
-4. `public/js/gauges.js` (GaugesModule) — UNCHANGED: `getZoneColor()` and `getStanceLabel()` already support all new colour logic needs
-5. `public/js/data.js` (DataModule) — UNCHANGED: cache mechanism handles repeated status.json fetches transparently
+**Key architectural patterns to follow:**
+- Optional fields in status.json: frontend checks `metricData.delta != null` before rendering badge — graceful on first run
+- One snapshot file per date in `public/data/snapshots/` with `index.json` manifest — avoids git merge conflicts and unbounded growth
+- Canvas 2D for sparklines, not Plotly — keeps Plotly chart count at 8 (1 hero + 7 bullets)
+- `element.style.color` with hardcoded hex for delta badge color — never concatenated Tailwind class strings
+- `min_age_days=5` guard in `read_previous_snapshot()` — prevents same-week double-runs treating current snapshot as previous
 
 ### Critical Pitfalls
 
-1. **Plotly gauge renders at zero width after hero DOM restructure** — Plotly measures `offsetWidth` at `newPlot()` call time. If new above-the-fold elements change the grid layout before paint, the gauge initialises at 0px and never recovers via `autosize` (which only listens to `window.resize`). Prevention: wrap `createHeroGauge()` in `requestAnimationFrame()`; call `Plotly.Plots.resize('hero-gauge-plot')` explicitly after inserting new hero HTML. Test at 375px, 768px, 1024px, 1440px immediately after any structural change. Never reduce `min-height: 280px` on the gauge container.
+1. **Git repository bloat from naive snapshot archiving** — Use a JSONL append pattern (`public/data/history.jsonl`) with a 52-line retention cap, OR per-file snapshots with a 52-file maximum enforced by the pipeline. Decide the storage strategy before writing the first snapshot — retrofitting requires `git filter-repo` history rewrite. Warning signs: `git count-objects -vH` pack-size above 200MB; Netlify deploy times above 2 minutes.
 
-2. **Tailwind CDN silently drops dynamically concatenated class names** — CDN scans source for literal class name tokens at load time; it cannot execute JS expressions. `'border-' + zoneColor + '-500'` produces a class Tailwind never generates CSS for — the style fails silently with no error. Prevention: use complete-string lookup objects (`ZONE_BORDER_CLASSES = { cold: 'border-blue-800', ... }`) or bypass Tailwind entirely with `element.style.color = GaugesModule.getZoneColor(score)` — already the established pattern in `gauges.js`.
+2. **Plotly used for sparklines triggers performance collapse** — The page already has 8 Plotly instances; adding 7 more causes Firefox to freeze and Chrome to show multi-second blanks; WebGL mode caps at 8. Use Canvas 2D API exclusively. Verify with `document.querySelectorAll('.js-plotly-plot').length === 8` after sparklines are added.
 
-3. **Verdict explanation copy crosses into ASIC general advice territory** — Explaining why a score is high naturally pulls language toward prediction and recommendation. "Rates will rise" and "you should consider fixing now" are ASIC RG 244 violations. Prevention: strict framing rules — state what the indicator is doing, not what it means for user decisions. Use "tends to," "historically associated with," "the data is consistent with." Mirror `getPlainVerdict()`'s hedged language pattern. Review every new sentence against: "Would a person reading this feel they have received personal advice?"
+3. **Delta badges show noisy daily ASX fluctuations** — ASX futures update daily and can swing 5-10 gauge points on market sentiment. Gate delta badges at `|delta| >= 5` gauge points; compute delta only from the weekly pipeline run (not the daily ASX run); suppress badges for low-confidence indicators.
 
-4. **Playwright nth-index selectors break after any DOM insertion near the gauge grid** — Tests use `.nth(0)`, `.nth(1)`, `.nth(5)` to address metric cards. Any new `bg-finance-gray` element inserted near `#metric-gauges-grid` shifts all indices. Prevention: keep `#verdict-explanation` structurally separate from `#metric-gauges-grid`; run the full 28-test Playwright suite before and after every structural HTML change; replace nth selectors for named indicators with `.filter({ hasText: 'Indicator Name' })` when updating tests.
+4. **ASIC compliance — affiliate links may constitute "arranging" a financial product** — Performance-based affiliate links (cost-per-lead, per-conversion) likely require an Australian Credit Licence under the Corporations Act 2001. Do not ship any affiliate link without legal review. Safe structure: a "mere referral" with disclosed referral fee, neutral framing, no implied product recommendation.
 
-5. **Mobile above-the-fold congestion after hero redesign** — The existing vertical stack (disclaimer + header + onboarding accordion + gauge at 280px + verdict + links) is already long on 375px viewports. Adding a prominent hero verdict block without removing other elements pushes the verdict below the fold, defeating the purpose of the redesign. Prevention: hero redesign must *replace* the current verbose verdict container and scale explainer, not add above them. Design constraint: score + verdict + 1 sentence explanation must fit in approximately 350-400px on mobile. Consider changing the onboarding `<details>` to default-closed on mobile.
-
----
+5. **Australian Spam Act 2003 non-compliance** — Fines up to $2.1M for subsequent breaches, enforced by ACMA. Express consent required (unchecked checkbox by default), unsubscribe link in every email, functional unsubscribe honored within 5 business days, sender identification in every email. Use MailerLite's double opt-in; never pre-tick the consent checkbox; never import external email lists.
 
 ## Implications for Roadmap
 
-Based on combined research, the architecture prescribes a strict three-phase sequence where each phase is a prerequisite for the next.
+Based on the dependency graph derived from research, a 5-phase sequence is recommended. The pipeline temporal layer must come first. Sparklines and OG/share are independent and can run in parallel with Phase 1 or be batched as their own phases. Historical chart and narrative summary wait on both Phase 1 completion and real data accumulation time.
 
-### Phase 1: Hero HTML Restructure
+### Phase 1: Pipeline Temporal Layer
 
-**Rationale:** DOM structure must be stable before any JS or CSS work begins. Plotly gauge sizing depends on container dimensions at render time — restructuring HTML after JS is wired creates zero-width gauge risk and CSS rework. The existing element IDs (`#verdict-container`, `#hero-gauge-plot`, etc.) are Playwright test targets that must survive the restructure. Establish the final DOM shape first so subsequent phases have a stable target.
+**Rationale:** Snapshot archiving is the hard dependency that gates delta badges, historical chart, and narrative summary. It has zero frontend dependencies and can be built, tested, and shipped completely independently. Starting here means delta fields are live in `status.json` before any frontend work touches indicator cards. This is also the phase with the highest-consequence architectural decision (storage format) — make it first.
+**Delivers:** `pipeline/normalize/archive.py` with `snapshot_current()` and `read_previous_snapshot(min_age_days=5)`; `previous_value`, `delta`, `direction` fields in status.json per gauge; `previous_hawk_score`, `hawk_score_delta` in overall block; `public/data/snapshots/` directory and `index.json`; extended `file_pattern` in `weekly-pipeline.yml`; unit tests for archive.py; updated engine.py tests for new fields
+**Addresses:** DELT-01 (delta infrastructure), HIST-01 (snapshot storage)
+**Avoids:** Git repository bloat (enforce JSONL or per-file cap from day one — pitfall 1); `previous_value` pointing to stale data (`min_age_days` guard prevents same-week double-run issues)
+**Research flag:** Standard Python patterns — no research phase needed
 
-**Delivers:** Above-the-fold hero section with `#verdict-container` promoted to visual top position; `#verdict-explanation` empty placeholder div added; Inter font preconnect + link tags in `<head>`; `tailwind.config` extended with `fontFamily.sans`; `@keyframes fadeSlideIn` and `fadeIn` added to `<style>` block; existing Playwright suite still passing 28/28; gauge rendering verified at 375px, 768px, 1024px, 1440px.
+### Phase 2: Indicator Card UI — Delta Badges + Sparklines
 
-**Addresses features from FEATURES.md:** Verdict label as visual hero (P1); scale explainer adjacent to verdict (P1); data freshness inside hero zone (P1); hero card zone-coloured accent border (P1 — CSS + 1 JS line).
+**Rationale:** Delta badges depend on Phase 1's `previous_value` being in status.json. Sparklines are independent (history[] already exists) but co-located in the same card DOM structure — batching them avoids touching `renderMetricCard()` twice. The card mobile layout (375px) must be designed for both elements simultaneously, not sequentially, or the second element will require layout rework.
+**Delivers:** Delta badges (▲/▼/— + threshold-gated magnitude at `|delta| >= 5`) on each indicator card; Canvas 2D sparklines from `history[]` on each indicator card; `sparklines.js` IIFE module; modifications to `interpretations.js` (badge element, canvas element) and `gauge-init.js` (sparkline wiring)
+**Uses:** Canvas 2D API (no library); `element.style.color` hex pattern; Unicode arrow literals (`\u25b2`, `\u25bc`, `\u2014`)
+**Implements:** SparklinesModule (new IIFE), delta badge rendering in InterpretationsModule
+**Avoids:** Plotly sparkline performance collapse; delta badge mobile layout overflow; Tailwind class concatenation; noisy daily ASX delta; `innerHTML` ESLint violation
+**Research flag:** Standard patterns — no research phase needed; run Playwright at 375px after every card element addition
 
-**Avoids pitfalls:** Plotly zero-width render (test at all breakpoints immediately; wrap `createHeroGauge()` in `requestAnimationFrame()`); Playwright nth-selector breakage (run suite after every structural change); mobile above-fold congestion (test at 375x812 throughout; hero is a replacement, not an addition).
+### Phase 3: Social Sharing — OG Meta Tags + Share Button
 
-**Research flag:** Standard patterns — no deeper research needed. All changes are HTML restructure and CSS class tuning with well-documented patterns.
+**Rationale:** OG tags must precede or accompany the share button — sharing without OG produces bare URL previews that actively deter engagement. These features are entirely independent of the pipeline and indicator card changes, making this phase clean and low-risk. Batching them ensures the `og:image` cache-buster strategy is in place before any URLs are shared publicly.
+**Delivers:** Static OG/Twitter Card meta tags in `index.html`; `public/og-image.png` (1200x630 static branded PNG — design prerequisite); `share.js` IIFE module; share button in hero card (via `createElement`/`textContent`); `?v=YYYYMMDD` cache-buster on `og:image` URL; Facebook re-scrape step in GitHub Actions post-deploy
+**Uses:** `navigator.share()` + `navigator.clipboard.writeText()` (browser-native); static PNG asset committed to repo
+**Avoids:** Missing `og:image` causing text-only link previews; relative URL on `og:image` (social crawlers reject relative paths); stale OG cache after weekly score change
+**Research flag:** Standard web patterns — no research phase needed; validate with Facebook Sharing Debugger and Twitter Card Validator before merge
 
----
+### Phase 4: Historical Hawk Score Chart + Narrative Summary
 
-### Phase 2: Verdict Explanation Component
+**Rationale:** The historical chart requires at least 4 weeks of Phase 1 snapshots to display a meaningful line. The "what changed this week" narrative summary also requires `previous_value` from Phase 1. Batching these together means one phase waits the same real-calendar time for data accumulation. Build the chart UI with an "Insufficient data" placeholder state from day one — never ship a flat-line or single-dot chart.
+**Delivers:** Historical hawk score Plotly line chart in `chart.js`; fetch of `index.json` + last 26 snapshots in `gauge-init.js` via `Promise.all()`; "Insufficient data" placeholder state (gate on 4+ snapshots); template-based `change_summary[]` array in status.json (Python engine.py modification); historical chart container in `index.html`
+**Uses:** Plotly.js 2.35.2 (existing); standard JS `fetch` + `Promise.all()`
+**Avoids:** Chart shipping with fewer than 4 data points (enforce minimum data gate); fetching all 52 snapshot files on page load (cap at 26); backfilling from CSVs without documenting approximation
+**Research flag:** Plotly scatter/line traces are stable — no research phase needed; verify "Insufficient data" state in Playwright before merging; decide whether to attempt historical backfill during planning
 
-**Rationale:** Requires Phase 1's `#verdict-explanation` container to exist in the DOM. The explanation logic ranks indicators by `(value - 50) * weight` — this is the only new algorithmic work in the milestone. Must be completed before visual polish so the explanation section's typography and spacing can be tuned in Phase 3 against real rendered content.
+### Phase 5: Newsletter Capture + Delivery
 
-**Delivers:** `renderVerdictExplanation()` function added to `interpretations.js` and exposed in its return object; wired in `gauge-init.js` `.then()` after `renderVerdict()`; two plain-English lists of hawkish and dovish indicator drivers rendered into `#verdict-explanation`; ASIC compliance verified on all new copy; safe DOM methods (`createElement`/`textContent`) used throughout; `GaugesModule.getZoneColor()` used for colour — no Tailwind class concatenation.
-
-**Uses from STACK.md:** No new libraries required. Uses existing `GaugesModule.getZoneColor()`, `getWhyItMatters()`, `generateMetricInterpretation()`, and `getStanceLabel()`. Safe DOM methods following established `renderMetricCard()` pattern.
-
-**Implements architecture component:** `renderVerdictExplanation(containerId, gaugesData, overallScore)` — sorts indicators by absolute contribution (`(value - 50) * weight`), renders top 3 hawkish and top 2 dovish drivers with ASIC-compliant copy.
-
-**Addresses features from FEATURES.md:** Verdict explanation section — "what's driving the score" (P1 differentiator); hawkish/dovish two-list layout per driver (P1 differentiator).
-
-**Avoids pitfalls:** Tailwind CDN concatenated class names (use `element.style` with hex values from `getZoneColor()`); ASIC copy compliance (hedge every sentence; apply factual-information review checklist per commit); new IIFE anti-pattern (extend InterpretationsModule, not a new IIFE with independent data fetch — avoids race conditions).
-
-**Research flag:** Standard patterns — ASIC framing rules are clear from existing `getWhyItMatters()` and `getPlainVerdict()` implementations. No deeper research needed.
-
----
-
-### Phase 3: Visual Polish
-
-**Rationale:** Must come last — CSS tuning against a DOM that is still changing causes double rework. Typography scale, spacing standardisation, and colour hierarchy require real content in all sections to evaluate correctly. The optional CountUp.js score animation and gauge entrance animation also belong here as final delight layers once structure and data rendering are confirmed working.
-
-**Delivers:** Consistent typography hierarchy (36-48px verdict label, 52px score, defined text-gray scale for secondary/body/metadata); standardised spacing across all sections; zone colour consistently applied to verdict label, hero border, and explanation headings; `fadeSlideIn` animation applied via `classList.add` on data load; CountUp.js integration for score number (with `prefers-reduced-motion` guard); final mobile verification at 375x812; gauge entrance animation if time permits (P2).
-
-**Uses from STACK.md:** Inter font (activated in Phase 1, applied universally in Phase 3 via `font-sans`); CountUp.js 2.9.0 UMD (added in script tags with `prefers-reduced-motion` guard); native CSS `@keyframes` (declared in Phase 1, triggered in Phase 3 JS).
-
-**Addresses features from FEATURES.md:** Visual polish — spacing, typography, colour hierarchy (all P1); gauge entrance animation via `requestAnimationFrame` workaround (P2 — add if time allows).
-
-**Avoids pitfalls:** Never reduce `min-height: 280px` on gauge container; never add zone colour to every page element (reserve for verdict label, hero border, explanation headings — colour overuse destroys signal value); always include `prefers-reduced-motion` guard around CountUp.js.
-
-**Research flag:** Standard patterns — established Tailwind CDN + `<style>` block pattern is fully documented. No deeper research needed.
-
----
+**Rationale:** Newsletter infrastructure requires an external account (MailerLite), legal compliance review of consent form design, and real audience time to accumulate before delivery is meaningful. Placing this last means the dashboard is fully featured for organic sharing (Phase 3) before asking users to subscribe. The Spam Act and ASIC compliance requirements make this phase higher-stakes than its technical complexity suggests — compliance review is a gating requirement, not a post-launch fix.
+**Delivers:** Netlify Form email capture in `index.html` (below hero, above indicators — after delivering value); `public/thanks.html` confirmation page; MailerLite account configured with double opt-in; weekly digest template in MailerLite; consent form with unchecked checkbox by default
+**Uses:** Netlify Forms (`data-netlify="true"` attribute); MailerLite JS embed snippet; no custom backend
+**Avoids:** Pre-ticked consent checkbox (Spam Act violation); missing unsubscribe link; missing sender identification; affiliate links without legal sign-off
+**Research flag:** Needs deliberate compliance review — verify Netlify Form configuration, MailerLite double opt-in setting, and consent form HTML against Spam Act checklist before shipping any emails
 
 ### Phase Ordering Rationale
 
-- **HTML before JS:** Plotly gauge container dimensions are measured at `newPlot()` call time. The final DOM layout must exist before gauge initialisation fires — or an explicit `Plotly.Plots.resize()` call must follow any DOM change. Doing HTML restructure in Phase 1 means the gauge renders correctly in its final container from the start, eliminating the most critical pitfall at its source.
-- **JS before CSS:** The verdict explanation section must have real content rendered before spacing and typography can be tuned correctly. CSS polish applied to empty or placeholder content requires rework when content arrives.
-- **Pitfalls drive phase boundaries:** The three most critical pitfalls (Plotly zero-width, Tailwind class concatenation, ASIC copy) each map to a specific phase. Separating the phases makes each pitfall the sole focus of its phase's verification checklist.
-- **Feature dependencies confirm this order:** All P1 features are frontend-only with no backend dependencies. No feature in Phase 2 or 3 requires anything outside the frontend codebase. Parallel execution is not beneficial — the dependencies are strictly sequential.
+- Phase 1 first because it is the hard dependency that unlocks delta badges, historical chart, and narrative summary — and it carries the highest-consequence irreversible decision (storage format); get it right before any frontend work assumes the schema
+- Phases 2 and 3 are independent of each other but both depend on Phase 1 completing; Phase 2 depends on status.json delta fields; Phase 3 is entirely independent but benefits from knowing the final URL before baking it into OG tags
+- Phase 4 is gated by real calendar time (4 weeks of data accumulation) as well as Phase 1 completion — building it in parallel with Phase 2/3 means the data will be ready by the time the chart UI is merged
+- Phase 5 is last because newsletter value compounds with audience, compliance review takes calendar time, and the dashboard must deliver clear value before asking for email sign-ups; affiliate monetization is explicitly excluded from v5.0
 
 ### Research Flags
 
-Phases with standard patterns (no `/gsd:research-phase` needed):
-- **Phase 1 (HTML Restructure):** Direct codebase inspection provides a complete implementation map. Tailwind CDN + Plotly resize patterns are well-documented with specific code examples. All element IDs and Playwright test targets are fully known from direct file inspection.
-- **Phase 2 (Verdict Explanation):** InterpretationsModule extension pattern follows direct precedent from `renderMetricCard()`. ASIC framing rules are established by existing compliant functions. The contribution ranking algorithm `(value - 50) * weight` is documented with worked examples in ARCHITECTURE.md.
-- **Phase 3 (Visual Polish):** Tailwind utility class application has no unknowns. CountUp.js integration is documented in STACK.md with a complete production-ready code snippet including the `prefers-reduced-motion` guard.
+Phases likely needing deliberate compliance review during planning:
+- **Phase 5 (Newsletter):** Australian Spam Act and ASIC compliance requirements must be verified against the specific MailerLite configuration before shipping any emails — these are regulatory obligations, not best practices
 
-No phase in this milestone requires a `/gsd:research-phase` pass. All implementation decisions are fully resolved by existing codebase inspection and verified external documentation.
-
----
+Phases with well-documented patterns (skip research-phase):
+- **Phase 1 (Pipeline Archive):** Pure Python stdlib; pattern verified against existing GHA workflow files; no novel technology
+- **Phase 2 (Indicator Card UI):** Canvas 2D API is browser-native and well-documented; delta badge follows existing ESLint-safe DOM patterns established in the codebase
+- **Phase 3 (OG + Share):** Static meta tags and Web Share API are fully documented at MDN; validate with platform debuggers, not additional research
+- **Phase 4 (Historical Chart):** Plotly scatter/line traces are stable in 2.35.2; fetch-and-parse pattern for JSONL/JSON is standard JS
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All technology decisions verified against official CDN registries, official docs, and Plotly changelog. Versions pinned and confirmed. Explicit anti-list (Tailwind v4, Plotly v3, Animate.css, Alpine.js, GSAP) grounded in confirmed breaking changes or architectural mismatches. |
-| Features | HIGH | Competitor analysis against CNN Fear & Greed and MacroMicro confirmed directly. Feature prioritisation anchored to existing utility functions verified in the live codebase. Anti-feature list includes specific technical reasons for each deferral. |
-| Architecture | HIGH | All findings from direct codebase inspection of 6 JS modules (98-694 LOC each), live status.json, and Playwright test files. No inference required. Integration points, data flow map, and build order all derived from reading actual source. |
-| Pitfalls | HIGH | All 5 critical pitfalls verified against Plotly GitHub issues (#3984, #2769), official Tailwind CDN docs, official ASIC RG 244, and official Playwright locator docs. Recovery strategies and warning signs are concrete and specific. |
+| Stack | HIGH | All technology choices verified against official docs, CDN registries, and existing codebase. Zero novel dependencies for core features. `@fnando/sparkline` ESM-only status confirmed via jsDelivr. MailerLite free plan limits verified from official page. Pillow (optional, future) is MEDIUM — well-established library but not yet integrated with this pipeline. |
+| Features | HIGH | Dependency graph verified by direct codebase inspection of `status.json` and `engine.py`. Competitor analysis is MEDIUM (CSS-heavy pages limit full feature visibility) but sufficient for positioning decisions. ASIC compliance research from official ASIC sources (HIGH). |
+| Architecture | HIGH | All architectural decisions derived from direct codebase inspection of 8+ source files. Component boundaries, module patterns, and data flow verified against live code. Snapshot storage strategy (per-file with index.json) has clear documented rationale. Canvas 2D sparkline implementation is browser-native with no unknowns. |
+| Pitfalls | HIGH | Critical pitfalls sourced from official ASIC/ACMA regulatory documents, Plotly community forum confirmed patterns (WebGL 8-chart cap), and direct codebase analysis. Technical debt patterns and recovery costs are concrete and specific. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **CountUp.js `prefers-reduced-motion` guard:** STACK.md includes the correct wrapper pattern but it must be implemented (not just documented) in Phase 3. The guard is not optional — it is an accessibility requirement.
-- **Onboarding accordion mobile behaviour:** PITFALLS.md flags the `<details open>` default as a mobile congestion risk after the hero redesign. Whether to change it to default-closed on mobile is a measurement-driven decision deferred to Phase 1 execution — test at 375x812 and decide based on actual vertical height.
-- **Gauge entrance animation timing:** FEATURES.md marks this P2 (add after P1 features verified). The `requestAnimationFrame` workaround for Plotly indicator gauge animation is documented — the implementation approach is clear. The decision is whether Phase 3 has time for it, not how to implement it.
-
----
+- **`history[]` has no timestamps:** Existing `history[]` arrays have no date labels — sparklines must render without x-axis labels and communicate clearly that points represent observations at mixed cadences (quarterly ABS, monthly NAB/Cotality), not uniform calendar intervals. A `history_dated` pipeline enhancement is desirable but not required for v5.0 sparklines, which are trend-signal-only. Flag for Phase 2 planning: decide whether to add `history_dated` alongside sparklines or defer.
+- **MailerLite API automation rate limits:** API endpoint limits on the free plan are not exhaustively documented — confirmed available on free plan but specific automation capabilities need testing once account is created. Low risk: newsletter delivery can fall back to manual sends if automation is restricted.
+- **Historical backfill decision:** The historical chart will show only a "Building history" placeholder on launch until Phase 1 archives accumulate (4+ weeks). A limited backfill from existing CSVs is feasible for ABS/RBA indicators but approximate for scraped sources. Decide during Phase 4 planning whether to attempt backfill and document any approximation clearly.
+- **OG image design:** A 1200x630 PNG needs to be designed and committed before Phase 3 ships. This is a design deliverable, not a code deliverable — flag it as a Phase 3 prerequisite that must be scheduled separately.
+- **ASIC affiliate legal review:** No affiliate links should ship in v5.0 without legal sign-off. This is not a gap to resolve during implementation — it is an explicit gate that defers the feature to v5.x+.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Direct codebase inspection: `public/index.html`, `public/js/gauge-init.js`, `public/js/interpretations.js`, `public/js/gauges.js`, `public/js/data.js`, `public/js/main.js`, `public/data/status.json`, `tests/dashboard.spec.js`, `tests/phase6-ux.spec.js`
-- Plotly.js changelog: [plotly.com/javascript/version-3-changes](https://plotly.com/javascript/version-3-changes/) — v3 breaking title API changes confirmed
-- Plotly GitHub issues #3984, #2769 — `responsive: true` only responds to `window.resize`; hidden container sizing bug confirmed
-- Google Fonts CSS2 API docs: [developers.google.com/fonts/docs/css2](https://developers.google.com/fonts/docs/css2) — `wght@300..900` variable range syntax verified
-- Tailwind CDN v3 docs: [tailwindcss.com/docs/installation/play-cdn](https://tailwindcss.com/docs/installation/play-cdn) — CDN class scanning limitations confirmed
-- ASIC RG 244 (December 2012, updated 2021) — factual information vs. general advice distinction; hedged language requirements
-- Official Playwright locator docs — `.nth()` flagged as fragile; `.filter({ hasText: ... })` preferred
-- jsDelivr: [cdn.jsdelivr.net/npm/countup.js](https://cdn.jsdelivr.net/npm/countup.js/) — CountUp.js 2.9.0 UMD build confirmed
+- Direct codebase analysis: `public/data/status.json` — live schema, `history[]` array structure, confirmed absence of `previous_value`
+- Direct codebase analysis: `pipeline/normalize/engine.py` — `build_gauge_entry()`, `generate_status()`, history construction
+- Direct codebase analysis: `public/js/gauge-init.js`, `interpretations.js`, `gauges.js` — existing DOM patterns, IIFE module structure, double-rAF pattern
+- Direct codebase analysis: `.github/workflows/weekly-pipeline.yml` — `git-auto-commit-action@v5` `file_pattern`
+- ASIC INFO 269 — discussing financial products online; ASIC RG 234 — advertising; ASIC RG 244 — giving information, general advice
+- ACMA — Spam Act 2003, Spam Regulations 2021, unsubscribe rules fact sheet
+- MDN: `navigator.share()`, `navigator.clipboard.writeText()`, Canvas 2D API — browser support verified
+- MailerLite free plan page — 500 subscribers, 12,000 emails/month confirmed
+- Plotly Community Forum — 10+ chart instances performance degradation, WebGL 8-chart cap confirmed
+- jsDelivr: `@fnando/sparkline` — ESM-only module types confirmed; no UMD/IIFE build available
+- `stefanzweifel/git-auto-commit-action` GitHub repo — v5 confirmed, already in use in both GHA workflows
 
 ### Secondary (MEDIUM confidence)
-- Tailwind community discussion #14210 — dynamic class concatenation not detected by CDN scanner
-- Plotly community forum — `Plotly.Plots.resize(divId)` required after container reparenting
-- CNN Fear & Greed Index — reference for verdict-as-hero design pattern
-- MacroMicro Hawk-Dove Index — competitor feature comparison
-- Toptal dashboard design — above-the-fold hero on mobile must fit within ~350px
+- Competitor direct inspection: Finder, Canstar, Mozo, Craggle, ASX Rate Tracker — CSS-heavy pages limit full feature visibility
+- Kit (ConvertKit) free plan — 10,000 subscribers, unlimited emails (third-party review, not official source)
+- MailerLite API automation on free plan — available but specific rate limits not fully verified
+- HN Law "Finfluencers" commentary — consistent with ASIC official position on "arranging" obligations
 
-### Tertiary (noted for completeness)
-- Tailwind CDN v4 config format: [tailkits.com/blog/tailwind-css-v4-cdn-setup](https://tailkits.com/blog/tailwind-css-v4-cdn-setup/) — confirms migration cost; validates stay-on-v3 decision
+### Tertiary (LOW confidence — needs validation)
+- Pillow pipeline integration — library is well-established (pypi.org confirmed 11.1.0 as of Feb 2026) but integration with this specific pipeline not yet prototyped
+- Historical backfill from existing CSVs — feasibility estimated; rolling Z-score window boundary effects not fully modeled
 
 ---
-*Research completed: 2026-02-25*
+*Research completed: 2026-02-26*
 *Ready for roadmap: yes*

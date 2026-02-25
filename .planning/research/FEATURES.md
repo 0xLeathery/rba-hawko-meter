@@ -1,26 +1,26 @@
 # Feature Research
 
-**Domain:** Financial/Economic Data Dashboard — Visual Overhaul (v4.0)
-**Researched:** 2026-02-25
-**Confidence:** HIGH (dashboard UX patterns well-established; implementation details verified against existing codebase and Plotly.js documentation)
+**Domain:** Australian economic/financial dashboard — v5.0 Direction & Momentum (subsequent milestone)
+**Researched:** 2026-02-26
+**Confidence:** HIGH (pipeline architecture/ASIC compliance), MEDIUM (competitor landscape — direct inspection limited by CSS-heavy pages)
 
 ---
 
-## Context: What Already Exists
+## Context: Subsequent Milestone
 
-The existing dashboard (v3.0, fully shipped) has:
-- Plotly.js semicircle gauge (hero hawk score 0-100, 52px number, zone-coloured needle)
-- 7 metric bullet gauges in a 3-column card grid with plain English interpretation
-- ASX futures multi-meeting table with stacked probability bars
-- Verdict text beneath the gauge: "HOLDING STEADY — The economy is giving mixed signals..."
-- "Why it matters" one-liners per indicator card
-- Mortgage calculator with scenario slider and comparison table
-- Dark theme: `finance-dark #0a0a0a`, `finance-gray #1a1a1a`, `finance-border #2d2d2d`, `finance-accent #60a5fa`
-- Tailwind CSS (CDN), Plotly 2.35.2, vanilla JS modules (no build step)
-- `getZoneColor()`, `getStanceLabel()`, `getDisplayLabel()`, `getPlainVerdict()` functions already defined
-- `generateMetricInterpretation()` and `getWhyItMatters()` already implemented per indicator
+This is v5.0 research on a live v4.0 product. Research covers ONLY new features being added. Existing shipped features are documented in PROJECT.md.
 
-The milestone adds: (1) above-the-fold hero redesign, (2) verdict explanation section, (3) visual polish.
+**Key structural facts affecting new features (verified directly from codebase):**
+
+| Fact | Value | Impact |
+|------|-------|--------|
+| `history[]` exists in status.json | 12 quarterly data points per gauge (6/7 indicators); `business_confidence` = 1 point only | Sparklines can ship without pipeline changes |
+| `previous_value` does NOT exist | Not in current status.json schema | Delta badges require pipeline change |
+| `previous_hawk_score` does NOT exist | Not in overall block | Hero delta requires pipeline change |
+| No build system | CDN-only (Tailwind CDN v3, Plotly 2.35.2, CountUp.js 2.9.0) | Library choices constrained to CDN-loadable, zero-dep packages |
+| Tailwind CDN silently drops dynamic class strings | Confirmed architectural constraint | Colours must be set via `element.style` with hex, not Tailwind classes |
+| JS is IIFE module pattern | No ES modules, no bundler | New JS must follow same IIFE pattern |
+| Static hosting (Netlify) | No server-side rendering, no serverless functions in scope | OG image must be static; no dynamic meta generation |
 
 ---
 
@@ -28,110 +28,118 @@ The milestone adds: (1) above-the-fold hero redesign, (2) verdict explanation se
 
 ### Table Stakes (Users Expect These)
 
-Features a polished financial/economic data dashboard in 2026 must have. Missing these makes the product feel unfinished compared to CNN Fear & Greed, Bloomberg, and peer dashboards.
+Features users assume exist on modern financial dashboards. Missing = product feels incomplete.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **Verdict dominates the hero** — the plain-English verdict label is the largest, most prominent element visible without scrolling | CNN Fear & Greed, Bloomberg Economic Conditions Dashboard — all best-in-class tools put the verdict ("FEAR", "GREED") first. Users arrive asking "will rates go up or down?" — the label IS the answer. | LOW | Currently `#verdict-container` sits below the gauge at text-lg. Needs to be the visual centre of gravity: font-size 36-48px, zone-coloured, above or overlapping the gauge area. Pure CSS change. |
-| **Score is immediately legible as a number** — "34/100" is readable on first glance, not just readable from the gauge needle position | Best-in-class KPI dashboards (Robinhood, Bloomberg terminals) anchor the experience with a big tabular number. The needle IS useful but secondary to the number. | LOW | Plotly `number.font.size: 52` exists. May need layout tuning on mobile to prevent collision. Score should read clearly before the user understands what the gauge means. |
-| **Score scale is explained physically near the verdict** — "Below 50 = pressure to cut. Above 50 = pressure to rise." | NN/g research: users need anchors to interpret scores. Without this, a "34" is meaningless. | LOW | `#scale-explainer` exists as a paragraph below the hero section. Needs to be repositioned inside or immediately adjacent to the hero card — currently it can scroll below the fold on mobile. |
-| **Status colours are consistent across all elements** — same red = same zone everywhere (gauge needle, verdict label, verdict explanation headings, metric card borders) | Users learn a colour vocabulary. If the red verdict label and the blue gauge needle reference different zones, trust collapses. | LOW | `getZoneColor()` already returns the correct hex for any score. Verdict label, hero card border, and verdict explanation need to use this function consistently. The bullet gauges already use it. |
-| **Loading states are graceful** — no layout shift, no blank areas during data fetch | Users read "blank = broken". Existing loading placeholders exist but may produce CLS (Cumulative Layout Shift). | LOW | Verify all loading placeholder `min-height` values match loaded content height. Hero gauge container has `min-height: 280px` — confirm this matches Plotly's rendered height. |
-| **Mobile layout works first-tap** — no horizontal scroll, verdict is readable, gauge fits screen | 60%+ of Australian mortgage holders visit on phone. The hero verdict must be the first thing seen, not half a gauge. | LOW | Existing `lg:col-span-3/2` grid collapses correctly. Test specifically that verdict label wraps gracefully at narrow widths (< 375px) and gauge doesn't overflow. |
-| **Data freshness is visible near the score** — users know if the score is current before they trust it | Economic data is monthly/quarterly. A user viewing in February needs to know if the score reflects January data. | LOW | `#data-freshness` div exists but sits above the gauge grid, separated from the verdict. Move it inside the hero card, directly beneath the verdict label. |
+| Delta badges showing direction of change | Every major financial dashboard (Bloomberg, FactSet, Finder) shows arrows/deltas. Users scan for "up/down" not just absolute numbers. Table stakes for any data dashboard updated on a cadence. | MEDIUM | Requires `previous_value` in status.json (pipeline change). Badge: ▲/▼/— arrow + magnitude in gauge units. Cannot use `history[-2]` as proxy without misleading users — quarterly steps don't reflect weekly change. |
+| OG meta tags for social sharing | Any link shared on Slack, iMessage, Twitter/X, LinkedIn without OG renders as a bare URL. For a tool users want to share with friends/family before rate decisions, this is effectively broken sharing. Finance sites report 78% traffic lift from proper OG implementation. | LOW | `og:title`, `og:description`, `og:image`, `og:url`, `og:type` + Twitter Card tags. Static tags in `<head>` of `public/index.html`. Static 1200x630 branded PNG in `public/`. No dynamic generation needed. |
+| Share button | "Share this page" is expected on any information tool. Without it, sharing happens anyway but with worse URLs. The expectation is one button, native OS share sheet on mobile. | LOW | Web Share API: `navigator.share({title, text, url})` with feature detection. Desktop fallback: clipboard copy + toast. Zero third-party scripts. No social SDK needed. Well-supported on iOS/Android Safari/Chrome (2026). |
+| Sparklines showing trend history | Industry-standard component in financial data UIs since Bloomberg Terminal. FactSet specifically uses sparklines to show "whether metrics are trending up, down, or stable within a single KPI card." Users expect trend signal alongside point-in-time value. | MEDIUM | `history[]` already exists (12 quarterly points). Library: `@fnando/sparkline` (CDN-loadable, zero deps, SVG output, 362 npm dependents). Exception: `business_confidence` has 1 history point — show "Building history..." placeholder. Colour via `getZoneColor()` on SVG `stroke` attribute directly (not Tailwind). |
 
 ### Differentiators (Competitive Advantage)
 
-Features that elevate this dashboard above any comparable tool. These serve the "Data, not opinion" value proposition.
+Features that set Hawk-O-Meter apart from Finder, Canstar, Mozo, Craggle, and the ASX Rate Tracker. Must align with "Data, not opinion" core value.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **Verdict Explanation Section** — a dedicated block that answers "why is the score X?" with two plain-English lists: what's pushing rates up, what's pulling them down | No comparable Australian mortgage tool does this. CNN Fear & Greed shows 7 indicator scores but gives no narrative synthesis. This is the missing layer between the score and the indicator cards. Users currently must infer the story themselves. | MEDIUM | New HTML section between hero and indicator grid. Logic: read `status.json` gauge values, filter those > 60 (hawkish, pushing rates up) and < 40 (dovish, pulling rates down), render as two labelled lists with coloured status dots and plain English names. Uses existing `getDisplayLabel()` + `generateMetricInterpretation()`. No new data needed — reads from existing status.json schema. |
-| **Hero verdict label as the centrepiece** — oversized verdict text (e.g., 40-48px bold, zone-coloured) positioned above or overlapping the gauge, making the conclusion unmissable | CNN Fear & Greed's most-copied design decision: the large coloured word "FEAR" or "GREED" is what users remember and share. The number proves it; the word IS the message. | LOW | CSS-only change: increase `#verdict-container` font-size, move it above the Plotly gauge plot or into a banner above the gauge wrapper. Apply `color: getZoneColor(hawkScore)` inline via JS. Already called in `renderVerdict()` — extend it to set font size. |
-| **Hero card with zone-coloured accent border** — the above-the-fold container has a top or left border coloured to match the current zone (e.g., `border-t-4 border-red-600` for hawkish) | Creates a visual "premium" zone distinct from supporting content below. The colour change reinforces the verdict at the card boundary level. Used by TradingView's market structure dashboards and Bloomberg's condition indicators. | LOW | Tailwind utility class applied dynamically via JS to the hero section wrapper: `border-t-4` + the appropriate zone colour class (or `style.borderColor = getZoneColor(score)`). Subtle but immediately perceived. |
-| **Gauge entrance animation** — hero gauge needle sweeps from 0 to final value over ~800ms on page load | Creates a "reveal" moment that makes the score feel meaningful rather than static. Used by Bloomberg and Robinhood for primary KPI displays. | MEDIUM | Plotly indicator gauges do NOT support smooth native animation (confirmed: only scatter traces animate smoothly; indicator gauge transitions are instantaneous per Plotly docs and community). Workaround: manual `requestAnimationFrame` loop calling `Plotly.react` with value incrementing from 0 to target. Cap at hero gauge only — bullet gauges should not animate (performance, attention fragmentation). Approximately 60 frames at 16ms = ~960ms total. |
-| **"What's driving this" two-column layout inside verdict explanation** — hawkish signals (red, right) and dovish signals (blue/green, left), omitting neutral indicators | Best pattern from consensus financial dashboards (ATC Dashboard / TradingView, MacroMicro Hawkish-Dovish Index). Users immediately see "Inflation is pushing rates up. Employment is pulling them down." Actionable in seconds. | MEDIUM | JS function: `getSignalLists(gauges)` → returns `{ hawkish: [...], dovish: [...] }` where hawkish = gauge value > 60, dovish = gauge value < 40. Render as CSS grid with two columns. Each entry: coloured dot + indicator name + one-line status from `generateMetricInterpretation()`. Depends entirely on existing data and functions. |
-| **Score freshness badge integrated into hero** — "Updated 3 days ago" displayed immediately beneath the score/verdict | Users must know if they can trust the score before acting on it. Particularly critical for quarterly data (housing) that may be 2+ months old. | LOW | Reuse existing `renderStalenessWarning()` function, target it to a new element inside the hero card rather than the separate `#data-freshness` div above the grid. Two-line change in gauge-init.js and a new element in index.html. |
+| Historical hawk score chart | No competitor shows a composite "rate pressure trajectory." Finder/Canstar/Mozo show raw cash rate history only (backward-looking). This shows where the composite pressure score has been trending — "we've been moving dovish for 3 months" — which is genuinely more useful for anticipating the next move. | HIGH | Requires snapshot archiving pipeline step (weekly row to `data/hawk_score_history.csv`). Frontend: Plotly.js line chart (already a dep). Blocking: chart needs 4+ weeks of real data to look meaningful. Can ship with placeholder "Building history — check back next week." |
+| "What changed this week" auto-narrative | Mozo/Finder do manual editorial articles per RBA decision. An auto-generated plain-English diff summary ("Wages fell from 6.4% to 5.45% YoY — easing slightly. Inflation steady.") pre-built into status.json by the pipeline adds immediate insight with zero manual effort — and is available every week, not just on RBA decision days. | MEDIUM | Python template-based generation in engine.py. Compare `previous_value` vs `current_value` per indicator, emit factual sentences. NO LLM needed. ASIC-compliant: "X moved from A to B" not "This means you should..." Output as `change_summary` array in status.json overall block. |
+| Newsletter digest with weekly data snapshot | Canstar/Finder have broad financial newsletters for millions of subscribers. A niche weekly "Hawk-O-Meter Report" with zero product recommendations differentiates on neutrality and specificity. The digest IS the data update — auto-assembled, no editorial effort. | HIGH | Platform: Buttondown (free ≤100 subscribers, $29/mo for API). Pipeline sends email via Buttondown API post-weekly-run in GitHub Actions. Signup form on dashboard (simple fetch to Buttondown subscribe endpoint). ASIC constraint: factual/educational only, no recommendations, affiliate footer must be disclosed. |
+| Mortgage broker affiliate CTA | Finder/Canstar earn revenue from sponsored product placement and referral fees. Hawk-O-Meter can offer a single neutral CTA: "Thinking about refinancing? Compare brokers →" without ranking or recommending specific products. Disclosed affiliate referrals: $200-$350 per settled loan (Mates Rates benchmark) or 0.33% commission (Unloan model). | MEDIUM | Single link, clearly disclosed. No product table, no ranking. Disclosure: "We may receive a referral fee if you contact a broker via this link." See ASIC compliance section. Revenue meaningful only at scale — treat as Phase 4 / future milestone. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| **Native Plotly gauge transition animation** | Looks polished in concept — set `transition.duration` and the needle sweeps | Plotly.js only smoothly animates scatter/bar/line traces. Indicator gauge transitions are instantaneous regardless of `transition.duration` setting. Setting it creates false expectations and no effect. Confirmed in Plotly community forum and issue tracker. | Manual `requestAnimationFrame` loop: increment value from 0 to target in ~60 steps, call `Plotly.react` each frame. Scoped to hero gauge only. |
-| **Dark/light theme toggle** | Modern UX expectation; users expect system preference respect | Every Tailwind class, every Plotly `paper_bgcolor`/`plot_bgcolor`/font colour, and every custom CSS variable would need dual definitions. This project uses no build step — Tailwind CDN with `class` dark mode cannot be toggled without `localStorage` + JS rewrite of all inline Plotly styles. High complexity for minimal value. | Stay dark. The finance-terminal aesthetic IS the brand. Document it. If system preference becomes important, add it in a future dedicated accessibility phase. |
-| **Real-time refresh/polling** | Feels live and modern | ABS/RBA data updates monthly or quarterly. Fetching status.json every N seconds is pure theatre — the file won't change between browser visits. Adds JavaScript complexity, potential rate-limit issues with GitHub Pages, and user confusion about why the score never changes mid-session. | Keep the existing weekly GitHub Actions batch update. Show a clear "Last updated: 3 days ago" timestamp. Freshness is an honest display problem, not a polling problem. |
-| **Sparkline charts inside each indicator card** | Shows trend over time | Each sparkline requires a historical series per metric — a significant schema extension (status.json currently stores only the latest snapshot). At 155px card height, adding a Plotly sparkline creates visual noise and performance cost (7 additional Plotly traces). | If trend context is needed, express it as text: "Inflation trending up over the past 3 months." This uses information already derivable from the multi-period z-score calculation. |
-| **Zone colour on every UI element across the whole page** — make every section heading, card border, and table row match the hawk score zone | Seems visually rich and thematic | If everything is red when the score is high, the colour loses all meaning. Colour overuse in dashboards (confirmed by datacamp and UXPin guidelines) reduces scannability and can make a "warning" feel like "decoration". | Reserve zone colour for: (1) the verdict label, (2) the hero card accent border, (3) the verdict explanation section headings. Everything else stays in the neutral grey palette. |
-| **Indicator direction delta badges (up/down arrow with "was 42, now 68")** | Trend context is valuable | Requires a `previous_value` or `delta` field per metric in status.json — a data pipeline change (engine.py must store and compute period-over-period deltas). This is a backend change masquerading as a frontend feature. | Defer to a future milestone when status.json schema is extended. The "why it matters" text already provides directional context in words. |
-| **User accounts or saved configurations** | Personalisation — save my mortgage inputs, email alerts | Authentication requires backend infrastructure that GitHub Pages cannot provide. localStorage already persists calculator inputs without auth. | Continue localStorage for calculator. No accounts needed for this tool's scope. |
+| LLM-generated narrative summary | "AI summary" sounds sophisticated; marketing hook | Adds OpenAI API cost, latency, hallucination risk on numerical data, secret management in GitHub Actions. Potential ASIC concern about AI-generated financial statements. Overkill when template-based generation covers 95% of the value. | Template-based Python in engine.py using existing interpretation strings. Same readability, zero cost, deterministic, ASIC-safe. |
+| "Best mortgage rate" comparison table | Obvious monetization; high conversion | Requires AFS license or credit licensee sponsorship under ASIC RG 234/RG 244. Rate tables go stale within hours. Crosses from macro education to lead gen — violates "Data, not opinion" core value. | Single neutral CTA: "Ready to act on this data? Find a broker →" with disclosed referral. |
+| Real-time sparklines / live price feeds | Users want "live" data | Weekly cadence is the actual data refresh rate. Macro indicators (CPI, wages) update quarterly. "Live" sparklines would just show no change. Misrepresents data currency. | Label sparklines with data frequency ("quarterly readings"). Show `data_date` per indicator — already in status.json. |
+| Dynamic OG image per hawk score | Share preview shows actual current score | Requires serverless function or pre-render pipeline to generate dynamic images. Violates zero-cost hosting constraint and no-build-system pattern. High complexity for marginal gain. | Static branded OG image: "RBA Hawk-O-Meter — Weekly Rate Pressure Score." Sufficient for 95% of sharing. Revisit in v6+ if serverless is added. |
+| Push notifications for RBA decisions | Engagement hook; "alert me when score crosses 70" | Service workers + push subscriptions require a backend. Netlify static hosting cannot maintain push subscriptions server-side. | Newsletter IS the notification channel — subscribers receive weekly digest automatically. |
+| Social media auto-posting (Twitter/X bot) | Organic distribution | Twitter/X API write access costs $100/month minimum (2026 pricing). No budget. Token management complexity in GitHub Actions. | Share button enables organic sharing by users. Newsletter digest is the owned distribution channel. |
+| Paid newsletter (Substack/subscription model) | Monetization | Charging for factual public economic data is ethically questionable and reduces reach. Affiliate referrals generate more revenue per user than subscriptions at small subscriber scale. | Free newsletter with disclosed affiliate CTAs in footer. |
+| User accounts / saved preferences | Personalization; "save my mortgage inputs" | Stateless app is a core project constraint. Adds auth infrastructure, Australian Privacy Act liability, session management. | `localStorage` already persists calculator inputs. No server-side user state needed. |
+| Delta badges using `history[-2]` as proxy | Avoids pipeline change | Quarterly history steps do not reflect weekly change. Showing "-3.2 pts" based on a 3-month-old snapshot misleads users about recency. The badge implies "this week" — it must mean this week. | Ship sparklines (which correctly represent quarterly cadence) in Phase 1. Ship delta badges only after snapshot archiving provides weekly `previous_value`. |
 
 ---
 
 ## Feature Dependencies
 
 ```
-[Verdict Explanation Section]
-    └──reads──> [status.json gauge values]                      (exists: status.json with .gauges)
-    └──calls──> [getDisplayLabel(metricId)]                     (exists: gauges.js)
-    └──calls──> [generateMetricInterpretation(metricId, data)]  (exists: interpretations.js)
-    └──enhances──> [Hero Verdict Label Redesign]                (both reference same hawk_score zone)
+[Snapshot Archiving — new pipeline step]
+    └──required by──> [Delta Badges on indicator cards]
+    └──required by──> [Previous Hawk Score delta on hero]
+    └──required by──> [Historical Hawk Score Chart] (needs ≥4 weeks data)
+    └──required by──> ["What Changed This Week" narrative]
+    └──required by──> [Newsletter Digest content] (diff needs previous values)
 
-[Hero Verdict Label Redesign]
-    └──calls──> [getZoneColor(hawkScore)]                       (exists: gauges.js)
-    └──calls──> [getStanceLabel(hawkScore)]                     (exists: gauges.js)
-    └──required by──> [Hero Card Zone-Coloured Border]          (same zone colour logic)
+[history[] arrays — already exist in status.json]
+    └──enables──> [Sparklines on indicator cards] (no pipeline change)
 
-[Hero Card Zone-Coloured Border]
-    └──requires──> [getZoneColor()]                             (exists)
-    └──enhances──> [Verdict Label Redesign]                     (consistent zone colour system)
+[OG Meta Tags]
+    └──required by──> [Share Button] (preview needs OG content to be useful)
+    └──enhances──> [Newsletter Digest] (shared links preview correctly)
 
-[Gauge Entrance Animation]
-    └──requires──> [hero gauge DOM element: #hero-gauge-plot]   (exists)
-    └──conflicts──> [Plotly native indicator transitions]       (do not animate smoothly)
-    └──requires──> [requestAnimationFrame loop workaround]      (manual implementation)
-    └──independent of all other features in this milestone]
+[Newsletter Signup Form]
+    └──required by──> [Newsletter Digest delivery]
+    └──requires──> [Buttondown account + API key in GitHub Actions secrets]
 
-[Data Freshness in Hero Zone]
-    └──calls──> [renderStalenessWarning()]                      (exists: interpretations.js)
-    └──requires──> [new DOM element inside hero card]           (new: 1 HTML line)
-    └──enhances──> [Hero Verdict Label Redesign]
+[Affiliate CTA]
+    └──enhances──> [Newsletter Digest] (CTA in email footer)
+    └──conflicts with──> [AFS License boundary] (must stay disclosed, factual, non-ranking)
+    └──meaningful only after──> [Newsletter audience exists]
 
-[Direction Delta Badges per Indicator Card]
-    └──requires──> [status.json delta/previous_value field]     (NOT IN SCHEMA — defer)
-    └──requires──> [engine.py changes]                          (pipeline work, out of scope)
+[Sparklines]
+    └──enhances──> [Delta Badges] (together: trend line + point-in-time direction)
+    └──independent of all other new features]
 ```
 
 ### Dependency Notes
 
-- **Verdict Explanation Section is entirely self-contained on the frontend.** All required data structures and utility functions already exist. No engine.py, no status.json schema changes. This is a pure JS + HTML addition.
-- **Gauge entrance animation conflicts with Plotly native.** Must implement via `requestAnimationFrame`. Scope strictly to hero gauge — bullet gauges must not animate.
-- **All P1 features are frontend-only.** Zero backend changes for the core milestone deliverables.
-- **Direction delta badges are explicitly deferred.** They require a data pipeline schema change that is out of scope for a visual overhaul milestone.
+- **Snapshot archiving is the core unblocking dependency.** Delta badges, historical chart, and narrative summary all require a `previous_value` and/or `hawk_score_history.csv`. This is the most critical pipeline addition in the milestone.
+- **Sparklines can ship in Phase 1 independently.** `history[]` with 12 quarterly data points exists for 6 of 7 indicators. No pipeline change. `business_confidence` (1 data point) shows a placeholder.
+- **OG tags must precede share button.** A share button without OG tags produces bare URL previews that actively deter sharing. They are one phase.
+- **Newsletter requires patience.** Buttondown integration is meaningful once an audience exists. Launch alongside share button to capture organic traffic from day one.
+- **Affiliate monetization is last.** Revenue is negligible at low subscriber count. Build audience first; monetize second.
 
 ---
 
-## MVP Definition
+## MVP Definition for v5.0
 
-### Launch With (v4.0)
+### Phase 1: Visual Momentum (No Pipeline Changes)
 
-Minimum needed to deliver the three milestone goals: hero redesign, verdict explanation, visual polish.
+Makes the dashboard feel "alive" and shareable. No pipeline dependencies. Pure frontend changes.
 
-- [ ] **Verdict label promoted to visual hero** — large (36-48px), zone-coloured, positioned above or at the top of the gauge area. CSS + `renderVerdict()` update. Single most impactful visual change.
-- [ ] **Verdict explanation section** — new HTML section between hero and indicator grid. Two plain-English lists: "Pushing rates up: Inflation (above target), Housing (prices rising)." and "Holding rates down: Employment (jobs softening), Spending (consumers cautious)." Derived from gauge values at runtime. No new data.
-- [ ] **Hero card with zone-coloured accent border** — top or left border of the hero section card matches current zone colour. Reinforces verdict visually. CSS + 1 line of JS.
-- [ ] **Data freshness repositioned into hero zone** — `renderStalenessWarning()` called on a new element inside the hero card, not the separate `#data-freshness` div above the gauge grid. Users need "this score is current" near the verdict.
-- [ ] **Scale explainer physically adjacent to verdict** — `#scale-explainer` moved inside or directly below the hero card. Currently separated by the gauge; can scroll below fold on mobile.
+- [ ] Sparklines from existing `history[]` arrays on each indicator card — shows quarterly trend in-place using existing data
+- [ ] OG meta tags in `<head>` of `public/index.html` — enables proper social link previews immediately
+- [ ] Share button with `navigator.share()` + clipboard fallback + toast — enables organic distribution
 
-### Add After Validation (v4.x)
+**Why start here:** Zero backend risk. High visual/shareability impact. Can ship and verify in isolation.
 
-- [ ] **Gauge entrance animation** — hero gauge sweeps from 0 to final value on load. Delight feature. Implement after P1 features ship and are verified working.
-- [ ] **Mobile hero height profiling** — profile actual render heights on sub-400px viewports and adjust Plotly `height` config if gauge overflows.
+### Phase 2: Pipeline Temporal Layer
 
-### Future Consideration (v5+)
+Adds the data infrastructure everything else depends on.
 
-- [ ] **Indicator delta/direction badges** — "Inflation up from 45 last month." Requires pipeline schema extension.
-- [ ] **Historical hawk score chart** — line chart of composite score over time. Requires archiving status.json snapshots (not currently stored — only current snapshot exists).
-- [ ] **Notification alerts** — "Email me when score crosses 70." Requires backend infrastructure beyond GitHub Pages scope.
+- [ ] Snapshot archiving: pipeline writes current gauge values + hawk score to `data/hawk_score_history.csv` each weekly run
+- [ ] `previous_value` field added to each gauge in status.json (current vs prior weekly snapshot)
+- [ ] `previous_hawk_score` field added to `overall` block in status.json
+- [ ] Delta badge component on indicator cards (▲/▼/— + magnitude)
+- [ ] Hawk score delta on hero section (e.g. "−3.2 since last week")
+
+**Why second:** Pipeline changes need their own test coverage. Once archiving runs for one week, delta values populate immediately.
+
+### Phase 3: Historical Chart + Narrative
+
+- [ ] Historical hawk score chart (Plotly.js line chart reading `hawk_score_history.csv` or embedded in status.json)
+- [ ] "What changed this week" auto-generated summary (template-based Python in engine.py, output as `change_summary[]` in status.json)
+- [ ] Newsletter signup form embedded in dashboard footer/hero
+- [ ] Buttondown integration: pipeline sends weekly digest email post-run via GitHub Actions
+
+### Phase 4: Monetization Foundation (Future Consideration, v5.x+)
+
+- [ ] Affiliate CTA section (single disclosed "find a broker" link, no product table or ranking)
+- [ ] Newsletter affiliate CTA in email footer
 
 ---
 
@@ -139,55 +147,141 @@ Minimum needed to deliver the three milestone goals: hero redesign, verdict expl
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Verdict label as hero (large, coloured, prominent) | HIGH | LOW | P1 |
-| Verdict explanation section (what's driving the score) | HIGH | MEDIUM | P1 |
-| Hero card zone-coloured accent border | HIGH | LOW | P1 |
-| Data freshness inside hero zone | MEDIUM | LOW | P1 |
-| Scale explainer adjacent to verdict | MEDIUM | LOW | P1 |
-| Gauge entrance animation (sweep from 0) | MEDIUM | MEDIUM | P2 |
-| Mobile hero height tuning | LOW | LOW | P2 |
-| Indicator direction delta badges | HIGH | HIGH (pipeline required) | P3 |
-| Historical hawk score chart | MEDIUM | HIGH (data model change) | P3 |
+| OG meta tags | HIGH | LOW | P1 |
+| Share button | HIGH | LOW | P1 |
+| Sparklines on indicator cards | HIGH | MEDIUM | P1 |
+| Delta badges on indicator cards | HIGH | MEDIUM (pipeline dep) | P1 |
+| Historical hawk score chart | HIGH | HIGH (archive dep + wait time) | P2 |
+| "What changed" narrative summary | MEDIUM | MEDIUM | P2 |
+| Newsletter signup + weekly digest | MEDIUM | HIGH | P2 |
+| Affiliate CTA | LOW | LOW (once audience exists) | P3 |
 
 **Priority key:**
-- P1: Ships with v4.0 — core milestone deliverables
-- P2: Add after v4.0 verification, within same milestone if time allows
-- P3: Future milestone — requires backend or data model work
+- P1: Must have for v5.0 launch — core milestone deliverables
+- P2: Should have, add once Phase 2 pipeline layer is complete
+- P3: Nice to have, defer until newsletter audience established
 
 ---
 
 ## Competitor Feature Analysis
 
-| Feature | CNN Fear & Greed | MacroMicro Hawk-Dove Index | Our Approach (v4.0) |
-|---------|-----------------|---------------------------|---------------------|
-| Composite score 0-100 | Yes — large semicircle dial | Yes — line chart | Plotly gauge (exists) |
-| Verdict label prominent | Yes — "FEAR" large, coloured, dominant above dial | Yes — zone label prominent | Promoted to hero centrepiece (new) |
-| Data freshness near score | Yes — "as of yesterday" | Yes — date label near chart | Move `#data-freshness` into hero card (new) |
-| Individual indicator breakdown | Yes — 7 sub-meters below dial | Yes — multiple indicator lines | Exists: 7 bullet gauge cards |
-| "What's driving" narrative | No — shows raw sub-scores only | No — shows raw time series | DIFFERENTIATOR: verdict explanation section (new) |
-| Plain English per-indicator copy | No — uses financial jargon | No | Exists: "why it matters" text per card |
-| Entrance animation | No — static on load | No | To add (P2) |
-| Dark theme | No (light) | Partial | Exists — maintained |
-| Zone-coloured card accent | No | No | New: hero card border (new) |
-| Mortgage impact calculator | No | No | Exists |
+Research method: Direct page inspection of Finder, Canstar (which absorbed RateCity via 301 redirect), Mozo, Craggle, ASX RBA Rate Tracker. Confidence: MEDIUM (CSS-heavy pages limit full feature visibility).
+
+| Feature | Finder | Canstar/RateCity | Mozo | Craggle | ASX Rate Tracker | Our v5.0 Approach |
+|---------|--------|------------------|------|---------|-----------------|-------------------|
+| Composite hawk/dove score | Not present | Not present | Not present | Not present | Market probability % only | **Unique: multi-indicator composite 0-100** |
+| Delta / change indicators | Cash rate only (basis points) | Not visible | Not visible | Table shows rate changes in basis points | Daily change in probability | Multi-indicator deltas per gauge card |
+| Sparklines / micro-charts | Financial graph element confirmed (CSS) | Not visible | Not visible | Flourish chart (full-page, not inline) | Line chart (market-derived only) | In-card micro sparklines (12 quarterly points) |
+| Social sharing | Share modal confirmed (Facebook, Twitter, WhatsApp, email) | Social icons footer only | Not visible | Not visible | Not visible | `navigator.share()` + clipboard (no SDK) |
+| Newsletter signup | Email signup form confirmed | Present (Canstar brand) | Mozo Money Moves (weekly editorial) | Not visible | Not visible | Data-only digest, no editorial |
+| OG meta tags | Confirmed (Optimizely tracking) | Present | Present | Not confirmed | Present | Static tags in `<head>` |
+| Affiliate/monetization | Banner ads + sponsored product placement | Sponsored tables + star ratings | Sponsored product tables | Minimal visible | Not applicable | Single disclosed "find a broker" CTA |
+| "What changed" narrative | Manual editorial per RBA decision | Manual editorial articles | Live blog on decision days | Manual article | Not applicable | **Auto-generated from status.json diff — no editorial** |
+| Historical composite chart | Not present | Not present | Not present | 15-year raw rate chart | Short-term market curve | **Hawk score trajectory — unique: composite not raw rate** |
+| Mortgage calculator | Present | Present | Present | Not visible | Not applicable | Already shipped v4.0 |
+
+**Key insight:** No competitor offers (a) a composite pressure score from multiple economic indicators, (b) auto-generated factual narrative summaries, or (c) a weekly data-driven digest with zero editorial overhead. These three together are the genuine differentiating position.
+
+---
+
+## ASIC Compliance Constraints on Monetization Features
+
+**Source:** ASIC INFO 269 (Discussing financial products online), RG 234 (Advertising), RG 244 (Advice obligations). Confidence: HIGH (direct ASIC source reading).
+
+### Permitted Without an AFS License
+
+- Display objective economic data and gauge values ("Wages grew 5.45% YoY — above the 10-year average")
+- Auto-generate factual narrative summaries: "This week: Inflation moved from 4.1% to 3.76% YoY"
+- Include a single "find a mortgage broker" link with clear adjacent disclosure
+- Newsletter with factual weekly data updates — no recommendations about what subscribers should do
+- Share button — sharing a URL is not financial advice
+
+### Not Permitted Without an AFS License
+
+- Recommend specific mortgage products or lenders (constitutes personal financial advice)
+- State or imply that a user "should" refinance based on gauge readings
+- Receive per-click affiliate payments without adequate disclosure — risks triggering "arranging" obligations
+- Rank or score mortgage products by suitability for readers
+
+### Affiliate Disclosure Pattern
+
+Per RG 234 and INFO 269: adjacent disclosure is required near any commercial CTA. Industry pattern confirmed from Finder/Canstar inspection: "Sponsored" or "We may receive a referral fee" labels adjacent to commercial links. Apply this pattern to any affiliate CTA.
+
+**Safe framing example:**
+> "Thinking about your mortgage? [Find a broker →]"
+> *Referral fee disclosure: We may receive a fee if you contact a broker through this link. This is not financial advice.*
+
+---
+
+## Implementation Notes by Feature
+
+### Sparklines
+- **Library:** `@fnando/sparkline` — CDN URL: `https://cdn.jsdelivr.net/npm/@fnando/sparkline@latest/dist/sparkline.js` — zero deps, SVG output, CDN-loadable without build system, actively maintained (546 GitHub stars, 362 npm dependents)
+- **Data source:** `status.json gauges[indicator].history` — already 12 quarterly points for 6 of 7 indicators
+- **Constraint:** `business_confidence.history` length = 1 — show "Building history..." placeholder text
+- **Colour:** SVG `stroke` attribute set to `getZoneColor(gauge.value)` (existing function) — NOT Tailwind classes
+- **Dimensions:** ~40px height, full card width, no axes, no labels — inline trend signal only
+- **Usage pattern:** `sparkline(svgElement, historyArray, {stroke: zoneHex, strokeWidth: 1.5})`
+
+### Delta Badges
+- **Pipeline dependency:** Add `previous_value` to each gauge in engine.py by comparing current normalized value to last saved row in `hawk_score_history.csv`
+- **Do NOT use `history[-2]` as proxy** — quarterly data points do not represent weekly change; misleads users
+- **Badge visual:** ▲/▼/— icon + magnitude in gauge units (e.g. "+5.2 pts"), zone colour on icon
+- **Edge cases:** `business_confidence` (1 history point) → show "—"; new indicators with no prior snapshot → show "—"
+- **ASIC framing:** "Score changed +5.2 points since last week" — factual, not advisory
+
+### OG Meta Tags
+- **Required:** `og:title`, `og:description`, `og:image`, `og:url`, `og:type: website`
+- **Twitter Card:** `twitter:card: summary_large_image`, `twitter:title`, `twitter:description`, `twitter:image`
+- **Static image:** 1200x630px PNG in `public/og-image.png` — simple branded card (no dynamic generation)
+- **Title:** "RBA Hawk-O-Meter — Rate Pressure at a Glance" (≤60 chars)
+- **Description:** "7 economic indicators. One weekly score. No opinion." (~52 chars — Twitter truncates at ~70)
+- **Netlify note:** Tags go in `<head>` of `public/index.html` — static HTML, no server-side rendering
+
+### Share Button
+- **Implementation:** `if (navigator.share) { navigator.share({title, text, url}) } else { navigator.clipboard.writeText(url).then(() => showToast('Link copied!')) }`
+- **Text payload:** "RBA Hawk-O-Meter: Score {hawkScore}/100 — {zone_label}. See what's driving rates: {url}"
+- **Placement:** Hero section, near hawk score — primary sharing trigger location
+- **Transient activation required:** Must be called directly from a click handler (Web Share API requirement)
+- **No SDK, no third-party scripts:** Zero external dependencies
+
+### Historical Hawk Score Chart
+- **Library:** Plotly.js (already a dependency) — line chart, `paper_bgcolor: 'transparent'`
+- **Data source:** New `data/hawk_score_history.csv` written by pipeline; OR embedded as `overall.history` array in status.json
+- **Blocking note:** Meaningful only after 4+ weeks of archiving. Ship chart with "Building history — check back next week" placeholder until 4+ data points exist
+- **Visual:** Single line, zone background bands (cold/cool/neutral/warm/hot), x-axis = weekly ISO dates, y-axis = 0-100
+- **Mobile:** Use `<details>/<summary>` collapsible wrapper (pattern already used for rate chart in v3) for below-fold mobile
+
+### Newsletter Digest
+- **Platform:** Buttondown — REST API, developer-friendly, free ≤100 subscribers, $29/mo for API access (required for automated sends). Preferred over Mailchimp (500 sub free tier, complex API) and ConvertKit (free to 10k subscribers but API automation requires paid plan).
+- **Automation:** GitHub Actions post-pipeline step calls Buttondown API to POST email after weekly run
+- **Content:** Auto-assembled from status.json: overall score, zone label, top movers (gauges with largest delta), `change_summary` narrative sentences
+- **Signup form:** Simple email input + submit → `fetch('https://api.buttondown.email/v1/subscribers', {method: 'POST', body: {email}})` with Buttondown API key
+- **ASIC email footer:** Factual-only disclaimer, affiliate disclosure if applicable, unsubscribe link (Buttondown auto-inserts unsubscribe)
 
 ---
 
 ## Sources
 
-- CNN Fear & Greed Index — reference for verdict-as-hero design pattern: [https://www.cnn.com/markets/fear-and-greed](https://www.cnn.com/markets/fear-and-greed)
-- UXPin dashboard design principles — hero placement, progressive disclosure, indicator cards: [https://www.uxpin.com/studio/blog/dashboard-design-principles/](https://www.uxpin.com/studio/blog/dashboard-design-principles/)
-- Plotly.js indicator gauge animation limitations — only scatter traces animate; gauge is instantaneous: [https://community.plotly.com/t/animations-on-gauge-needle/5804](https://community.plotly.com/t/animations-on-gauge-needle/5804)
-- Plotly.js animations reference — `requestAnimationFrame` workaround documented: [https://plotly.com/javascript/animations/](https://plotly.com/javascript/animations/)
-- Typography hierarchy for data dashboards — 24-32px hero, 3-4 levels max, 4.5:1 contrast: [https://datafloq.com/typography-basics-for-data-dashboards/](https://datafloq.com/typography-basics-for-data-dashboards/)
-- Dark mode UI best practices 2025 — charcoal over pure black, off-white body text, 1.5x line height: [https://www.graphiceagle.com/dark-mode-ui/](https://www.graphiceagle.com/dark-mode-ui/)
-- Dashboard design DataCamp — inverted pyramid, top-left critical placement, minimal hierarchy: [https://www.datacamp.com/tutorial/dashboard-design-tutorial](https://www.datacamp.com/tutorial/dashboard-design-tutorial)
-- Fintech KPI card patterns — big number + short label + delta: [https://uisea.net/fintech-dashboard-ui-kpis-card-patterns-tables-figma-guide/](https://uisea.net/fintech-dashboard-ui-kpis-card-patterns-tables-figma-guide/)
-- MNI FOMC Hawk-Dove Spectrum — indicator contribution display reference: [https://www.mnimarkets.com/mni-fomc-hawk-dove-spectrum](https://www.mnimarkets.com/mni-fomc-hawk-dove-spectrum)
-- Tailwind gradient/glow border patterns: [https://tailwindflex.com/@prashant/glowing-gradient-border](https://tailwindflex.com/@prashant/glowing-gradient-border)
-- Fintech dashboard UX trends 2025: [https://www.designstudiouiux.com/blog/fintech-ux-design-trends/](https://www.designstudiouiux.com/blog/fintech-ux-design-trends/)
-- Existing codebase: `/Users/annon/projects/rba-hawko-meter/public/` — confirmed all utility functions and data shapes (HIGH confidence, direct analysis)
+- Canstar Rate Tracker (direct inspection): https://www.canstar.com.au/ratetracker/
+- Finder RBA Cash Rate (direct inspection): https://www.finder.com.au/rba-cash-rate
+- Craggle RBA Rate Tracker (direct inspection): https://www.craggle.com.au/blog/rba-cash-rate
+- ASX RBA Rate Tracker: https://www.asx.com.au/markets/trade-our-derivatives-market/futures-market/rba-rate-tracker
+- ASIC INFO 269 — Discussing financial products online: https://www.asic.gov.au/regulatory-resources/financial-services/giving-financial-product-advice/discussing-financial-products-and-services-online/
+- ASIC RG 234 — Advertising financial products: https://download.asic.gov.au/media/rkzj5nxb/rg234-published-15-november-2012-20211008.pdf
+- @fnando/sparkline library: https://github.com/fnando/sparkline
+- MDN Web Share API: https://developer.mozilla.org/en-US/docs/Web/API/Navigator/share
+- Open Graph protocol: https://ogp.me/
+- OG Tags complete guide (2026): https://share-preview.com/blog/og-tags-complete-guide.html
+- Buttondown pricing: https://buttondown.com/pricing
+- Eleken Fintech Design Guide 2026: https://www.eleken.co/blog-posts/modern-fintech-design-guide
+- FactSet Sparkline usage: https://insight.factset.com/sparkline-charts-enhance-trend-analysis-in-factset-fundamentals-financial-reports
+- Australian mortgage affiliate programs: https://www.authorityhacker.com/mortgage-affiliate-programs/
+- Mates Rates referral fee benchmarks: https://matesratesmortgages.com.au/ambassador-program/
+- Canstar mortgage broker fee disclosure: https://www.canstar.com.au/home-loans/mortgage-brokers-fees/
+- Existing codebase (direct analysis — HIGH confidence): `/Users/annon/projects/rba-hawko-meter/public/data/status.json`, `/Users/annon/projects/rba-hawko-meter/pipeline/normalize/engine.py`
 
 ---
-*Feature research for: RBA Hawk-O-Meter v4.0 Dashboard Visual Overhaul*
-*Researched: 2026-02-25*
+
+*Feature research for: RBA Hawk-O-Meter v5.0 Direction & Momentum milestone*
+*Researched: 2026-02-26*

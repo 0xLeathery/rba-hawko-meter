@@ -1,176 +1,291 @@
 # Pitfalls Research
 
-**Domain:** Dashboard Visual Overhaul — Adding hero redesign and verdict explanation to existing vanilla JS / Tailwind CDN / Plotly.js dashboard
-**Researched:** 2026-02-25
-**Confidence:** HIGH (direct codebase analysis + verified against Plotly.js issues, Tailwind CDN docs, ASIC RG 244, Playwright docs)
+**Domain:** Direction & Momentum tracking, social sharing, and newsletter monetization on existing vanilla JS / Plotly.js / Tailwind CDN economic dashboard
+**Researched:** 2026-02-26
+**Confidence:** HIGH (official ASIC sources, Plotly community confirmed patterns, Australian Spam Act 2003 official text, verified against existing codebase)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Plotly Gauge Renders at Zero Width After Hero DOM Restructure
+### Pitfall 1: Git Repository Bloat from Snapshot Archiving
 
 **What goes wrong:**
-The hero section currently places `#hero-gauge-plot` inside a `lg:col-span-3` grid column. If the redesign wraps the gauge in a new flex or grid container — or inserts new sibling elements that change the parent's computed width before Plotly renders — the gauge initializes with zero or minimal width and never recovers. The Plotly SVG renders at 0px width and the gauge appears as a thin sliver or disappears entirely. `responsive: true` in the config only triggers re-layout on **window resize**, not on container-size changes caused by DOM mutation.
+Committing `status.json` snapshots to the repository on every pipeline run (weekly + daily ASX) compounds indefinitely. Git stores full snapshots of binary-similar JSON files rather than meaningful diffs — even small numeric changes cause near-full-file re-storage. After 12 months of weekly pipeline runs plus daily ASX commits, the repository grows by hundreds of megabytes. GitHub free tier has a 1GB repository soft limit and a 5GB hard limit; Netlify re-clones on every deploy, meaning larger repos slow down deploy times.
+
+The current repository already auto-commits `data/abs_cpi.csv`, `data/asx_futures.csv`, and `public/data/status.json` on every pipeline run. Adding a `snapshots/` directory of JSON files with a weekly cadence will accelerate this growth substantially.
 
 **Why it happens:**
-Plotly measures the container's `offsetWidth` at the moment `Plotly.newPlot()` is called. If the parent element's layout is still settling (e.g., flexbox is redistributing space, a sibling above-the-fold element has been inserted but not painted), the container may report a smaller or zero width. `autosize: true` does not fix this — it only subscribes to the `window.resize` event. The existing code in `gauge-init.js` already calls `Plotly.relayout('hero-gauge-plot', { autosize: true })` in the resize handler, but this handler fires on window resize only, not on programmatic layout changes.
+The simplest implementation of "archive the previous status.json" is to copy it into a `snapshots/YYYY-MM-DD.json` folder on each pipeline run and commit everything. This works for many months before becoming painful, so no one fixes it until the repo is already bloated. Git LFS or alternative storage is perceived as over-engineering for "just a few JSON files."
 
 **How to avoid:**
-- Never rely on implicit paint timing for gauge initialization. Call `Plotly.newPlot()` inside a `requestAnimationFrame()` callback, or add a zero-delay `setTimeout()` after inserting new above-the-fold elements.
-- After adding the new hero section HTML above the gauge, call `Plotly.Plots.resize('hero-gauge-plot')` explicitly once the new elements have painted.
-- If adding a verdict summary block **above** the gauge container in the DOM, measure impact on grid column layout before calling `createHeroGauge()`.
-- Set `min-height: 280px` on `#hero-gauge-plot` (already present via inline style) — do not remove or reduce this value.
+- Do **not** commit snapshot files to the repository. Store snapshots outside Git.
+- Option A (recommended for zero-cost): Write snapshots to a single append-only `data/snapshots.jsonl` (newline-delimited JSON) file. One line per weekly run. Git diffs JSONL files efficiently since only the new line is added. This keeps the full history in a single tracked file.
+- Option B: Store snapshots as a GitHub Actions artifact (90-day retention) or in a free R2/S3-compatible store — but this adds external dependency.
+- Option C: Write `previous_value` directly into `status.json` by reading the current values before overwriting — no separate archive file needed at all. This is the minimal approach for DELT-01 (delta badges only).
+- **Define a retention policy upfront:** If committing snapshots at all, enforce a maximum count (e.g., 52 weeks = 52 files). Add a pipeline step that deletes files older than the retention window before committing.
 
 **Warning signs:**
-- Hero gauge container is visible but gauge SVG is present with `width="0"`.
-- Gauge renders correctly on mobile (narrow viewport where no reflow occurs) but is broken on desktop where the new hero grid applies.
-- Playwright test "Hero gauge renders with hawk score" times out waiting for `svg.main-svg` instead of failing cleanly.
+- `git count-objects -vH` shows pack-size above 200MB.
+- Netlify deploy times increase from ~30s to >2 minutes.
+- `git clone` of the repository takes more than 60 seconds on a standard connection.
+- `data/snapshots/` directory contains more than 30 JSON files.
 
 **Phase to address:**
-Phase 1 (hero redesign). Test gauge rendering at 375px, 768px, 1024px, and 1440px immediately after adding any new above-the-fold HTML. Do not leave this for the visual polish phase.
+Phase 1 (snapshot archiving / pipeline temporal layer). The retention strategy and storage mechanism must be decided before writing a single snapshot. Retrofitting this after 20+ snapshots have been committed requires `git filter-repo`, which rewrites history and breaks all forks/clones.
 
 ---
 
-### Pitfall 2: Tailwind CDN Drops Dynamically Constructed Classes
+### Pitfall 2: `history` Array Has No Timestamps — Sparklines Are Misleading
 
 **What goes wrong:**
-The existing codebase uses Tailwind utilities correctly — all class names are statically present as complete strings. But when adding verdict explanation cards or score-driven color highlighting to the new hero section, developers construct class names via string concatenation in JS, e.g.:
+The existing `status.json` `history` arrays are gauge-score sequences (e.g., `[100.0, 100.0, 87.2, 39.0, 10.3, 0.0, 26.4, 30.2]` for inflation). These 12 values are not equally spaced in time — quarterly ABS data, monthly Cotality HVI, weekly ASX futures, and monthly NAB surveys all update at different cadences. Rendering all `history` arrays as sparklines of the same visual width implies equal time intervals between points, which is false. A sparkline of 12 quarterly CPI values looks the same width as 12 monthly housing values, but represents 3 years vs. 1 year.
 
-```javascript
-// WRONG — Tailwind CDN cannot detect this at runtime
-card.className = 'border-' + zoneColor + '-500';
-
-// WRONG — same problem with template literals
-card.className = `bg-${direction === 'up' ? 'red' : 'blue'}-400`;
-```
-
-The Tailwind CDN scans the document source at runtime to generate CSS. It cannot execute JS expressions to discover what class names will eventually appear. Concatenated class names are never generated, so the styles silently fail to apply.
+Additionally, the history arrays have no timestamps attached. The frontend cannot know what time period each point covers, so it cannot label axes, show tooltips with dates, or warn users about gaps.
 
 **Why it happens:**
-Tailwind's Play CDN works by scanning for class name tokens at load time. String concatenation produces class names that are not present as literal tokens, so Tailwind never generates the corresponding CSS rules. The component renders, the class is applied, but there is no CSS to match it. This is identical to the build-time purging problem in production Tailwind, but it affects the CDN version at runtime.
+The history was designed for the rolling z-score window (last N observations), not for display. It captures "gauge scores over past observations" rather than "gauge scores over a time axis." This is correct for the pipeline's mathematical purpose but wrong for user-facing sparklines.
 
 **How to avoid:**
-Use a complete-class lookup object for any JS-driven class assignment:
-
-```javascript
-// CORRECT — all class names are literal strings Tailwind can detect
-var ZONE_BORDER_CLASSES = {
-  cold:    'border-blue-800',
-  cool:    'border-blue-400',
-  neutral: 'border-gray-500',
-  warm:    'border-red-400',
-  hot:     'border-red-600'
-};
-card.className = 'border ' + ZONE_BORDER_CLASSES[zone];
-```
-
-This pattern is already used indirectly via `GaugesModule.getZoneColor()` (which returns hex values applied via `style.color`, bypassing Tailwind entirely). Follow the same pattern for any new verdict card colour logic: use `element.style.backgroundColor = hexValue` for dynamic colours, not Tailwind utility classes.
+- Add timestamped history to `status.json` alongside (not replacing) the existing unlabelled arrays: `"history_dated": [{"date": "2024-10-01", "value": 26.4}, ...]`.
+- Set a fixed display window for sparklines (e.g., last 12 observations) and document this as "approximately N years" not a specific time axis.
+- Render sparklines without x-axis labels or ticks — sparklines are trend indicators, not charts. A line going up or down is the only signal.
+- Do **not** mix indicators on the same sparkline scale. Each indicator's sparkline must auto-scale to its own min/max, but communicate clearly that scales differ between cards.
+- Use a lightweight SVG sparkline (e.g., `@fnando/sparkline` or a 30-line inline SVG path generator) rather than Plotly for sparklines, to avoid the performance trap described in Pitfall 3.
 
 **Warning signs:**
-- New verdict card appears with correct layout but incorrect (missing) background or border colour.
-- Colour applies in the browser devtools when you manually add the class, but not when JS applies it.
-- Playwright test for verdict colour passes because it checks text content, not visual colour.
+- A developer draws sparklines using the raw `history` array and the line for housing (monthly) looks "flatter" than inflation (quarterly) just because of point density differences.
+- Tooltip dates are missing or show "point 7 of 12" rather than an actual date.
+- Users interpret the sparkline x-axis as uniform calendar time and draw incorrect conclusions about rate of change.
 
 **Phase to address:**
-Phase 2 (verdict explanation section). Audit every `className` assignment in new code before committing. For score-driven colours, prefer `element.style` with hex values (following `GaugesModule.getZoneColor()` pattern) over Tailwind utility classes.
+Phase 1 (snapshot archiving / pipeline temporal layer). The pipeline must emit `history_dated` with timestamps before the frontend can render meaningful sparklines. If `history_dated` is deferred, sparklines must be deferred too — shipping unlabelled sparklines first creates a misleading user experience that is harder to walk back than to delay.
 
 ---
 
-### Pitfall 3: Verdict Explanation Text Crosses Into General Advice Territory
+### Pitfall 3: Using Plotly.js for Sparklines Triggers a Multi-Chart Performance Collapse
 
 **What goes wrong:**
-The v4.0 verdict explanation section will show "which indicators are driving the score up/down." Developers write copy that sounds intuitive but crosses from factual information into general advice under ASIC RG 244. The violation is subtle — it is not the data itself but the framing that creates the problem.
-
-Examples of language that crosses the line:
-
-- "Inflation is high. **You should consider locking in a fixed rate now.**" — personal financial advice
-- "The RBA is **likely to raise rates at the next meeting.**" — forward-looking prediction presented as probable fact
-- "This indicator suggests **rates will rise** in the next quarter." — prediction, not factual summary
-- "**Now is a good time** to speak to a mortgage broker." — recommendation
-
-The existing `getPlainVerdict()` function is compliant: "Interest rates may be more likely to rise than fall" uses hedged language ("may be more likely"). The risk emerges when adding explanatory bullet points per indicator, where authors instinctively write more direct copy.
+The dashboard currently renders 1 hero gauge + 7 metric gauges = 8 Plotly charts. Adding 7 sparklines (one per indicator card) would bring the total to 15+ Plotly instances. Plotly.js is an SVG-based library by default — documented community reports show page render becomes noticeably slow with 10+ Plotly charts in DOM, causing Firefox to freeze and Chrome to show multi-second blanks. Additionally, WebGL mode (which is faster) is capped at a maximum of 8 charts simultaneously.
 
 **Why it happens:**
-Explaining *why* a score is high naturally pulls language toward prediction and recommendation. Plain English clarity and compliance neutrality are in direct tension. The more readable an explanation, the more likely it sounds like advice.
+Reusing the existing Plotly dependency is the path of least resistance. It avoids adding a new CDN dependency and uses a library the team already understands. But Plotly is designed for one or two complex charts per page, not for sparkline-style repetition.
 
 **How to avoid:**
-Strict framing rules for all new verdict copy:
-- State what the indicator is doing, not what it means for the user's decisions.
-- Use "the data shows" / "this indicator is" / "historically, this has been associated with" — not "therefore you should" or "this means rates will."
-- Never predict a specific RBA outcome. "The data is consistent with pressure to raise rates" is compliant. "The RBA will raise rates" is not.
-- Mirror the existing `getWhyItMatters()` pattern: "When prices rise too fast, the RBA **tends to** raise interest rates to slow things down" — note the use of "tends to," which expresses a historical pattern, not a forecast.
-- Every new explanatory paragraph must pass the test: "Would a person reading this feel they have received personal advice about their financial decisions?" If yes, rewrite.
+- Use inline SVG path generation for sparklines — zero additional CDN dependencies, ~30 lines of vanilla JS. The path is: compute min/max of the history array, map each value to an (x, y) coordinate in a fixed viewBox, render an SVG `<polyline>` or `<path>`.
+- Alternatively, load a purpose-built micro-library via CDN (`@fnando/sparkline`: 1.2KB gzipped, zero dependencies) using the same CDN-with-fallback pattern already established for CountUp.js.
+- The existing Plotly charts must keep their double-`requestAnimationFrame` stagger pattern. Sparklines must initialize completely separately and must not interfere with Plotly's render cycle.
+- If Plotly must be used for sparklines despite this recommendation: use `Plotly.newPlot()` with `staticPlot: true` and `displayModeBar: false` to reduce overhead, and initialize only after all gauge charts have painted.
 
 **Warning signs:**
-- Any sentence containing "you should," "you need to," "it is time to," "now is a good time."
-- Any forward prediction without hedging: "rates will," "the RBA will," "this means rates are going to."
-- Copy that is specific to a user's personal situation ("if you have a variable rate mortgage...").
-- A non-lawyer reviewer describes the text as "advice."
+- Adding sparkline Plotly instances causes the hero gauge to render at zero width (Plotly layout pass is interrupted by competing render calls).
+- Page LCP (Largest Contentful Paint) increases from ~800ms to >2000ms after sparklines are added.
+- Mobile devices (low-power CPUs) show visible jank or blank cards for 3+ seconds.
+- Firefox DevTools shows "Unresponsive script" warning during initial render.
 
 **Phase to address:**
-Phase 2 (verdict explanation section). Review all new copy against this checklist before each commit. If uncertain, use the most conservative hedging available.
+Phase 2 (sparklines / delta badges on indicator cards). Use the inline SVG approach — decide this before any code is written. Retrofitting away from Plotly for sparklines after implementation is a complete rewrite of the sparkline rendering layer.
 
 ---
 
-### Pitfall 4: Playwright Tests Break on nth-Index Selectors After Card Count Changes
+### Pitfall 4: Delta Badges Show Noisy Week-to-Week Changes That Mislead Users
 
 **What goes wrong:**
-`dashboard.spec.js` and `phase6-ux.spec.js` use `.nth(0)`, `.nth(1)`, `.nth(5)`, etc. to address specific metric cards:
+Delta badges display the change between the current gauge score and the previous one. For indicators with high data volatility or low update frequency, this creates noise that misrepresents the actual trend:
 
-```javascript
-// This breaks if a new card is inserted above inflation in the hero area,
-// or if the verdict explanation renders into the metric-gauges-grid
-const inflationCard = allCards.nth(0);   // Assumes inflation is always first
-const wagesCard = allCards.nth(1);       // Assumes wages is always second
-const buildingCard = allCards.nth(5);    // Assumes building_approvals is 6th
-```
-
-If the hero redesign adds any new `bg-finance-gray` element into or near `#metric-gauges-grid`, or if the verdict explanation section uses the same CSS class structure, these nth selectors will point to the wrong cards and tests will either fail with wrong assertions or silently pass against unexpected elements.
+- ASX futures update daily and can swing 5-10 gauge points in a day on market sentiment, even if underlying economic fundamentals haven't changed. A badge showing "↑ 8 points" on Monday and "↓ 6 points" on Thursday looks chaotic.
+- Gauge scores for indicators with low confidence (e.g., NAB capacity utilisation — monthly, often with 45+ day staleness) may show large apparent changes when a new data point arrives after a staleness gap, not because of a genuine trend shift.
+- The history arrays are gauge scores (0-100), which are non-linear transformations of raw data. A 5-point change at score 50 (neutral zone) is meaningless; the same change near 0 or 100 is significant. Treating all deltas as equally meaningful is misleading.
 
 **Why it happens:**
-The tests rely on positional ordering (nth) which is structurally brittle. Any insertion of a new element that matches the `[class*="bg-finance-gray"]` selector before the expected card invalidates all subsequent nth indices. The existing tests acknowledge this risk in comments ("index 5 — housing now active at index 3") — the indices have already shifted once during development.
+The simplest delta implementation is `current_value - previous_value`. This is always computable once `previous_value` exists in status.json. The problem only becomes visible to users after the feature ships.
 
 **How to avoid:**
-- Do not add any new `bg-finance-gray` elements into `#metric-gauges-grid` except for indicator cards rendered by `renderMetricCard()`.
-- The verdict explanation section must use a distinct container ID (`#verdict-explanation` or similar) that is **outside** the `#metric-gauges-grid` element.
-- Before any DOM change that affects the grid, run the full Playwright suite to establish a passing baseline.
-- When the tests inevitably need updating: replace nth selectors for named indicators with `.filter({ hasText: 'Inflation' })` — which the housing and business conditions tests already use correctly.
-- Do not add `data-testid` attributes to existing elements (changes are intentionally minimal), but do add `data-testid` to any new hero or verdict elements introduced in v4.0.
+- Threshold-gate delta display: only show a delta badge when `|current - previous| >= 5` gauge points, to suppress noise from minor fluctuations.
+- Apply different badge logic per indicator: ASX futures badge should show "no change" unless the weekly pipeline confirms a persistent shift, not daily micro-movements.
+- Consider showing direction (up/down arrow) without a numeric value. "This indicator moved up this week" is informative. "This indicator moved up 3.2 points" implies false precision on a derived metric.
+- Add a tooltip explaining: "Change since last weekly data update" rather than ambiguously implying "change since last week."
+- For LOW-confidence indicators, suppress delta badges entirely or show them with a muted style.
+- Never show delta on the hawk score itself without explaining that the score is a weighted composite — a 3-point score change could reflect a single large indicator move, not broad consensus.
 
 **Warning signs:**
-- Playwright test 2 ("Individual metric cards render with interpretations") passes but `allCards.nth(0)` contains text other than "Prices up."
-- Playwright test 18 ("Weight badges show importance labels") fails because `allCards.nth(5)` is no longer the building approvals card.
-- Adding a new hero summary card causes a cascade of test failures across dashboard.spec.js and phase6-ux.spec.js.
+- ASX futures delta badge changes daily (or multiple times per day).
+- A user feedback or social comment asks "why is the indicator going up and down so much?" when macroeconomic data hasn't changed materially.
+- Delta badges for NAB capacity utilisation spike large on the first weekly run after new monthly data arrives, looking alarming even when the underlying trend is stable.
 
 **Phase to address:**
-Phase 1 (hero redesign). Run Playwright suite before and after every structural HTML change. Do not touch `#metric-gauges-grid` from the hero redesign phase — that is the verdict explanation section's concern.
+Phase 2 (delta badges / sparklines). Define the threshold-gating rules and per-indicator badge suppression logic as part of the feature specification, not as a follow-up refinement.
 
 ---
 
-### Pitfall 5: Mobile Above-the-Fold Congestion After Hero Redesign
+### Pitfall 5: Delta Badges Break the Indicator Card Mobile Layout
 
 **What goes wrong:**
-The current hero section at mobile (375px) already stacks: disclaimer banner → header → onboarding details → data freshness → hero gauge (280px min-height) → verdict container → jump link → scale explainer → ASX futures → cash rate. This vertical stack is already long. Adding a prominent verdict + hawk score "visual centrepiece" without reducing other elements will push the critical content (the verdict) below the fold on mobile, defeating the purpose of the redesign.
-
-The grid layout `grid-cols-1 lg:grid-cols-5` already collapses to full-width columns on mobile. Any new element inserted into the hero section adds to mobile height without a corresponding reduction elsewhere.
+The indicator cards at mobile (375px) already contain: gauge score, zone label, indicator name, weight badge, staleness badge, and interpretation text. Adding a delta badge and a sparkline to this layout causes one of: (a) the card grows vertically to 220-280px and 7 cards means 1,500-2,000px of scrolling just to see indicators, (b) text elements wrap to two lines and truncate, or (c) the sparkline is squeezed below a readable size (meaningful sparklines need at least 80px wide).
 
 **Why it happens:**
-Designers prototype at desktop dimensions where the 5-column grid spreads content horizontally. On mobile, every grid item stacks. The hero gauge alone is 280px. The onboarding `<details open>` element adds ~120px. Adding a verdict hero section that is visually prominent on desktop (e.g., large score + bold verdict text) adds another 100-200px on mobile. The page is too long before the user sees the indicators.
+Card layout is usually designed at desktop first, where there is horizontal space to absorb the new elements. Mobile is tested last and by then the architecture of the card is set.
 
 **How to avoid:**
-- Measure total above-the-fold height at 375px after each hero change. The verdict and score must be visible without scrolling on a 812px-tall mobile viewport (iPhone SE height).
-- Consider collapsing the onboarding `<details>` to `open` only on desktop, or moving it below the hero at mobile.
-- The hero redesign should **replace** the current verbose verdict container and scale explainer, not **add above** them.
-- Design constraint: on mobile, the entire hero (score + verdict + 1 sentence explanation) must fit in approximately 350-400px vertical space.
+- Design indicator card layout mobile-first for v5.0. Sketch the 375px card layout with all proposed elements before writing any code.
+- Establish a card height budget: target 160px maximum per card at 375px. If the budget is exceeded, something must be removed or collapsed.
+- Hide sparklines at mobile by default (CSS `hidden md:block`) if they cannot fit meaningfully. A sparkline squeezed to 40px wide communicates nothing.
+- Place the delta badge inline with the zone label or gauge score, not as a separate row. A small arrow icon (`↑` / `↓`) next to the score number adds context without extra vertical space.
+- Audit the existing card DOM structure in `interpretations.js` before adding new elements — understand what is currently rendered and where there is room.
 
 **Warning signs:**
-- Playwright viewport test at 375x812 requires scrolling to see the verdict.
-- The onboarding details element and the hero verdict area are both fully expanded on mobile, causing >600px of content before the first indicator.
-- Page LCP (Largest Contentful Paint) is the Plotly gauge SVG at >300px offset from the viewport on mobile.
+- At 375px viewport, indicator cards exceed 200px height.
+- Weight badge or staleness badge wraps to a second line inside the card header.
+- Playwright test at 375px shows card content overflowing its container (visible bottom border clipped).
+- Sparkline SVG renders at less than 60px wide.
 
 **Phase to address:**
-Phase 1 (hero redesign). Test at 375px after every above-the-fold HTML change, not just at desktop. Consider whether the onboarding `<details open>` default should change for mobile users.
+Phase 2 (delta badges / sparklines). Run Playwright at 375px after every card element addition — not just at end of phase.
+
+---
+
+### Pitfall 6: OG Meta Tags Are Ignored Because the Page Has No `og:image`
+
+**What goes wrong:**
+Adding `og:title`, `og:description`, and `og:url` to `index.html` is straightforward, but without `og:image`, major platforms (Facebook, Twitter/X, iMessage, WhatsApp, Slack) either refuse to show a preview card at all, or show a link with no visual — just text. In 2025, link previews without images get significantly lower click-through rates and are sometimes collapsed to a single-line link by the platform.
+
+Generating a dynamic OG image (showing the current hawk score and verdict) is valuable but adds complexity. Generating a static fallback image is easy but goes stale — a static OG image showing "Neutral — Score 50" becomes wrong when the score moves.
+
+**Why it happens:**
+Developers add the text OG tags first (easy) and defer the image (complex). The image requirement is only discovered when testing share previews on Facebook Debugger, by which time the architecture for image generation needs to be decided.
+
+**How to avoid:**
+- Decide the image strategy before implementing any OG tags:
+  - **Static fallback (easiest):** A pre-designed 1200x630px PNG branded image ("RBA Hawk-O-Meter — Check today's rate pressure") that is always the OG image regardless of current score. Stale but always correct for branding.
+  - **Pre-generated on pipeline run:** Python pipeline generates a new OG image (using Pillow/PIL) and commits it to `public/images/og.png` on each weekly run. Current score baked into the image. Suitable for this project's zero-cost constraint.
+  - **Dynamic via Netlify Edge Function:** Generates image at request time using Satori or similar. Adds runtime infrastructure dependency. Overkill for a static site.
+- For this project (zero-cost, static, weekly updates): the pipeline-generated static image is the right balance — it reflects the current score without adding runtime infrastructure.
+- Always use absolute URLs for `og:image`: `https://domain.com/images/og.png` not `/images/og.png`. Social crawlers reject relative URLs.
+
+**Warning signs:**
+- Facebook Sharing Debugger shows "og:image not found" or "image too small."
+- Twitter/X Card Validator shows a text-only preview without an image panel.
+- Slack unfurl shows just the URL with no card.
+- OG image URL is relative (`/images/og.png`) rather than absolute (`https://...`).
+
+**Phase to address:**
+Phase 3 (OG meta tags / share button). Decide the image strategy at the start of the phase — do not add `og:title`/`og:description` without also solving `og:image`.
+
+---
+
+### Pitfall 7: Social Platform OG Cache Serves Stale Previews After Score Changes
+
+**What goes wrong:**
+Social platforms (Facebook, Twitter/X, LinkedIn, Slack) aggressively cache OG metadata. Once a URL has been shared, the platform stores the preview indefinitely. When the hawk score changes from "Dovish" to "Hawkish" the following week, any reshare of the same URL will show the cached (stale) preview. Facebook in particular is documented to cache previews "indefinitely" until a manual re-scrape is triggered.
+
+For a dashboard whose value proposition is "current data," showing a week-old verdict in a social preview undermines trust.
+
+**Why it happens:**
+Developers test the OG tags once, see a correct preview, and ship. The caching problem only surfaces when the underlying data changes.
+
+**How to avoid:**
+- After each weekly pipeline run that updates status.json, trigger a Facebook cache-bust by hitting the [Facebook Sharing Debugger API](https://developers.facebook.com/tools/debug/) scrape endpoint via a GitHub Actions step. This forces a fresh crawl.
+- For Twitter/X: use their Card Validator similarly, though X's cache TTL is typically shorter (hours vs. days).
+- Add a `?v=YYYYMMDD` cache-buster query parameter to the `og:image` URL. Social crawlers treat different URLs as different resources: `og:image: https://domain.com/images/og.png?v=20260224` will bust the cached image on each weekly run.
+- Add `og:updated_time` meta tag with the pipeline's `generated_at` timestamp.
+- Accept that preview cache on already-shared URLs cannot be fully controlled — the best outcome is that new shares show current data.
+
+**Warning signs:**
+- Sharing the dashboard URL on Slack two weeks after a score change still shows the old verdict in the preview.
+- Facebook Sharing Debugger shows "scraped time" as more than 7 days ago.
+- `og:image` URL has no cache-busting parameter.
+
+**Phase to address:**
+Phase 3 (OG meta tags / share button). Bake the `?v=` query parameter strategy and Facebook scrape step into the implementation from day one.
+
+---
+
+### Pitfall 8: ASIC Compliance — Affiliate Links Constitute "Arranging" a Financial Product
+
+**What goes wrong:**
+Adding mortgage broker affiliate links to the dashboard (e.g., "Compare mortgage brokers here" with a referral link) likely constitutes "dealing by arranging" under the Corporations Act 2001, which requires an Australian Financial Services (AFS) licence or an Australian Credit Licence (ACL). This is not a grey area — ASIC's own published guidance explicitly states that "promoting a unique link to a trading platform where a payment is received... upon signing up" is "likely to be dealing by arranging."
+
+The risk extends beyond the affiliate link itself: if the dashboard copy anywhere connects data to a recommendation (even implicitly), it strengthens the case that the site is providing general financial advice rather than factual information.
+
+**Why it happens:**
+Affiliate link programs (Lendi, Aussie, Finspo, etc.) have low barriers to entry and are presented as "just adding a link." The compliance implications of receiving referral fees for connecting users to financial product providers are not made clear in affiliate program terms.
+
+**How to avoid:**
+- Do **not** integrate performance-based affiliate links (cost-per-lead, cost-per-signup, per-click payments linked to financial product conversions) without seeking legal advice on ACL/AFSL requirements.
+- The safest compliant structure is a "mere referral" that: (1) gives only the name of the broker and how to contact them, (2) does not make a recommendation ("use this broker"), and (3) discloses any referral benefit received.
+- A newsletter sponsorship model (e.g., "This week's newsletter is supported by [Broker]") is lower risk than per-conversion affiliate links because the payment is for content placement, not for arranging a financial transaction.
+- All monetization copy must pass the RG 244 factual information test: the dashboard provides data; any commercial relationship must be disclosed and must not influence the data presentation.
+- Include a visible, prominent disclosure on any page containing referral links: "We may receive a referral fee if you contact a broker through this link. This does not constitute financial advice."
+- Seek guidance from ASIC's INFO 265 ("Discussing financial products and services online") before shipping any affiliate arrangement.
+
+**Warning signs:**
+- The affiliate program pays per lead, per click, or per signup (conversion-based payments).
+- The dashboard copy frames the affiliate link as a recommendation ("Talk to an expert") rather than neutral disclosure ("Mortgage brokers operate in this space — find one here").
+- There is no disclosure of the commercial relationship anywhere on the page where the affiliate link appears.
+- The link appears inside or adjacent to the hawk score verdict, implying the verdict is a signal to act.
+
+**Phase to address:**
+Phase 4 (newsletter / monetization foundation). This phase should not ship affiliate links without legal review. The newsletter capture (email, consent management) is lower risk and can ship independently. Affiliate links should be a separate, gated decision.
+
+---
+
+### Pitfall 9: Australian Spam Act 2003 — Newsletter Compliance Mistakes
+
+**What goes wrong:**
+Sending marketing emails without complying with the Australian Spam Act 2003 and Spam Regulations 2021 carries fines up to $220,000 per breach (single breach) and up to $2.1 million for subsequent breaches, enforced by ACMA (Australian Communications and Media Authority).
+
+Common compliance failures:
+- No clearly visible unsubscribe link in every email.
+- Failing to honor unsubscribe requests within 5 business days.
+- Sending to email addresses where explicit consent was not collected (implied consent rules in the Spam Act are narrow and generally require a pre-existing business relationship).
+- Unclear sender identification (must clearly state who sent the email and their contact details).
+- Using a third-party email service that has its own compliance obligations but not configuring it correctly.
+
+**Why it happens:**
+Developers focus on the capture form and ESP integration, assuming the email template will handle compliance. But compliance depends on configuration choices (unsubscribe link type, sender identification fields, list segmentation) that must be set deliberately.
+
+**How to avoid:**
+- Use an established ESP (Email Service Provider) with Australian Spam Act compliance built in: Mailchimp, ConvertKit, or Buttondown are all compliant by default when configured correctly.
+- Collect **express consent** only: a checkbox that is unchecked by default saying "I want to receive the weekly hawk score newsletter." Do not pre-tick the box. Do not bundle consent into terms of service acceptance.
+- Every email must include: sender name, sender contact address (physical address or PO Box is acceptable), and a functional unsubscribe link.
+- Honor unsubscribe requests within 5 business days — most ESPs automate this.
+- Store consent records (timestamp, IP, form version) in case of an ACMA audit.
+- Do not import external email lists or purchase lists — this is prohibited under the Spam Act without verifiable consent records.
+
+**Warning signs:**
+- The email capture form has a pre-ticked checkbox.
+- The unsubscribe link in sent emails leads to a broken or inaccessible page.
+- No physical sender address appears in the email footer.
+- The ESP account shows emails going to "imported contacts" rather than "subscribed contacts."
+
+**Phase to address:**
+Phase 4 (newsletter / monetization foundation). ESP selection and configuration must happen before the first test email is sent. The consent form design and storage mechanism are gating requirements, not afterthoughts.
+
+---
+
+### Pitfall 10: Historical Hawk Score Chart Without Snapshot Archive Produces Flat/Empty Line
+
+**What goes wrong:**
+HIST-01 (historical hawk score chart) requires a time-series of past hawk scores to draw a meaningful line chart. Without a snapshot archive, the pipeline has no historical record — `status.json` is overwritten on every run. Attempting to reconstruct the historical hawk score from the existing CSVs is possible (by re-running the Z-score pipeline against historical slices) but is complex and error-prone, especially for indicators with irregular data (Cotality HVI monthly PDF, NAB scraper failures, ASX daily).
+
+Shipping the historical chart UI before the archive has populated at least 4-6 data points produces a chart with a single dot or a very short flat line — misleading and visually poor.
+
+**Why it happens:**
+Developers build the frontend chart first (it is the visible feature) and expect to backfill data later. Backfilling historical hawk scores from CSVs is underestimated in complexity because the pipeline's Z-score window and confidence calculations depend on the rolling window of data available at each historical date, not just the raw values.
+
+**How to avoid:**
+- Start the snapshot archive (Pipeline phase) before building the frontend chart (UI phase). The chart should only be activated once there are at least 4 weekly snapshots.
+- Attempt a limited historical backfill: re-run the normalize pipeline against the last 12 quarters of CSV data to produce 12 historical hawk scores. This is feasible for ABS/RBA indicators but approximate for scraped sources with gaps.
+- If backfill is attempted: document clearly that backfilled scores are approximate recalculations, not live pipeline outputs, and may differ slightly from scores that would have been emitted at the time.
+- Show an "Insufficient history" placeholder in the chart UI when fewer than 4 snapshots exist, rather than rendering a degenerate chart.
+
+**Warning signs:**
+- The historical chart UI is built before the snapshot archive pipeline is implemented.
+- The chart is shipped with fewer than 4 data points and looks like a flat line or single dot.
+- Backfill code re-runs the pipeline against historical CSVs but the Z-score window produces different results than the live pipeline because the historical data slices don't match the rolling window boundaries.
+
+**Phase to address:**
+Phase 1 (snapshot archiving) must be complete before Phase 2+ can ship the historical chart. Gate the chart on data availability.
 
 ---
 
@@ -178,12 +293,15 @@ Phase 1 (hero redesign). Test at 375px after every above-the-fold HTML change, n
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Adding new Tailwind classes dynamically via string concatenation | Readable code | Classes silently absent at runtime — CDN cannot detect them | Never — use complete-string lookup tables or `element.style` with hex values |
-| Embedding verdict copy directly in JS strings without compliance review | Fast to write | ASIC compliance risk; may constitute general advice | Never — all new verdict copy must pass the factual-information test |
-| Referencing metric cards by nth index in tests | Simple to write | Breaks on any DOM insertion; has already caused test failures in v1.x | Never for named indicators — use `.filter({ hasText: ... })` instead |
-| Reducing `min-height` on `#hero-gauge-plot` to make room for new elements | More room for hero content | Gauge renders at insufficient height; SVG clips; looks broken on mid-size viewports | Never — 280px is the minimum safe height for Plotly indicator gauges |
-| Wrapping the existing gauge container in a new div without calling `Plotly.Plots.resize()` | Simpler DOM manipulation | Gauge renders at wrong size inside new container | Never — always trigger a resize after reparenting a Plotly container |
-| Keeping `open` attribute on onboarding `<details>` at all viewport sizes | Consistent behavior | Pushes hero content below fold on mobile after redesign adds more height above it | Acceptable only if hero redesign removes sufficient vertical space to compensate |
+| Commit snapshot JSON files to Git | Zero external dependencies | Repo bloat past GitHub limits within 12-24 months; slow Netlify deploys | Never — use JSONL append pattern or write `previous_value` directly into status.json |
+| Draw sparklines using Plotly.js | Reuse existing library | 15+ Plotly instances causes render freeze on mobile; WebGL cap at 8 | Never for sparklines — use inline SVG or micro-library |
+| Show raw `history` array as sparkline without timestamps | Simple to implement | Unequal time intervals imply false regularity; users draw incorrect trend conclusions | Never — add `history_dated` before rendering sparklines |
+| Add affiliate links without legal review | Revenue potential | ASIC "arranging" violation; AFS/ACL licence required; fines and reputational damage | Never without legal sign-off |
+| Pre-tick the newsletter consent checkbox | Higher signup rate | Australian Spam Act violation; express consent required | Never |
+| Static OG image without cache-buster | Simple to deploy | Stale score in share previews after weekly pipeline run | Only acceptable for branding-only static images that do not contain live data |
+| Import external email list to ESP | Fast list-building | Spam Act violation; no verifiable consent records | Never |
+| Show delta badge without threshold-gating | Simpler code | Noisy daily swings in ASX data cause user confusion and trust erosion | Never — gate at `|delta| >= 5` minimum |
+| Build historical hawk score chart before archive has data | Visible feature shipped early | Empty/flat chart undermines trust in the dashboard's data depth | Never — gate chart render on minimum 4 historical data points |
 
 ---
 
@@ -191,13 +309,14 @@ Phase 1 (hero redesign). Test at 375px after every above-the-fold HTML change, n
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Plotly.js + new above-the-fold hero elements | Call `Plotly.newPlot()` before new DOM elements have painted | Wrap `createHeroGauge()` in `requestAnimationFrame()` or call `Plotly.Plots.resize()` after inserting new hero HTML |
-| Tailwind CDN + JS-driven score colours | Use Tailwind utility classes assembled by string concatenation | Use `element.style.color = GaugesModule.getZoneColor(score)` — already the established pattern in `gauges.js` |
-| Verdict explanation section + `#metric-gauges-grid` | Add explanation cards inside the gauges grid | Put explanation in a dedicated `<section id="verdict-explanation">` that is structurally separate |
-| Playwright + `nth()` selectors + new cards | Add new `bg-finance-gray` cards anywhere near the gauges grid | Use `.filter({ hasText: 'Indicator Name' })` for named cards; never add elements that match the grid card selector to other sections |
-| ASIC compliance + indicator-specific explanations | Write "CPI is above target therefore rates will rise" | Write "Inflation data shows prices rising at X% — historically this has been associated with upward rate pressure" |
-| Python pipeline + JS-only changes | Accidentally modify `status.json` schema expectations in JS | v4.0 is frontend-only; `status.json` schema must not change; any new field in JS must be optional and defaulted |
-| Hero redesign + `#verdict-container` / `#calculator-jump-link` | Remove or rename existing IDs that Playwright tests assert against | Phase6-ux.spec.js tests IDs: `#verdict-container`, `#scale-explainer`, `#calculator-jump-link`, `#onboarding` — these must survive the redesign |
+| GitHub Actions + snapshot archive | Commit full JSON snapshot on every run | Append one line to `data/snapshots.jsonl` per weekly run; keep file in Git with meaningful diffs |
+| Python pipeline + `previous_value` | Overwrite status.json without reading current values first | Read the current `value` fields from existing `status.json` before writing the new one; write `previous_value` as part of the same atomic operation |
+| Plotly.js + sparklines | Use `Plotly.newPlot()` for each indicator card sparkline | Use inline SVG polyline — no Plotly for sparklines |
+| Facebook OG cache + weekly pipeline | Add OG tags and never re-scrape | Add `?v=YYYYMMDD` cache-buster to `og:image` URL; call Facebook scrape endpoint from GitHub Actions post-deploy |
+| ESP (Mailchimp/ConvertKit) + consent form | Use the ESP's default double opt-in setting without configuring it | Verify double opt-in is enabled; store timestamp + IP of consent; use unchecked checkbox for initial opt-in |
+| Affiliate links + ASIC RG 244 | Frame affiliate link as "speak to an expert" recommendation | Frame as "find a licensed broker in your area" with prominent disclosure of referral relationship |
+| Netlify + dynamic OG image generation | Use Netlify Edge Functions for image generation (runtime dependency) | Generate OG image in Python pipeline using Pillow; commit to `public/images/og.png`; reference with absolute URL |
+| Tailwind CDN + new badge elements | Assemble badge classes with string concatenation | Use complete literal class strings in full, or use `element.style` for dynamic colors (established project pattern) |
 
 ---
 
@@ -205,22 +324,23 @@ Phase 1 (hero redesign). Test at 375px after every above-the-fold HTML change, n
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Plotly renders all 8 gauges (hero + 7 metric) simultaneously on load | Visible layout jank; first meaningful paint delayed by 400-800ms | The existing `requestAnimationFrame()` stagger in `gauge-init.js` handles this — do not remove it | If the hero redesign calls `createHeroGauge()` outside the RAF stagger pattern |
-| Large hero section causes layout shift before Plotly renders | CLS (Cumulative Layout Shift) spike; hero snaps from placeholder to full gauge | Set `min-height: 280px` on gauge container (already present); do not set it to `auto` | If new hero wrapper removes the `min-height` style |
-| Tailwind CDN scanning large new hero HTML at load | Page style recalculation noticeably delayed on first load | Minimal new HTML only; avoid embedding large SVGs or complex template HTML in the hero | If hero section adds >100 new DOM elements |
-| New `<details>` or collapsed sections above the gauge | Plotly renders inside a hidden/zero-height container before section expands | Open all sections by default, or render gauge only after the section opens (add event listener on `toggle`) | If any new collapsible element wraps the hero gauge container |
+| 15+ Plotly chart instances on page | Page freeze on Firefox; 3+ second blank on mobile; "Unresponsive script" warning | Use inline SVG for sparklines — zero Plotly instances added by v5.0 | Immediately on any low-power mobile device once sparklines use Plotly |
+| Large `snapshots.jsonl` file growing unboundedly | Git push times increase; Netlify clone time grows | Cap JSONL at 104 lines (2 years of weekly snapshots); delete oldest lines when cap exceeded | At 52+ weeks if no retention policy is enforced |
+| OG image generation in Python pipeline using unoptimized PNG | `og.png` grows to 500KB-1MB; slow social crawl; Netlify bandwidth use | Use Pillow's PNG optimize flag; target 1200x630px at 72dpi; aim for under 100KB | On first generation if image is created at print resolution |
+| Email list growth triggering paid ESP tier | Monthly cost surprise; feature parity changes | Choose ESP with generous free tier (Mailchimp: 500 contacts free; ConvertKit: 1,000 subscribers free); monitor list size | At 500-1,000 subscribers depending on ESP |
+| Daily ASX futures delta badge causing continuous DOM updates | Card re-renders on every daily ASX pipeline run; visual churn | Only compute delta on weekly pipeline run (not daily ASX run); daily run updates ASX card only, not delta badge | From day one if delta is computed from daily pipeline output |
 
 ---
 
 ## Security Mistakes
 
-This is a static, read-only dashboard — no user inputs are stored or transmitted except the mortgage calculator (client-side only). Security surface is minimal. The relevant risks are:
-
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Adding `innerHTML` to new verdict explanation elements | XSS if `status.json` data is ever compromised or tampered | Follow the established pattern: use `element.textContent` only. Never use `innerHTML` for data-driven content. The existing modules are already safe — maintain this invariant. |
-| Adding user-editable text fields to the verdict explanation | Stored XSS if field content is ever persisted | The verdict explanation is read-only output from `status.json` — do not add input fields |
-| Referencing `status.json` fields with loose null checks | Broken display if pipeline changes field names | Guard every new field access with `data.field != null` checks before use |
+| Email capture form without CSRF protection | Spam submissions; list pollution | Use ESP-hosted embed forms (they handle this) rather than custom POST endpoints |
+| Storing email addresses in status.json or public/ directory | Subscribers' emails exposed publicly on Netlify | Store email list only within the ESP; never write emails to any Git-tracked file |
+| Affiliate link tracking via query parameters that reveal internal identifiers | Revenue data leakage; partner relationship disclosure | Use ESP-generated UTM parameters only; do not expose internal campaign IDs |
+| Newsletter unsubscribe link with predictable token (`?email=user@example.com`) | Anyone can unsubscribe any address by guessing the URL | Use ESP-managed unsubscribe links with opaque tokens (all reputable ESPs do this by default) |
+| `innerHTML` in new delta badge or sparkline rendering | XSS if status.json is tampered with (e.g., via a compromised pipeline) | Follow the established project pattern: `textContent` for text, `setAttribute` for SVG attributes, never `innerHTML` for data-driven content |
 
 ---
 
@@ -228,24 +348,30 @@ This is a static, read-only dashboard — no user inputs are stored or transmitt
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Hero score displayed as raw number without context ("37/100") | User does not know if 37 is good or bad | Display score + zone label + brief verdict sentence together; do not separate them |
-| Verdict explanation lists all 7 indicators with equal weight | Information overload; user cannot identify the key drivers | Show top 2-3 drivers only — the indicators with the largest deviation from neutral (z-score furthest from 50) |
-| Indicator cards in verdict explanation repeat the same data as the gauges grid below | Redundant information; no reason to scroll | The explanation section should show only the *drivers* (indicators pulling score strongly in one direction), not all 7 |
-| Hawk score hero is the only element with colour (others stay grey) | Dark theme looks polished but verdict colour is disconnected from the rest of the page | Apply zone colour consistently to: score text, verdict heading, any verdict explanation card borders — not just the gauge needle |
-| "See what this means for your mortgage" link is the only call-to-action | Users who are not mortgage holders are not served | The jump link is appropriate; do not add more CTAs (financial advice risk) |
+| Delta badge on every indicator card simultaneously | Information overload; user doesn't know what changed matters | Show deltas only on indicators where `|delta| >= 5` gauge points this week; suppress low-signal changes |
+| Sparkline and delta badge on the same card row compete visually | Neither element communicates clearly | Hierarchize: sparkline shows trend over time (bottom of card), delta badge shows recent change (inline with score) |
+| Historical hawk score chart without a time axis explanation | User doesn't know if they're seeing 3 months or 3 years | Label x-axis with actual dates; add subtitle "Weekly since [start date]" |
+| Share button opens native share sheet with just the URL | Shared post on social media has no preview because OG tags are missing or malformed | Verify OG preview in Facebook Debugger and Twitter Card Validator before shipping the share button |
+| Newsletter signup widget positioned above indicator data | Users who landed for data feel interrupted before getting value | Place newsletter signup below the economic indicators section (after delivering value), not in the hero or header |
+| "Compare brokers here" affiliate link adjacent to hawk score verdict | Implies verdict is a personal recommendation to act | Separate affiliate links from data sections; place in footer or a clearly marked "Resources" section |
+| Delta badge shows direction but no magnitude | Users can't tell if it was a tiny or large move | Show direction arrow + numeric delta (when above threshold), e.g., "↑ 8 pts" |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Gauge renders correctly at all breakpoints:** Verify `#hero-gauge-plot` is not zero-width at 375px, 768px, 1024px, and 1440px viewports. Run `Playwright.Plots.resize()` test manually.
-- [ ] **No concatenated Tailwind classes in new JS:** Search all new JS files for `bg-\$` or `border-\$` or `text-\$` patterns. Every Tailwind class used in JS must be a complete literal string.
-- [ ] **ASIC copy review complete:** Every new sentence in verdict/explanation copy has been reviewed against the factual-information test. No sentence contains "you should," "rates will," or "now is the time."
-- [ ] **Playwright suite still passes 28/28 tests:** Run `npm run verify:playwright` after every structural HTML change. Do not defer this to end of milestone.
-- [ ] **Existing element IDs preserved:** Confirm `#verdict-container`, `#scale-explainer`, `#calculator-jump-link`, `#onboarding`, `#hero-gauge-plot`, `#metric-gauges-grid`, `#asx-futures-container` all still exist in the DOM after redesign.
-- [ ] **Mobile above-fold test:** Open browser at 375x812. Everything above "Economic Indicators" heading should be visible — hawk score and verdict in particular — without scrolling.
-- [ ] **Python pipeline untouched:** Run `npm run test:fast` (411 unit tests + coverage check). Any Python test failure is a sign that something in the JS phase accidentally modified shared files.
-- [ ] **status.json schema not changed:** The verdict explanation section reads from `status.json` but must not require new fields to function. All new field accesses must be optional with graceful defaults.
+- [ ] **Snapshot archive retention policy enforced:** Verify that the pipeline deletes or truncates snapshots beyond the defined retention window. Run the pipeline 3x in CI and confirm the JSONL file does not grow unboundedly.
+- [ ] **`previous_value` written atomically:** The pipeline reads the current `status.json` values and writes `previous_value` in a single operation. Verify that a failed pipeline run does not result in `previous_value` pointing to itself.
+- [ ] **Sparkline history is timestamped:** Confirm `history_dated` entries in `status.json` have ISO date strings, not just sequential index numbers.
+- [ ] **Delta badge threshold-gated:** Verify that cards with `|delta| < 5` show no badge (or a "no change" indicator), not a delta of zero or a small noisy number.
+- [ ] **OG image URL is absolute:** Confirm `og:image` contains `https://` not a relative path. Test with Facebook Sharing Debugger before launch.
+- [ ] **OG image cache-buster present:** Confirm `og:image` URL includes a versioning parameter that changes with each pipeline run.
+- [ ] **Newsletter consent checkbox unchecked by default:** Verify the HTML has `<input type="checkbox">` without a `checked` attribute. Spam Act requires unchecked default.
+- [ ] **Unsubscribe link present and functional in every email template:** Send a test email and verify the unsubscribe link resolves and removes the test address from the list.
+- [ ] **ASIC affiliate disclosure visible:** If any affiliate or referral link is present, a disclosure statement is visible without requiring the user to scroll or click — on the same viewport as the link.
+- [ ] **Mobile card layout verified at 375px:** All indicator cards with sparklines and delta badges render within their card bounds without overflow or text wrapping to more than 2 lines.
+- [ ] **Plotly chart count unchanged:** `document.querySelectorAll('.js-plotly-plot').length` still returns 8 after sparklines are added (confirming sparklines use SVG, not Plotly).
+- [ ] **Historical hawk score chart shows "insufficient data" state:** Simulate fewer than 4 snapshots and confirm the chart renders a placeholder, not an empty Plotly div with broken axes.
 
 ---
 
@@ -253,12 +379,13 @@ This is a static, read-only dashboard — no user inputs are stored or transmitt
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Gauge renders at zero width after hero change | LOW | Call `Plotly.Plots.resize('hero-gauge-plot')` in browser console to confirm resize fixes it; then wrap the `createHeroGauge()` call in `requestAnimationFrame()` |
-| Concatenated Tailwind class is not applying | LOW | Switch the CSS assignment to `element.style.color = hexValue` using the existing `GaugesModule.getZoneColor()` return value |
-| ASIC copy violation discovered in review | MEDIUM | Rewrite using hedged language ("the data is consistent with," "historically associated with"); do not attempt to soften rather than rewrite |
-| Playwright nth-selector tests break after DOM change | LOW-MEDIUM | Replace `allCards.nth(N)` with `allCards.filter({ hasText: 'Indicator Name' })` for any named indicator; update count assertions |
-| Mobile hero overflows viewport after redesign | MEDIUM | Remove one of: onboarding `<details open>`, scale explainer text, or verdict container redundancy — the hero should be a replacement, not an addition |
-| Python tests fail after frontend-only commit | LOW | Check if `public/data/status.json` was accidentally modified; restore from git; pipeline tests are isolated from JS changes unless data files change |
+| Git repository bloated by snapshot files | HIGH | Use `git filter-repo --path snapshots/ --invert-paths` to remove snapshot directory from history; force-push; notify any collaborators; migrate to JSONL pattern |
+| Stale OG preview on social platforms | LOW | Use platform debugger tools (Facebook Sharing Debugger, Twitter Card Validator) to force re-scrape; add `?v=` query parameter to `og:image` going forward |
+| Affiliate link identified as potential ASIC violation | HIGH | Remove the link immediately; seek legal advice before re-adding in any form; add prominent disclosure if reinstating as a "mere referral" |
+| Newsletter sent without unsubscribe link | MEDIUM | Immediately send a follow-up email with unsubscribe link; update ESP template; document the incident date and remediation for ACMA if ever queried |
+| Sparklines implemented with Plotly causing page freeze | MEDIUM | Remove Plotly sparkline instances; reimplement as inline SVG `<polyline>` elements; test on low-power device before re-shipping |
+| Delta badge showing noisy daily ASX fluctuations | LOW | Change delta computation to weekly pipeline only; suppress daily ASX run from delta calculations; deploy updated pipeline logic |
+| `previous_value` pointing to stale data after pipeline failure | LOW | Add a `previous_value_date` field alongside `previous_value`; render badge as "data unavailable" if `previous_value_date` is more than 14 days old |
 
 ---
 
@@ -266,36 +393,36 @@ This is a static, read-only dashboard — no user inputs are stored or transmitt
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| Plotly zero-width render after DOM restructure | Phase 1: Hero redesign | Playwright test "Hero gauge renders with hawk score" passes at 375px, 768px, 1024px |
-| Tailwind CDN concatenated class names | Phase 2: Verdict explanation section | Grep for `bg-\$` / `border-\$` / `text-\$` in new JS files; visual test shows correct colours |
-| ASIC compliance — general advice language | Phase 2: Verdict explanation copy | Copy review checklist applied to every new sentence before commit |
-| Playwright nth-selector fragility | Phase 1: Hero redesign | Full Playwright suite runs passing before and after each structural HTML change |
-| Mobile above-fold congestion | Phase 1: Hero redesign | Browser test at 375x812 — verdict visible without scrolling |
-| Dynamically structured DOM breaking card count assertions | Phase 2: Verdict explanation section | `toHaveCount(7)` assertion in dashboard.spec.js still passes after verdict section added |
-| IIFE module load order regression | Phase 1 or 2 | `data.js` → `chart.js` → `countdown.js` → `calculator.js` → `main.js` → `gauges.js` → `interpretations.js` → `gauge-init.js` order preserved in `index.html` |
-| New hero element IDs shadowing existing IDs | Phase 1: Hero redesign | All 28 Playwright tests pass; no `duplicate ID` warnings in browser console |
-| status.json schema dependency for new features | Phase 2: Verdict explanation section | Simulate `status.json` with missing new fields; verify explanation renders a default/empty state gracefully |
+| Git repository bloat from snapshot archiving | Phase 1: Pipeline temporal layer | Confirm JSONL or equivalent strategy; check `git count-objects -vH` shows minimal growth after 3 test runs |
+| `history` array has no timestamps | Phase 1: Pipeline temporal layer | `status.json` contains `history_dated` with ISO date strings before sparkline frontend begins |
+| Plotly performance collapse from sparklines | Phase 2: Indicator card UI (sparklines + delta) | `document.querySelectorAll('.js-plotly-plot').length === 8` after sparklines added |
+| Delta badge noisy data | Phase 2: Indicator card UI | Delta badges hidden on cards where `|delta| < 5`; ASX daily run does not update badge |
+| Delta badge mobile layout breakage | Phase 2: Indicator card UI | Playwright at 375px — all cards within bounds, no overflow |
+| OG image missing or relative URL | Phase 3: Social sharing | Facebook Sharing Debugger shows image preview with absolute URL |
+| OG cache serving stale previews | Phase 3: Social sharing | `og:image` URL includes `?v=YYYYMMDD`; Facebook re-scrape step in GitHub Actions post-deploy |
+| ASIC affiliate compliance violation | Phase 4: Newsletter / monetization | Legal review completed before any affiliate link ships; disclosure visible on same viewport as link |
+| Spam Act newsletter non-compliance | Phase 4: Newsletter / monetization | Test email contains unsubscribe link; consent form has unchecked checkbox; ESP configured for double opt-in |
+| Historical chart with insufficient data | Phase 5 (if separate): Historical chart | Chart shows "Insufficient data" placeholder when fewer than 4 snapshots exist; minimum data gate enforced in frontend |
 
 ---
 
 ## Sources
 
-- Direct codebase analysis: `public/js/gauge-init.js` — `setupResizeHandler()` only fires on `window.resize`; `Plotly.relayout({autosize: true})` does not trigger on container DOM changes
-- Direct codebase analysis: `public/js/gauges.js` — `getZoneColor()` returns hex values; existing colour logic uses `element.style.color`, not Tailwind classes — established safe pattern
-- Direct codebase analysis: `public/js/interpretations.js` — `getPlainVerdict()` and `getWhyItMatters()` show the correct compliant language patterns already in use
-- Direct codebase analysis: `tests/dashboard.spec.js` and `tests/phase6-ux.spec.js` — nth-index selectors `.nth(0)`, `.nth(1)`, `.nth(5)` identified as fragility risk; existing filter pattern `.filter({ hasText: '...' })` already in use for housing and business conditions cards
-- Direct codebase analysis: `public/index.html` — existing element IDs that Playwright asserts against; hero section HTML structure; script load order
-- Plotly.js GitHub issue #3984: "Plotly Not Responsive When Parent Size Changes" — confirms `responsive: true` only responds to window resize, not container resize (HIGH confidence — official issue tracker)
-- Plotly.js GitHub issue #2769: "Resize bug using Details/hidden Div and width=100%" — confirms hidden-container sizing bug (HIGH confidence — official issue tracker)
-- Plotly community forum: resize after container change requires `Plotly.Plots.resize(divId)` explicit call (MEDIUM confidence — community verified pattern)
-- Tailwind CSS v3 Play CDN docs: "not intended for production; cannot use tailwind.config.js customizations" — confirms CDN class scanning limitations (HIGH confidence — official Tailwind docs)
-- Tailwind community discussion #14210 and Medium article: dynamic class name concatenation is not detected by CDN or build scanner; complete class names required (HIGH confidence — official docs + community confirmation)
-- ASIC RG 244 (December 2012, updated 2021): defines factual information vs. general advice distinction; key test is whether provider "has considered one or more of the client's objectives, financial situation and needs" (HIGH confidence — official regulatory guide)
-- ASIC "Tips for giving limited advice": hedged language patterns; "tends to," "historically associated with," "may be more likely" (HIGH confidence — official ASIC guidance)
-- Playwright docs — locators: `.nth()` flagged as fragile; prefer `getByRole()`, `getByTestId()`, `.filter({ hasText: ... })` (HIGH confidence — official Playwright docs)
-- BrowserStack "15 Playwright Selector Best Practices 2026": nth selectors break when DOM structure changes; data-testid is preferred (MEDIUM confidence — practitioner source, consistent with official docs)
-- Toptal "Intuitive Mobile Dashboard UI": above-the-fold hero on mobile must fit within ~350px to avoid scroll requirement (MEDIUM confidence — practitioner design source)
+- ASIC official guidance: "Discussing financial products and services online" — [https://www.asic.gov.au/regulatory-resources/financial-services/giving-financial-product-advice/discussing-financial-products-and-services-online/](https://www.asic.gov.au/regulatory-resources/financial-services/giving-financial-product-advice/discussing-financial-products-and-services-online/) (HIGH confidence — official ASIC)
+- ASIC RG 244 "Giving information, general advice and scaled advice" — [https://www.asic.gov.au/regulatory-resources/find-a-document/regulatory-guides/rg-244-giving-information-general-advice-and-scaled-advice/](https://www.asic.gov.au/regulatory-resources/find-a-document/regulatory-guides/rg-244-giving-information-general-advice-and-scaled-advice/) (HIGH confidence — official ASIC regulatory guide)
+- ASIC media release 12-304MR "ASIC warns comparison websites" — [https://www.asic.gov.au/about-asic/news-centre/find-a-media-release/2012-releases/12-304mr-asic-warns-comparison-websites/](https://www.asic.gov.au/about-asic/news-centre/find-a-media-release/2012-releases/12-304mr-asic-warns-comparison-websites/) (HIGH confidence — official ASIC enforcement action guidance)
+- HN Law "Finfluencers, referrers and discussing financial products online" — [https://www.hnlaw.com.au/finfluencers-referrers-and-discussing-financial-products-online/](https://www.hnlaw.com.au/finfluencers-referrers-and-discussing-financial-products-online/) (MEDIUM confidence — legal commentary consistent with ASIC official position)
+- ACMA "Email and SMS unsubscribe rules" fact sheet — [https://www.acma.gov.au/sites/default/files/2024-05/Fact%20sheet%20-%20email%20and%20SMS%20unsubscribe%20rules.pdf](https://www.acma.gov.au/sites/default/files/2024-05/Fact%20sheet%20-%20email%20and%20SMS%20unsubscribe%20rules.pdf) (HIGH confidence — official regulator fact sheet)
+- ACMA "Avoid sending spam" — [https://www.acma.gov.au/avoid-sending-spam](https://www.acma.gov.au/avoid-sending-spam) (HIGH confidence — official ACMA guidance)
+- Plotly Community Forum: "Plotly.js page render is super slow with 10 charts in DOM" — [https://community.plotly.com/t/plotly-js-page-render-is-super-slow-with-10-charts-in-dom-firefox-freezes-whats-wrong/40936](https://community.plotly.com/t/plotly-js-page-render-is-super-slow-with-10-charts-in-dom-firefox-freezes-whats-wrong/40936) (MEDIUM confidence — community confirmed; consistent with Plotly WebGL 8-chart cap)
+- GitHub `mitjafelicijan/sparklines` — lightweight SVG sparkline library, zero dependencies: [https://github.com/mitjafelicijan/sparklines](https://github.com/mitjafelicijan/sparklines) (HIGH confidence — official repository)
+- GitHub `fnando/sparkline` — SVG sparklines, zero dependencies: [https://github.com/fnando/sparkline](https://github.com/fnando/sparkline) (HIGH confidence — official repository)
+- Netlify: "Generate dynamic Open Graph images using Netlify Edge Functions" — [https://developers.netlify.com/guides/generate-dynamic-open-graph-images-using-netlify-edge-functions/](https://developers.netlify.com/guides/generate-dynamic-open-graph-images-using-netlify-edge-functions/) (HIGH confidence — official Netlify docs)
+- Perceptual Edge: "Best Practices for Scaling Sparklines" — [https://www.perceptualedge.com/articles/visual_business_intelligence/best_practices_for_scaling_sparklines.pdf](https://www.perceptualedge.com/articles/visual_business_intelligence/best_practices_for_scaling_sparklines.pdf) (HIGH confidence — authoritative data visualization source, Stephen Few)
+- Direct codebase analysis: `public/data/status.json` — `history` arrays confirmed as unlabelled gauge-score sequences with no timestamps; 12 values per indicator at mixed cadences (quarterly ABS, monthly NAB/Cotality)
+- Direct codebase analysis: `public/js/gauge-init.js` — 8 existing Plotly chart instances; double-rAF pattern for zero-width prevention
+- Direct codebase analysis: `data/abs_cpi.csv`, `data/asx_futures.csv` — existing CSV schemas; no snapshot history directory exists yet
 
 ---
-*Pitfalls research for: Dashboard Visual Overhaul (v4.0) — hero redesign, verdict explanation, visual polish*
-*Researched: 2026-02-25*
+*Pitfalls research for: v5.0 Direction & Momentum — snapshot archiving, delta badges, sparklines, social sharing, newsletter monetization*
+*Researched: 2026-02-26*
