@@ -180,11 +180,34 @@
 
     DataModule.fetch('data/status.json')
       .then(function (data) {
-        // Render hero gauge
-        GaugesModule.createHeroGauge('hero-gauge-plot', data.overall.hawk_score);
+        // Render hero gauge wrapped in rAF to prevent zero-width after DOM restructure
+        requestAnimationFrame(function () {
+          GaugesModule.createHeroGauge('hero-gauge-plot', data.overall.hawk_score);
+          // Second rAF for resize after paint
+          requestAnimationFrame(function () {
+            var heroEl = document.getElementById('hero-gauge-plot');
+            if (heroEl && heroEl.data) {
+              Plotly.Plots.resize('hero-gauge-plot');
+            }
+          });
+        });
 
         // Render verdict
         InterpretationsModule.renderVerdict('verdict-container', data.overall);
+
+        // Render hawk score number in hero card
+        var scoreDisplay = document.getElementById('hawk-score-display');
+        if (scoreDisplay) {
+          scoreDisplay.textContent =
+            Math.round(data.overall.hawk_score) + '/100';
+        }
+
+        // Set zone-coloured top border on hero card
+        var heroCard = document.getElementById('hero-card');
+        if (heroCard) {
+          heroCard.style.borderTopColor =
+            GaugesModule.getZoneColor(data.overall.hawk_score);
+        }
 
         // Render "jump to calculator" link in hero
         var jumpContainer = document.getElementById('calculator-jump-link');
@@ -205,9 +228,9 @@
           data.asx_futures || null
         );
 
-        // Render data freshness
+        // Render data freshness inside hero card
         InterpretationsModule.renderStalenessWarning(
-          'data-freshness', data.generated_at
+          'hero-freshness', data.generated_at
         );
 
         // Render individual metric gauges
@@ -227,6 +250,14 @@
 
         // Render calculator bridge text
         renderCalculatorBridge(data.overall.hawk_score, data.overall.zone_label);
+
+        // Animate hero card entry (only on success, respect reduced motion)
+        var reducedMotion = window.matchMedia(
+          '(prefers-reduced-motion: reduce)'
+        ).matches;
+        if (heroCard && !reducedMotion) {
+          heroCard.classList.add('hero-animate-in');
+        }
       })
       .catch(function (err) {
         console.error('Gauge initialization failed:', err);

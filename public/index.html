@@ -6,6 +6,11 @@
   <title>RBA Hawk-O-Meter | Are Australian interest rates going up or down?</title>
   <meta name="description" content="Free tool tracking economic data to show whether Australian interest rates are likely to rise, fall, or stay the same. Updated automatically.">
 
+  <!-- Inter font via Google Fonts CDN -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -21,6 +26,9 @@
             'gauge-green': '#10b981',
             'gauge-amber': '#f59e0b',
             'gauge-red': '#ef4444'
+          },
+          fontFamily: {
+            'sans': ['Inter', 'system-ui', 'sans-serif']
           }
         }
       }
@@ -49,6 +57,17 @@
       #chart-details > div, #chart-details > p { display: block !important; }
     }
     details summary::-webkit-details-marker { display: none; }
+    /* Hero card entry animation */
+    @keyframes fadeSlideIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .hero-animate-in {
+      animation: fadeSlideIn 300ms ease-out both;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hero-animate-in { animation: none; }
+    }
   </style>
 </head>
 <body class="bg-finance-dark text-gray-100 min-h-screen flex flex-col">
@@ -98,9 +117,8 @@
       </details>
     </section>
 
-    <!-- Hero Section: Hawk-O-Meter Gauge + ASX Futures + Cash Rate -->
+    <!-- Hero Section: Hawk-O-Meter Gauge + Hero Card + ASX Futures + Cash Rate -->
     <section id="hawk-o-meter-section" aria-label="Overview" class="mb-8">
-      <div id="data-freshness" class="text-center text-sm mb-2"></div>
       <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
         <div class="lg:col-span-3 min-w-0">
           <div id="hero-gauge-plot" class="w-full overflow-hidden" style="min-height: 280px; min-width: 0;">
@@ -109,7 +127,20 @@
             </div>
           </div>
         </div>
-        <div class="lg:col-span-2 space-y-4">
+        <div class="lg:col-span-2 order-first lg:order-none space-y-4">
+          <div id="hero-card" class="bg-finance-gray rounded-xl p-6 border border-finance-border border-t-4 border-transparent">
+            <div id="verdict-container" class="text-center text-lg">
+              <span class="text-gray-500">Loading verdict...</span>
+            </div>
+            <p id="hawk-score-display" class="text-5xl sm:text-6xl font-bold text-white tabular-nums text-center mt-4">
+              --
+            </p>
+            <p id="scale-explainer" class="mt-3 text-center text-sm text-gray-500">
+              Score out of 100. Below 50 = pressure to cut rates. Above 50 = pressure to raise rates.
+            </p>
+            <div id="hero-freshness" class="text-center text-sm mt-3"></div>
+            <div id="calculator-jump-link" class="mt-3 text-center"></div>
+          </div>
           <div id="asx-futures-container" class="bg-finance-gray rounded-lg p-5 border border-finance-border">
             <h3 class="text-lg font-semibold text-gray-200 mb-3">What Markets Expect</h3>
             <div class="text-gray-500 text-sm">Loading futures data...</div>
@@ -125,13 +156,6 @@
           </div>
         </div>
       </div>
-      <div id="verdict-container" class="mt-6 text-center text-lg">
-        <span class="text-gray-500">Loading verdict...</span>
-      </div>
-      <div id="calculator-jump-link" class="mt-3 text-center"></div>
-      <p id="scale-explainer" class="mt-2 text-center text-sm text-gray-500">
-        Score out of 100. Below 50 = pressure to cut rates. Above 50 = pressure to raise rates.
-      </p>
     </section>
 
     <!-- Countdown Section -->
