@@ -9,12 +9,12 @@ Requirements for v4.0 Dashboard Visual Overhaul milestone. Each maps to roadmap 
 
 ### Hero Section
 
-- [ ] **HERO-01**: User sees the verdict label ("RATES LIKELY FALLING") as the dominant above-the-fold element — large, zone-coloured, immediately legible without scrolling
-- [ ] **HERO-02**: User sees the hawk score as a prominent number (e.g. "38/100") in the hero card alongside the verdict
-- [ ] **HERO-03**: User sees the scale explainer ("0 = Strongly Dovish → 100 = Strongly Hawkish") adjacent to the verdict in the hero card, not below the fold
-- [ ] **HERO-04**: User sees a data freshness badge inside the hero card showing when the data was last updated
-- [ ] **HERO-05**: User sees a zone-coloured accent border on the hero card that reflects the current hawk/dove/neutral zone
-- [ ] **HERO-06**: User sees the hero card animate in with a fadeSlideIn entry effect when page data loads
+- [x] **HERO-01**: User sees the verdict label ("RATES LIKELY FALLING") as the dominant above-the-fold element — large, zone-coloured, immediately legible without scrolling
+- [x] **HERO-02**: User sees the hawk score as a prominent number (e.g. "38/100") in the hero card alongside the verdict
+- [x] **HERO-03**: User sees the scale explainer ("0 = Strongly Dovish → 100 = Strongly Hawkish") adjacent to the verdict in the hero card, not below the fold
+- [x] **HERO-04**: User sees a data freshness badge inside the hero card showing when the data was last updated
+- [x] **HERO-05**: User sees a zone-coloured accent border on the hero card that reflects the current hawk/dove/neutral zone
+- [x] **HERO-06**: User sees the hero card animate in with a fadeSlideIn entry effect when page data loads
 
 ### Verdict Explanation
 
@@ -65,12 +65,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| HERO-01 | Phase 21 | Pending |
-| HERO-02 | Phase 21 | Pending |
-| HERO-03 | Phase 21 | Pending |
-| HERO-04 | Phase 21 | Pending |
-| HERO-05 | Phase 21 | Pending |
-| HERO-06 | Phase 21 | Pending |
+| HERO-01 | Phase 21 | Done |
+| HERO-02 | Phase 21 | Done |
+| HERO-03 | Phase 21 | Done |
+| HERO-04 | Phase 21 | Done |
+| HERO-05 | Phase 21 | Done |
+| HERO-06 | Phase 21 | Done |
 | EXPL-01 | Phase 22 | Pending |
 | EXPL-02 | Phase 22 | Pending |
 | EXPL-03 | Phase 22 | Pending |

@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-02-26)
 
 **Core value:** "Data, not opinion." Empowers laypeople to understand interest rate drivers without relying on media sensationalism or biased advice.
-**Current focus:** Phase 21 — Hero HTML Restructure (v4.0)
+**Current focus:** Phase 22 — Verdict Explanation Component (v4.0)
 
 ## Current Position
 
-Phase: 21 of 23 (Hero HTML Restructure)
+Phase: 22 of 23 (Verdict Explanation Component)
 Plan: 0 of 1 in current phase
 Status: Ready to plan
-Last activity: 2026-02-26 — v4.0 roadmap created (Phases 21-23)
+Last activity: 2026-02-26 — Phase 21 Hero HTML Restructure complete
 
-Progress: [████████████░░░░░░░░] 60% (Phases 1-20 of 23 complete)
+Progress: [█████████████░░░░░░░] 65% (Phases 1-21 of 23 complete)
 
 ## Performance Metrics
 
@@ -45,7 +45,8 @@ Progress: [████████████░░░░░░░░] 60% (Ph
 All v1.0–v3.0 decisions archived to PROJECT.md Key Decisions table.
 
 v4.0 key constraints from research:
-- Phase 21: Wrap createHeroGauge() in requestAnimationFrame() to prevent Plotly zero-width render after DOM restructure
+- Phase 21 (DONE): Wrapped createHeroGauge() in requestAnimationFrame() to prevent Plotly zero-width render after DOM restructure
+- Phase 21 (DONE): Hero card with #verdict-container, #hawk-score-display, #scale-explainer, #hero-freshness, #calculator-jump-link inside; zone border via element.style.borderTopColor; fadeSlideIn with prefers-reduced-motion guard
 - Phase 22: Use element.style with hex from getZoneColor() — never concatenate Tailwind class strings dynamically
 - Phase 23: prefers-reduced-motion guard is required on CountUp.js and gauge sweep animation (accessibility, not optional)
 
@@ -56,5 +57,5 @@ None active.
 ## Session Continuity
 
 Last session: 2026-02-26
-Stopped at: v4.0 roadmap created — Phases 21-23 defined, ready to plan Phase 21
+Stopped at: Phase 21 complete — ready to plan Phase 22 (Verdict Explanation Component)
 Resume file: None

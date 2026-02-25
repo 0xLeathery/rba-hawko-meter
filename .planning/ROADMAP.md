@@ -62,10 +62,10 @@ Delivered: pytest-cov auto-measurement on every run, 10 scraper fixture files fo
   3. User sees a data freshness badge inside the hero card and a zone-coloured accent border that changes colour with the hawk/dove/neutral zone
   4. The Plotly hawk gauge renders at its correct width on all tested viewports after the DOM restructure — no zero-width render regression
   5. All 28 Playwright tests pass after the structural HTML change
-**Plans**: TBD
+**Plans**: 1 plan, 1 wave
 
 Plans:
-- [ ] 21-01: Hero section DOM restructure, Inter font, keyframes, tailwind.config extension
+- [x] 21-01: Hero section DOM restructure, Inter font, keyframes, tailwind.config extension
 
 ### Phase 22: Verdict Explanation Component
 **Goal**: Users understand which indicators are pushing the hawk score up or down via a plain-English, ASIC-compliant explanation section
@@ -113,6 +113,6 @@ Plans:
 | 18. Test Infrastructure | v3.0 | 2/2 | Complete | 2026-02-25 |
 | 19. Ingest Module Tests | v3.0 | 2/2 | Complete | 2026-02-25 |
 | 20. Orchestration Tests and Enforcement | v3.0 | 2/2 | Complete | 2026-02-25 |
-| 21. Hero HTML Restructure | v4.0 | 0/1 | Not started | - |
+| 21. Hero HTML Restructure | v4.0 | 1/1 | Complete | 2026-02-26 |
 | 22. Verdict Explanation Component | v4.0 | 0/1 | Not started | - |
 | 23. Visual Polish and Animations | v4.0 | 0/1 | Not started | - |
