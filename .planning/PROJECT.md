@@ -49,8 +49,21 @@ Empowers laypeople to understand interest rate drivers without relying on media 
 - ✓ LIVE-01 through LIVE-04: Live verification (ABS/RBA/ASX APIs, scrapers, verify_summary.py) — v2.0
 - ✓ HOOK-01 through HOOK-04: Pre-push hook + unified npm scripts (test:fast, verify) — v2.0
 
+## Current Milestone: v3.0 Full Test Coverage
+
+**Goal:** Achieve 85%+ code coverage on every module in `pipeline/`, closing the gap on ingest, orchestration, and normalization layers.
+
+**Target features:**
+- Per-module 85% minimum coverage across all `pipeline/` modules
+- Unit tests for all 5 scraper/ingest modules (ABS, RBA, ASX, Cotality, NAB) with mocked I/O
+- Unit tests for orchestration (`main.py`, `engine.py`)
+- Strengthen existing coverage on `ratios.py`, `gauge.py`, `http_client.py`
+
 ### Active
-(No active requirements — next milestone not yet defined)
+- [ ] Per-module 85%+ coverage for all pipeline/ modules
+- [ ] Mocked unit tests for ingest modules (abs_data, rba_data, asx_futures_scraper, corelogic_scraper, nab_scraper)
+- [ ] Unit tests for orchestration (main.py, engine.py)
+- [ ] Coverage for http_client.py, ratios.py remaining gaps, gauge.py remaining gaps
 
 ### Out of Scope
 | Feature | Reason |
@@ -111,4 +124,4 @@ Automated data updates: weekly pipeline (Monday) + daily ASX futures (weekdays) 
 3. **Accurate:** ✓ All metrics normalized via ratios/Z-scores, no nominal currency values.
 
 ---
-*Last updated: 2026-02-25 after v2.0 milestone completed*
+*Last updated: 2026-02-25 after v3.0 milestone started*

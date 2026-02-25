@@ -5,13 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-25)
 
 **Core value:** "Data, not opinion." Empowers laypeople to understand interest rate drivers without relying on media sensationalism or biased advice.
-**Current focus:** Planning next milestone
+**Current focus:** v3.0 Full Test Coverage — 85%+ per-module coverage
 
 ## Current Position
 
-Milestone: v2.0 complete — archived to milestones/
-Status: Between milestones
-Last activity: 2026-02-25 — v2.0 milestone archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-25 — Milestone v3.0 started
 
 ## Performance Metrics
 
@@ -46,5 +47,5 @@ None active.
 ## Session Continuity
 
 Last session: 2026-02-25
-Stopped at: v2.0 milestone archived
-Next action: /gsd:new-milestone — define next milestone
+Stopped at: Defining v3.0 requirements
+Next action: Define requirements and roadmap for v3.0
