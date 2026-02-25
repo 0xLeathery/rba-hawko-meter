@@ -113,10 +113,7 @@ var GaugesModule = (function () {
       type: 'indicator',
       mode: 'gauge+number',
       value: hawkScore,
-      title: {
-        text: getStanceLabel(hawkScore),
-        font: { size: 20, color: getZoneColor(hawkScore) }
-      },
+      title: { text: '' },
       number: {
         font: { size: 52, color: '#f3f4f6' },
         valueformat: '.0f',
@@ -150,6 +147,84 @@ var GaugesModule = (function () {
   }
 
   /**
+   * Create the hero gauge with sweep animation from 0 to live score.
+   * Uses requestAnimationFrame + Plotly.react() because Plotly.animate()
+   * does not smoothly transition indicator traces.
+   * @param {string} containerId - DOM element ID for the gauge
+   * @param {number} hawkScore - Hawk score 0-100
+   */
+  function createHeroGaugeAnimated(containerId, hawkScore) {
+    var container = document.getElementById(containerId);
+    if (container) {
+      while (container.firstChild) {
+        container.removeChild(container.firstChild);
+      }
+    }
+
+    var animDuration = 1500;
+    var startTime = null;
+    var finalColor = getZoneColor(hawkScore);
+
+    function easeOutExpo(t) {
+      return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
+    }
+
+    function buildTrace(value) {
+      return {
+        type: 'indicator',
+        mode: 'gauge+number',
+        value: value,
+        title: { text: '' },
+        number: {
+          font: { size: 52, color: '#f3f4f6' },
+          valueformat: '.0f',
+          suffix: '/100'
+        },
+        gauge: {
+          shape: 'angular',
+          axis: {
+            range: [0, 100],
+            tickwidth: 1,
+            tickcolor: '#4a4a4a',
+            tickfont: { size: 12, color: '#9ca3af' }
+          },
+          bar: { color: finalColor, thickness: 0.6 },
+          bgcolor: '#1f2937',
+          borderwidth: 0,
+          steps: getGaugeSteps(),
+          threshold: {
+            line: { color: '#fbbf24', width: 3 },
+            thickness: 0.75,
+            value: 50
+          }
+        },
+        domain: { x: [0, 1], y: [0, 1] }
+      };
+    }
+
+    var layout = getDarkLayout();
+    var config = { responsive: true, displayModeBar: false };
+
+    Plotly.newPlot(containerId, [buildTrace(0)], layout, config);
+
+    requestAnimationFrame(function startAnimation() {
+      requestAnimationFrame(function step(timestamp) {
+        if (!startTime) startTime = timestamp;
+        var elapsed = timestamp - startTime;
+        var progress = Math.min(elapsed / animDuration, 1);
+        var easedProgress = easeOutExpo(progress);
+        var currentValue = easedProgress * hawkScore;
+
+        Plotly.react(containerId, [buildTrace(currentValue)], layout, config);
+
+        if (progress < 1) {
+          requestAnimationFrame(step);
+        }
+      });
+    });
+  }
+
+  /**
    * Efficiently update the hero gauge value.
    * @param {string} containerId - DOM element ID
    * @param {number} hawkScore - New hawk score 0-100
@@ -159,10 +234,7 @@ var GaugesModule = (function () {
       type: 'indicator',
       mode: 'gauge+number',
       value: hawkScore,
-      title: {
-        text: getStanceLabel(hawkScore),
-        font: { size: 20, color: getZoneColor(hawkScore) }
-      },
+      title: { text: '' },
       number: {
         font: { size: 52, color: '#f3f4f6' },
         valueformat: '.0f',
@@ -263,6 +335,7 @@ var GaugesModule = (function () {
     getStanceLabel: getStanceLabel,
     getDisplayLabel: getDisplayLabel,
     createHeroGauge: createHeroGauge,
+    createHeroGaugeAnimated: createHeroGaugeAnimated,
     updateHeroGauge: updateHeroGauge,
     createBulletGauge: createBulletGauge,
     updateBulletGauge: updateBulletGauge
