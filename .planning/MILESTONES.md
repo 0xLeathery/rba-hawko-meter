@@ -72,3 +72,26 @@
 
 ---
 
+
+## v3.0 Full Test Coverage (Shipped: 2026-02-25)
+
+**Phases completed:** 3 phases, 6 plans
+
+**Key accomplishments:**
+- pytest-cov auto-measurement wired into every `pytest` run — terminal report + `.coverage.json` generated without extra flags, 28% baseline captured
+- 10 scraper fixture files covering all 5 data sources (happy-path + error variants) plus `scripts/check_coverage.py` per-module enforcement with `--min` threshold and diff table output
+- 132 ingest unit tests across all 6 pipeline ingest modules (http_client, abs_data, rba_data, asx_futures, corelogic, nab) — zero real HTTP requests, fully socket-blocked
+- 117 engine.py tests at 96% coverage with `engine_data_dir` fixture isolating `STATUS_OUTPUT`; 16 main.py tests covering all tier behaviors and `sys.exit(1)` contract
+- All 13 `pipeline/` modules at 85%+ coverage (range: 90–100%) — 411 total unit tests passing
+- Coverage enforcement wired into `npm run test:fast` and lefthook pre-push hook — coverage regression impossible to push undetected
+
+**Stats:**
+- Timeline: 2026-02-25 (1 day)
+- Commits: 26
+- Files modified: 100
+- Lines changed: +9,779
+- Codebase total: ~9,514 Python LOC
+- Test suite: 411 pytest unit tests + 9 live tests + 28 Playwright tests
+
+---
+
