@@ -58,26 +58,26 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| INFRA-01 | — | Pending |
-| INFRA-02 | — | Pending |
-| INFRA-03 | — | Pending |
-| INFRA-04 | — | Pending |
-| INGEST-01 | — | Pending |
-| INGEST-02 | — | Pending |
-| INGEST-03 | — | Pending |
-| INGEST-04 | — | Pending |
-| INGEST-05 | — | Pending |
-| INGEST-06 | — | Pending |
-| ORCH-01 | — | Pending |
-| ORCH-02 | — | Pending |
-| ENFORCE-01 | — | Pending |
-| ENFORCE-02 | — | Pending |
+| INFRA-01 | Phase 18 | Pending |
+| INFRA-02 | Phase 18 | Pending |
+| INFRA-03 | Phase 18 | Pending |
+| INFRA-04 | Phase 18 | Pending |
+| INGEST-01 | Phase 19 | Pending |
+| INGEST-02 | Phase 19 | Pending |
+| INGEST-03 | Phase 19 | Pending |
+| INGEST-04 | Phase 19 | Pending |
+| INGEST-05 | Phase 19 | Pending |
+| INGEST-06 | Phase 19 | Pending |
+| ORCH-01 | Phase 20 | Pending |
+| ORCH-02 | Phase 20 | Pending |
+| ENFORCE-01 | Phase 20 | Pending |
+| ENFORCE-02 | Phase 20 | Pending |
 
 **Coverage:**
 - v3.0 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14
+- Mapped to phases: 14
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-25*
-*Last updated: 2026-02-25 after initial definition*
+*Last updated: 2026-02-25 — traceability mapped during roadmap creation*
