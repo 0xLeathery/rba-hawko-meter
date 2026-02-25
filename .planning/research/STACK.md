@@ -1,242 +1,269 @@
 # Technology Stack
 
-**Project:** RBA Hawk-O-Meter — v2.0 Local CI & Test Infrastructure
-**Researched:** 2026-02-24
-**Scope:** NEW capabilities only — Python unit testing, data validation, linting, git hooks, task runner
+**Project:** RBA Hawk-O-Meter — v3.0 Full Test Coverage
+**Researched:** 2026-02-25
+**Scope:** NEW capabilities only — HTTP response mocking, PDF/HTML fixture patterns, coverage enforcement. Does NOT re-research what v2.0 already established.
+**Confidence:** HIGH (all versions verified against PyPI/official docs)
 
 ---
 
-## Context: What Already Exists (Do Not Change)
+## Context: What v2.0 Already Established (Do NOT Re-research or Change)
 
-| Layer | Technology | Version | Do Not Touch |
-|-------|------------|---------|--------------|
-| Python pipeline | pandas, numpy, requests, beautifulsoup4, pdfplumber | Per requirements.txt | Already in requirements.txt |
-| E2E tests | Playwright | ^1.50.0 | Already in package.json |
-| Python runtime | Python 3.11 (GitHub Actions), 3.13.12 (local) | 3.11+ | Used in weekly-pipeline.yml |
-| Node.js runtime | v25.6.1 (local) | v25 | Already installed |
-| Hosting | Netlify + GitHub Actions | — | Unchanged |
+| Layer | Technology | Version | Status |
+|-------|------------|---------|--------|
+| Test runner | pytest | 9.0.2 | Installed, configured in pyproject.toml |
+| Coverage plugin | pytest-cov | 7.0.0 | Installed locally, NOT yet in requirements-dev.txt |
+| Linting | ruff | 0.15.2 | Installed, configured in pyproject.toml |
+| Schema validation | jsonschema | 4.26.0 | Installed |
+| Data libraries | pandas, numpy, requests, beautifulsoup4, pdfplumber, lxml | see requirements.txt | Installed |
+| Test isolation | socket-level network blocker, DATA_DIR monkeypatch | — | conftest.py autouse fixtures |
+| Git hooks | lefthook | — | Pre-push: lint + unit tests |
+| Mock stdlib | unittest.mock (MagicMock, patch, call) | Python 3.13 stdlib | Available, no install needed |
 
----
+**Current coverage baseline (2026-02-25):**
 
-## Recommended Stack Additions
-
-### Python Testing
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| **pytest** | `>=9.0,<10` | Unit test runner | Industry standard for Python. Pure function coverage (zscore.py, gauge.py, ratios.py) maps cleanly to pytest's fixture + parametrize model. 9.0.2 is current stable (Dec 2025). |
-| **pytest-cov** | `>=7.0,<8` | Coverage reporting | Direct pytest integration. Version 7.0.0 (Sep 2025) is current. Produces terminal + HTML reports. `--cov-fail-under=80` enforces a floor without being painful. |
-| **pytest-mock** | `>=3.15,<4` | Mocking HTTP calls in tests | Thin wrapper around `unittest.mock`. Needed to unit-test scrapers without live network calls (mock `requests.get`, `pdfplumber.open`). 3.15.1 is current. |
-
-**No pytest-xdist.** Test suite will be small (< 100 tests). Parallel execution adds complexity with no payoff at this scale.
-
-**No pytest-asyncio.** Pipeline is synchronous — no async code to test.
-
-### Python Data Validation
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| **jsonschema** | `>=4.26,<5` | status.json schema validation | Validates status.json against a defined JSON Schema — catches missing keys, wrong types, out-of-range gauge values (0–100), invalid zone strings. 4.26.0 (Jan 2026) is current stable. Requires Python >=3.10, compatible with Python 3.11+. Used directly in a pytest test, no plugin needed. |
-
-**No Pydantic for this use case.** Pydantic is excellent for runtime validation in web apps. For a one-file test-time JSON assertion against a fixed schema, jsonschema is lighter and more declarative — the schema file serves as living documentation of the status.json contract.
-
-**No Great Expectations.** GE is a data pipeline observability platform for enterprise ETL workflows. Massive over-engineering for a 7-indicator JSON file.
-
-**No Cerberus or Voluptuous.** Active but niche. jsonschema is the JSON Schema standard — portable, tooling-supported, well-understood.
-
-### Python Linting
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| **ruff** | `>=0.15,<1` | Python linting + formatting | Replaces flake8 + isort + black in a single binary. 10–100x faster than legacy tools. v0.15.2 released 2026-02-19. Configured via `ruff.toml` (no pyproject.toml required — project has none). Single `ruff check` + `ruff format --check` command covers everything. |
-
-**No flake8.** Superseded by ruff. Slower, requires separate isort/black plugins.
-
-**No black standalone.** Ruff's formatter is black-compatible; no need for two tools.
-
-**No mypy/pyright.** Type checking is not in scope for v2.0 and adds significant configuration overhead for a dynamically-typed ETL pipeline that predates type annotations.
-
-### JavaScript Linting
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| **eslint** | `^10.0.0` | JS linting for vanilla IIFE modules | v10.0.0 released Feb 2026. Node.js v25.6.1 (installed) satisfies the `>=20.19.0` requirement. ESLint v10 removes the legacy eslintrc system entirely — flat config (`eslint.config.js`) is the only format. Catches real bugs in the IIFE-pattern JS files: undefined vars, unreachable code, `no-undef` on global APIs. |
-| **@eslint/js** | `^10.0.0` | ESLint recommended rule set | Ships with ESLint. Provides `eslint.configs.recommended` — the baseline rule set for JS linting. No TypeScript parser needed. |
-| **globals** | `^16.0.0` | Browser global definitions | Required for flat config to recognize `window`, `document`, `Plotly`, `Decimal` as known globals (not errors). Must be installed explicitly — ESLint v10 no longer bundles it. |
-
-**No TypeScript/tsx support.** Codebase is vanilla JS — no TS needed.
-
-**No prettier for JS.** Codebase has no build system; formatting enforcement on vanilla JS is not in scope for v2.0. ESLint handles correctness, not style.
-
-**No @eslint/eslintrc compatibility layer.** Project starts fresh with flat config — no legacy config to migrate.
-
-### Git Hooks
-
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| **lefthook** | `^2.1.1` | Pre-push git hook runner | Language-agnostic (runs both Python and JS commands in one config). Single `lefthook.yml` file — no shell script scaffolding. Binary-based: no Node.js startup overhead in the hook. Pre-push (not pre-commit) is the right trigger — fast enough that it doesn't block every commit, catches regressions before they reach GitHub. Installs via `npm i --save-dev lefthook`; integrates into `package.json prepare` script for auto-setup. |
-
-**Not husky.** Husky only runs shell commands — works fine, but lefthook's single-file config and parallel execution capability justify the swap. For this project the difference is minor, but lefthook cleanly separates Python (`pytest`) and JS (`eslint`) hooks without shell script juggling.
-
-**Not pre-commit (Python tool).** pre-commit is Python-ecosystem-first. Managing it alongside npm-installed tools adds a second tool registry. Lefthook handles both languages with one config.
-
-**Not plain shell scripts in `.git/hooks/`.** Not portable across team members (not committed to git). Lefthook scripts are committed and auto-installed.
-
-### Task Runner
-
-**No new tool needed.** npm scripts in `package.json` are the task runner. The existing `package.json` already has `test` and `test:headed` scripts. Adding `test:fast`, `test:python`, `lint`, `lint:py`, `lint:js`, and `verify` scripts is sufficient.
-
-**Not Makefile.** Project is macOS/Linux only and simple enough that npm scripts cover it. A Makefile would be a third configuration system alongside `lefthook.yml` and `package.json`.
-
-**Not Just (Justfile).** Just is excellent but adds a Rust binary dependency with no payoff over npm scripts at this complexity level.
+| Module | Coverage | Gap |
+|--------|----------|-----|
+| pipeline/ingest/abs_data.py | 17% | 83pp to 85% |
+| pipeline/ingest/asx_futures_scraper.py | 13% | 72pp to 85% |
+| pipeline/ingest/corelogic_scraper.py | 19% | 66pp to 85% |
+| pipeline/ingest/nab_scraper.py | 14% | 71pp to 85% |
+| pipeline/ingest/rba_data.py | 24% | 61pp to 85% |
+| pipeline/main.py | 0% | 85pp to 85% |
+| pipeline/normalize/engine.py | 0% | 85pp to 85% |
+| pipeline/utils/http_client.py | 42% | 43pp to 85% |
+| pipeline/normalize/gauge.py | 81% | 4pp to 85% |
+| pipeline/normalize/ratios.py | 68% | 17pp to 85% |
 
 ---
 
-## Installation
+## Recommended Stack Additions for v3.0
 
-### Python additions (add to requirements.txt)
+### 1. pytest-mock — Mocking Convenience Layer
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **pytest-mock** | `>=3.15,<4` | `mocker` fixture for patching | Not installed. Provides `mocker.patch()`, `mocker.MagicMock()` as pytest fixtures that auto-reset after each test — cleaner than `@patch` decorators or `monkeypatch.setattr` chains for complex mock trees. 3.15.1 current (Sep 2025). Python 3.9+ compatible. |
+
+**Why not raw `unittest.mock` + `monkeypatch`?** For tests with 3+ mock targets (e.g., `http_client.create_session`, `session.get`, `pdfplumber.open`, `pipeline.config.DATA_DIR`), decorator stacking with `@patch` becomes hard to read. `mocker.patch()` keeps mocks inline where they are used, and they auto-reset without needing `addCleanup`. For single-target mocks, `monkeypatch.setattr` (already in conftest) is fine and stays.
+
+**Integration:** Works alongside existing `monkeypatch` fixtures — they solve different problems. `mocker` for third-party call interception; `monkeypatch` for attribute/module-level patches that need to survive fixture teardown ordering.
+
+---
+
+### 2. responses — HTTP Response Mocking for requests.Session
+
+| Technology | Version | Purpose | Why |
+|------------|---------|---------|-----|
+| **responses** | `>=0.26,<1` | Intercept `requests.Session.get()` calls | 0.26.0 released 2026-02-19. Intercepts at the transport adapter layer — works transparently with the project's `create_session()` which mounts a custom `HTTPAdapter` with `urllib3.Retry`. Tests do not need to replace `create_session` itself. |
+
+**The core problem it solves:** The existing `block_network` conftest fixture blocks at `socket.socket` level. Scraper tests need to call the actual scraper functions (testing real parsing logic) but return controlled HTTP responses. The approach is:
+
+1. `@responses.activate` intercepts at the `requests` transport layer, before the socket blocker fires.
+2. Register mock URLs: `responses.add(responses.GET, url, body=b"...", status=200)`.
+3. The scraper's `session.get(url)` returns the mocked response — no socket is opened.
+4. The network blocker remains effective for any code that bypasses `responses`.
+
+**Why not `requests-mock`?** `requests-mock` (latest: 1.12.1, March 2024) has equivalent functionality and also intercepts at the adapter layer. Both work. `responses` is chosen because:
+- More active maintenance (0.26.0 released Feb 2026 vs requests-mock last updated Mar 2024).
+- Cleaner `@responses.activate` decorator pattern integrates well with pytest without a separate fixture parameter.
+- Native pytest fixture available via `responses` context manager.
+
+**Why not `unittest.mock.patch('requests.Session.get')`?** Patching at the method level requires knowing exactly where the session is created and used. The project's `create_session()` is called inside each scraper function — patching at the right import path is fragile across refactors. `responses` intercepts at the network layer regardless of where the session object lives.
+
+**Integration with socket blocker:** The `block_network` fixture in conftest.py patches `socket.socket`. The `responses` library intercepts at the `HTTPAdapter.send()` level, before any socket is created. No conflict. Both can be active simultaneously — `responses` handles registered URLs; the socket blocker catches anything that falls through unregistered.
+
+---
+
+### 3. pytest-cov in requirements-dev.txt + pyproject.toml addopts
+
+pytest-cov 7.0.0 is already installed locally. It is NOT in requirements-dev.txt and is NOT wired into pyproject.toml `addopts`. This means coverage is not measured on `npm run test:fast` or the pre-push hook.
+
+**Change needed:** Add to `requirements-dev.txt`:
 
 ```
-pytest>=9.0,<10
 pytest-cov>=7.0,<8
+```
+
+**Change needed:** Add to `pyproject.toml` `[tool.pytest.ini_options]`:
+
+```toml
+addopts = ["--strict-markers", "--cov=pipeline", "--cov-report=term-missing"]
+```
+
+This runs coverage on every `pytest` invocation (including the pre-push hook). The `--cov-report=term-missing` output shows exactly which lines are uncovered — essential during active test development.
+
+**Do NOT add `--cov-fail-under` to addopts.** Coverage enforcement belongs in a separate script (see section 4 below). Wiring it into `addopts` means every test run fails until 85% is achieved globally — which penalizes iterative development of tests for individual modules.
+
+---
+
+### 4. Per-Module Coverage Enforcement Script
+
+`coverage.py`'s `--cov-fail-under` is a global threshold only — it cannot enforce per-module minimums. This is a documented limitation (GitHub issue #444 in pytest-dev/pytest-cov). Coverage.py does not support per-file `fail_under` in pyproject.toml configuration.
+
+**Solution:** A small Python script (`scripts/check_coverage.py`) that:
+
+1. Reads `--cov-report=json` output (`.coverage.json`)
+2. Iterates per-file coverage percentages
+3. Asserts each `pipeline/` module meets 85%
+4. Exits non-zero on failure with a clear diff table
+
+This is the standard pattern used in the Python ecosystem when per-file thresholds are needed. It is NOT a third-party library — it is a ~30-line project script.
+
+**Wire into `pyproject.toml` addopts:**
+
+```toml
+addopts = [
+    "--strict-markers",
+    "--cov=pipeline",
+    "--cov-report=term-missing",
+    "--cov-report=json:.coverage.json",
+]
+```
+
+**Wire into Lefthook pre-push** after pytest:
+
+```yaml
+commands:
+  unit-tests:
+    run: python -m pytest tests/python/ -m "not live"
+  coverage-check:
+    run: python scripts/check_coverage.py --min 85
+```
+
+**Why a script vs. a plugin?** The only third-party plugin for per-file thresholds is `pytest-cov-threshold` (unmaintained, last commit 2020). Writing 30 lines of JSON-parsing logic is safer and requires no additional dependency.
+
+---
+
+### 5. PDF and HTML Test Fixtures
+
+No new library needed. The approach for testing scraper parsing functions:
+
+**PDF fixtures (corelogic_scraper, nab_scraper):** Create minimal real PDFs using `pdfplumber` + `reportlab` — OR use `io.BytesIO` with pre-captured real PDF bytes stored as fixture files.
+
+**Recommended approach:** Store binary fixture files in `tests/python/fixtures/`:
+- `cotality_hvi_sample.pdf` — 1-page PDF with "Australia 0.8% 2.4% 9.4%" pattern
+- `nab_survey_sample.pdf` — 1-page PDF with "Capacity utilisation 82.1%"
+
+These are created once by running the scraper against live sources and saving the bytes. They are small (<100KB), committed to git, and never change unless the source format changes.
+
+**HTML fixtures:** Store as `.html` files in `tests/python/fixtures/`:
+- `nab_tag_archive.html` — mock tag archive page with a `monthly-business-survey` link
+- `nab_article.html` — mock article with capacity utilisation inline text
+- `nab_article_no_capacity.html` — article without the pattern (tests PDF fallback path)
+
+These are used by passing `Path("tests/python/fixtures/nab_article.html").read_bytes()` directly to parsing functions — no HTTP call needed for the parsing layer.
+
+**Why not `reportlab` for generating PDFs?** reportlab is a ~4MB dependency for generating PDFs programmatically. Saving real PDF bytes as binary fixtures accomplishes the same goal with zero new dependencies.
+
+---
+
+## Complete Installation Delta
+
+### requirements-dev.txt additions
+
+```
+# v3.0 additions — full test coverage milestone
 pytest-mock>=3.15,<4
-jsonschema>=4.26,<5
-ruff>=0.15,<1
-```
-
-### JavaScript additions (add to package.json devDependencies)
-
-```bash
-npm install --save-dev eslint@^10.0.0 @eslint/js@^10.0.0 globals@^16.0.0 lefthook@^2.1.1
-```
-
----
-
-## Configuration Files to Create
-
-| File | Tool | Location | Notes |
-|------|------|----------|-------|
-| `ruff.toml` | ruff | repo root | `target-version = "py311"`, select E/F/I/W, exclude `pipeline/__init__.py` stubs |
-| `eslint.config.js` | ESLint | repo root | Flat config with `globals.browser`, IIFE globals (Plotly, Decimal) |
-| `lefthook.yml` | lefthook | repo root | `pre-push` hook: runs `pytest` (fast subset) + `ruff check` + `eslint` |
-| `pytest.ini` or `[tool.pytest.ini_options]` in `pyproject.toml` | pytest | repo root | `testpaths = tests/python`, `--cov=pipeline`, `--cov-report=term-missing` |
-
-**Use `pytest.ini` (not `pyproject.toml`)** — project has no pyproject.toml and adding one just for pytest config is unnecessary overhead. `pytest.ini` is a single-purpose file.
-
----
-
-## Integration with Existing Files
-
-### package.json — New Scripts
-
-```json
-{
-  "scripts": {
-    "test": "npx playwright test",
-    "test:headed": "npx playwright test --headed",
-    "test:python": "python -m pytest tests/python/ -v",
-    "test:fast": "python -m pytest tests/python/ -v -m 'not live' && npm run lint",
-    "lint": "npm run lint:py && npm run lint:js",
-    "lint:py": "ruff check . && ruff format --check .",
-    "lint:js": "npx eslint public/js/",
-    "verify": "python -m pytest tests/python/ -v -m live && npm test"
-  },
-  "prepare": "lefthook install"
-}
-```
-
-**Two-tier design:**
-- `npm run test:fast` — pytest unit tests (mocked, no network) + linting. Runs in ~5-15 seconds. Triggered by lefthook pre-push hook.
-- `npm run verify` — full pipeline with live API calls + Playwright E2E. Runs on demand; too slow for git hooks.
-
-### requirements.txt — Additions Only
-
-```
-# Existing (unchanged)
-pandas>=2.0,<3.0
-numpy>=1.24,<3.0
-requests>=2.28,<3.0
-beautifulsoup4>=4.12,<5.0
-lxml>=4.9,<6.0
-python-dateutil>=2.8,<3.0
-pdfplumber>=0.11,<1.0
-
-# NEW: testing and linting (v2.0)
-pytest>=9.0,<10
+responses>=0.26,<1
 pytest-cov>=7.0,<8
-pytest-mock>=3.15,<4
-jsonschema>=4.26,<5
-ruff>=0.15,<1
 ```
+
+### No package.json changes needed.
+
+### pyproject.toml changes
+
+```toml
+[tool.pytest.ini_options]
+minversion = "6.0"
+testpaths = ["tests/python"]
+pythonpath = ["."]
+addopts = [
+    "--strict-markers",
+    "--cov=pipeline",
+    "--cov-report=term-missing",
+    "--cov-report=json:.coverage.json",
+]
+markers = [
+    "live: marks tests that require live network access (deselect with '-m \"not live\"')",
+    "unit: marks fast unit tests with no I/O (default tier)",
+]
+```
+
+### New file: scripts/check_coverage.py
+
+A ~30-line script parsing `.coverage.json` and asserting >=85% per `pipeline/` module. No third-party dependency.
 
 ---
 
 ## What NOT to Add
 
-| Avoid | Why |
-|-------|-----|
-| **Pydantic** | Overkill for a static JSON validation test. jsonschema is self-documenting and schema-portable. |
-| **Great Expectations** | Enterprise data pipeline observability — 100x more than needed for status.json validation. |
-| **mypy / pyright** | Type checking is out of scope for v2.0. Pipeline pre-dates type annotations. |
-| **black (standalone)** | Ruff's formatter is black-compatible. Two formatters cause conflicts. |
-| **flake8 + isort** | Superseded by ruff entirely. |
-| **prettier** | JS formatting not in scope. Project has no build system; prettier requires a config + ignore file for every dev. |
-| **Jest / Vitest** | Vanilla IIFE JS is not modular — no `import`/`export` to unit-test without a bundler. Playwright E2E already covers JS behavior. |
-| **webpack / esbuild** | No build system is a deliberate architectural decision. No bundler = no module graph = no bundler needed for tests. |
-| **pytest-xdist** | Parallel test execution not needed at < 100 tests. |
-| **tox** | Multi-environment testing not needed. Single Python 3.11 target matches GitHub Actions. |
-| **pyproject.toml** | Project has no build system. Adding pyproject.toml just for tool config (ruff + pytest already have standalone alternatives: `ruff.toml` and `pytest.ini`) adds a config system with no payoff. |
-| **husky + lint-staged** | Lefthook handles both Python and JS hooks in one file without shell scripting. |
-| **Makefile** | npm scripts are sufficient; Makefile is a third config system with no advantage here. |
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| **vcrpy / betamax** | Record/replay HTTP cassettes — overkill for predictable API responses. Cassettes go stale when endpoints change. | `responses` with inline fixture data |
+| **httpretty** | Older HTTP mocking library, patches at socket level. Conflicts with the existing socket blocker in conftest.py. | `responses` (transport-layer interception) |
+| **pytest-httpserver** | Runs a real local HTTP server — requires port management, slower, more complex. | `responses` (no server, no ports) |
+| **reportlab** | PDF generation library — heavy (4MB). Only needed if generating test PDFs programmatically. | Binary fixture files in tests/python/fixtures/ |
+| **faker / factory_boy** | Data generation libraries for ORM-backed apps. Pipeline operates on DataFrames from CSVs, not model instances. | Inline DataFrames in test functions |
+| **pytest-cov-threshold** | Third-party per-file threshold plugin, unmaintained since 2020. | Custom `scripts/check_coverage.py` parsing JSON report |
+| **tox** | Multi-environment testing. One Python version target (3.13 local, 3.11 GHA). | Single pytest invocation |
+| **pytest-xdist** | Parallel test execution. Test suite will be ~200-300 tests max — parallelism adds complexity with no payoff at this scale. | Single-process pytest |
+| **mypy / pyright** | Type checking. Explicitly out of scope per PROJECT.md "Out of Scope" table. | ruff catches the relevant issues |
+| **requests-mock** | Functionally equivalent to `responses` but last updated March 2024 vs `responses` Feb 2026. | `responses` |
+| **pytest-recording (VCR)** | Wraps vcrpy with pytest — same cassette staleness problem. | `responses` with explicit mock data |
 
 ---
 
 ## Alternatives Considered
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Python test runner | pytest | unittest | pytest fixtures, parametrize, and plugin ecosystem are substantially better DX. unittest has no equivalent of `mocker` or `pytest-cov` integration. |
-| Python linter | ruff 0.15.x | flake8 + black + isort | Three tools → one. Ruff is 10–100x faster. Active development (released 2026-02-19). |
-| Data validation | jsonschema 4.26 | Pydantic | jsonschema is declarative + portable. Pydantic is runtime validation for typed models — wrong fit for a one-off JSON file assertion in tests. |
-| JS linter | ESLint v10 | Biome | Biome is excellent but ESLint has broader vanilla JS rule coverage and better established community configs. No TypeScript = no Biome advantage for this project. |
-| Git hook manager | lefthook | husky | lefthook handles Python + JS in one YAML file without shell scripts. Binary = faster. |
-| Git hook manager | lefthook | pre-commit (Python tool) | pre-commit is Python-ecosystem-first and installs via pip — mixing it with npm-managed tools creates two registration systems. |
-| Task runner | npm scripts | Makefile / Just | npm scripts are already in place. Adding Makefile or Just is a third config system with no payoff at this complexity level. |
+| Category | Recommended | Alternative | When Alternative Is Better |
+|----------|-------------|-------------|---------------------------|
+| HTTP mocking | `responses` 0.26.0 | `requests-mock` 1.12.1 | If team has existing requests-mock familiarity — functionally equivalent |
+| HTTP mocking | `responses` 0.26.0 | `unittest.mock.patch('requests.Session.get')` | For tests that only call a single HTTP endpoint once — simpler to inline |
+| Mock fixtures | `pytest-mock` mocker | `unittest.mock.patch` decorators | For tests with a single mock target — `@patch` is fine and has no extra dep |
+| PDF fixtures | Binary fixture files | `reportlab` generated PDFs | If PDF structure needs to change frequently between tests — then programmatic generation wins |
+| Per-module enforcement | Custom script | `--cov-fail-under` global | For projects that only need a global floor — one liner in pyproject.toml |
+
+---
+
+## Integration with Existing pyproject.toml / pytest Config
+
+**Existing conftest.py is compatible.** The `block_network` fixture (socket-level) and `responses` library (transport-level) operate at different layers and co-exist without conflict. Tests using `@responses.activate` will have their HTTP calls intercepted before the socket blocker fires.
+
+**Existing `isolate_data_dir` fixture is unaffected.** Scraper tests still need `pipeline.config.DATA_DIR` isolated — this remains an autouse fixture. Scraper tests using `responses` will additionally patch `pipeline.config.DATA_DIR` to a tmp_path (already handled automatically).
+
+**Existing `--strict-markers` stays.** The new `unit` marker needs to be declared in `pyproject.toml` markers list if used.
+
+**Coverage in the pre-push hook:** Adding `--cov` to `addopts` means the pre-push hook (which runs `pytest -m "not live"`) now produces coverage output. This is desirable — it surfaces gaps during active development. The lefthook 30s timeout is sufficient; the current 118-test suite runs in ~0.4s; 200-300 tests with coverage should complete in under 5s.
 
 ---
 
 ## Version Compatibility
 
-| Package | Python | Node.js | Conflicts |
-|---------|--------|---------|-----------|
-| pytest 9.0.2 | >=3.8 | — | None |
-| pytest-cov 7.0.0 | >=3.9 | — | Requires coverage >=7.10.6 (auto-installed) |
-| pytest-mock 3.15.1 | >=3.8 | — | None |
-| jsonschema 4.26.0 | >=3.10 | — | None (Python 3.11 matches) |
-| ruff 0.15.2 | >=3.7 | — | None |
-| ESLint 10.0.x | — | ^20.19.0 \|\| ^22.13.0 \|\| >=24 | Node.js v25.6.1 installed — requirement met |
-| globals 16.x | — | — | None |
-| lefthook 2.1.1 | — | any | None (binary, not Node.js dependent) |
+| Package | Version | Python Compat | Conflicts |
+|---------|---------|---------------|-----------|
+| pytest-mock | 3.15.1 | >=3.9 | None with pytest 9.0.2 |
+| responses | 0.26.0 | >=3.8 | None with requests 2.x |
+| pytest-cov | 7.0.0 | >=3.8 | Requires coverage >=7.10.6 (installed: 7.13.4 — satisfied) |
+| coverage | 7.13.4 | >=3.9 | Already installed, satisfies pytest-cov requirement |
 
-**GitHub Actions compatibility:** GitHub Actions uses Python 3.11 (set in `weekly-pipeline.yml`). All Python additions require >=3.8 or >=3.10 — compatible. GitHub Actions does not install Node.js by default; any JS linting steps in Actions would need `actions/setup-node`. This is NOT needed for the pre-push hook (local only) but would be needed if ESLint is added to a CI workflow in the future.
+**Python 3.13 local / 3.11 GitHub Actions:** All additions are compatible with both. `responses` 0.26.0 requires Python >=3.8. `pytest-mock` 3.15.1 requires Python >=3.9. Both satisfied by 3.11+.
 
 ---
 
 ## Sources
 
-- **pytest 9.0.2** — https://pypi.org/project/pytest/ — confirmed latest stable Dec 2025 (HIGH confidence)
-- **pytest-cov 7.0.0** — https://pypi.org/project/pytest-cov/ — confirmed Sep 2025 (HIGH confidence)
-- **pytest-mock 3.15.1** — https://pypi.org/project/pytest-mock/ — confirmed current (HIGH confidence)
-- **jsonschema 4.26.0** — https://pypi.org/project/jsonschema/ — confirmed Jan 2026, requires Python >=3.10 (HIGH confidence)
-- **ruff 0.15.2** — https://pypi.org/project/ruff/ — confirmed released 2026-02-19 (HIGH confidence)
-- **ruff configuration** — https://docs.astral.sh/ruff/configuration/ — `ruff.toml` supported, no pyproject.toml needed (HIGH confidence)
-- **ESLint v10.0.0** — https://eslint.org/blog/2026/02/eslint-v10.0.0-released/ — released Feb 2026, requires Node.js >=20.19.0 (HIGH confidence)
-- **ESLint flat config** — https://eslint.org/docs/latest/use/configure/configuration-files — flat config is now the only system in v10 (HIGH confidence)
-- **globals package** — https://www.npmjs.com/package/globals — required for ESLint flat config browser globals (HIGH confidence)
-- **lefthook 2.1.1** — https://www.npmjs.com/package/lefthook — latest published ~7 days ago as of 2026-02-24 (HIGH confidence)
-- **Node.js v25.6.1** — verified locally via `node --version` — satisfies ESLint v10 Node.js requirement (HIGH confidence)
+- **pytest-mock 3.15.1** — https://pypi.org/project/pytest-mock/ — version verified Feb 2026 (HIGH confidence)
+- **responses 0.26.0** — https://pypi.org/project/responses/ — released 2026-02-19, verified (HIGH confidence)
+- **responses + Session/HTTPAdapter** — https://github.com/getsentry/responses — intercepts at HTTPAdapter.send(), compatible with urllib3.Retry (MEDIUM confidence; docs confirm Session support for prepared requests)
+- **pytest-cov 7.0.0** — https://pypi.org/project/pytest-cov/ — version verified, already installed locally (HIGH confidence)
+- **coverage.py per-file thresholds** — https://coverage.readthedocs.io/en/latest/config.html — confirmed: no per-file fail_under, only global (HIGH confidence)
+- **pytest-cov per-file threshold limitation** — https://github.com/pytest-dev/pytest-cov/issues/444 — open issue, confirmed as unimplemented feature (HIGH confidence)
+- **requests-mock** — https://pypi.org/project/requests-mock/ — v1.12.1, last updated March 2024 — considered and deprioritized vs responses (HIGH confidence)
+- **coverage.py JSON report format** — https://coverage.readthedocs.io/en/latest/config.html — --cov-report=json supported (HIGH confidence)
+- **pytest-cov configuration** — https://pytest-cov.readthedocs.io/en/latest/config.html — addopts integration verified (HIGH confidence)
 
 ---
 
-*Stack research for: RBA Hawk-O-Meter v2.0 Local CI & Test Infrastructure*
-*Researched: 2026-02-24*
+*Stack research for: RBA Hawk-O-Meter v3.0 Full Test Coverage milestone*
+*Researched: 2026-02-25*

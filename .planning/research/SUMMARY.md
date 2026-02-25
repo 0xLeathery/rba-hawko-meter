@@ -1,17 +1,17 @@
 # Project Research Summary
 
-**Project:** RBA Hawk-O-Meter — v2.0 Local CI & Test Infrastructure
-**Domain:** Developer tooling — Python + vanilla JS economic dashboard
-**Researched:** 2026-02-24
+**Project:** RBA Hawk-O-Meter — v3.0 Full Test Coverage
+**Domain:** Python unit test coverage — I/O-heavy scraper, ingest, and orchestration modules
+**Researched:** 2026-02-25
 **Confidence:** HIGH
 
 ## Executive Summary
 
-The v2.0 milestone adds local CI and test infrastructure to an existing Python+vanilla JS dashboard that has no unit tests, no linting, and no pre-push gates. The project already has 24 Playwright E2E tests and two GitHub Actions workflows; the gap is purely in fast, local quality feedback. Research across stack, features, architecture, and pitfalls converges on a single recommendation: a lean, two-tier test system using pytest (unit tests) + ruff (Python linting) + ESLint v10 (JS linting) + lefthook (pre-push hook), all orchestrated through npm scripts, with no new abstraction layers or frameworks beyond what these tools provide out of the box.
+The v3.0 milestone extends the test infrastructure built in v2.0 (pytest foundation, conftest autouse fixtures, 118 unit tests for pure math modules) to the I/O-heavy layer that was deliberately left uncovered: five ingest/scraper modules, the normalization engine, the pipeline orchestrator, and the HTTP client utility. These modules are currently at 0-42% coverage. The target is 85%+ per-module coverage enforced by a custom `scripts/check_coverage.py` script (since `coverage.py` offers no per-file threshold configuration natively). Three new packages are added: `pytest-mock` for clean multi-target mocking, `responses` for HTTP transport-layer interception (though research ultimately recommends `unittest.mock.MagicMock` with `create_session` patching as the primary pattern), and `pytest-cov` wired into `pyproject.toml addopts` so coverage is measured on every test run including the pre-push hook.
 
-The critical architectural decision is strict separation between fast "unit" tests and slow "live" tests. Unit tests must never make real HTTP calls or read from live `data/*.csv` files; they run in the pre-push hook and must complete in under 10 seconds. Live tests (marked `@pytest.mark.live`) hit real external APIs and run only on demand via `npm run verify`. This separation is the single most important design decision — every pitfall identified in research flows from violating it. The `conftest.py` in `tests/python/` must enforce this from day one via an `autouse` network-blocking fixture and a `DATA_DIR` patch redirecting all file I/O to `tmp_path`.
+The recommended approach is an inside-out test writing sequence: pure functions first (zero mocking, immediate coverage gains), then file-I/O functions using the existing `isolate_data_dir` autouse fixture, then mock-session tests for the five ingest modules, and finally orchestration tests for `engine.py` and `main.py`. This order is critical because the mock session pattern must be established and verified in one module before being replicated across all five ingest modules. The single most important architectural rule — established in ARCHITECTURE.md and reinforced across all four research files — is that `create_session` must be patched in the module where it is used (e.g., `pipeline.ingest.abs_data.create_session`), not in the source module (`pipeline.utils.http_client.create_session`). Getting this wrong produces confusing `RuntimeError: Network access blocked in tests` failures that look like infrastructure problems.
 
-The tooling choices are deliberate and minimal: ruff 0.15.x replaces flake8 + black + isort in a single binary; lefthook manages the pre-push hook without shell-script juggling; ESLint v10 flat config is the only valid ESLint format going forward. The right output for this milestone is 8-15 meaningful test functions covering the pure math modules (`zscore.py`, `gauge.py`, `ratios.py`, `csv_handler.py`), a schema validation test for `status.json`, and a pre-push hook that runs clean in under 10 seconds. That is the complete scope — resist the pull toward over-engineering.
+Three categories of risk dominate the pitfalls research. First, the correct patch target for `create_session` is the most likely source of frustration during Phase 1. Second, error-path coverage is the primary reason modules plateau at 60-70% — every ingest function has 4-8 distinct error branches that each require their own test. Third, date-dependent logic in the CoreLogic and NAB scrapers causes non-deterministic CI failures unless `datetime.now()` is frozen or patched per-test. A fourth structural gap that is easy to miss: `pipeline.config.STATUS_OUTPUT` (pointing to `public/data/status.json`) is NOT patched by the `isolate_data_dir` autouse fixture, so any test calling `generate_status()` writes to the real output file unless explicitly patched.
 
 ---
 
@@ -19,168 +19,135 @@ The tooling choices are deliberate and minimal: ruff 0.15.x replaces flake8 + bl
 
 ### Recommended Stack
 
-The existing stack (pandas, numpy, requests, beautifulsoup4, pdfplumber, Playwright, GitHub Actions) is untouched. Five Python packages and four Node.js packages are added, all at their current stable versions. No build system, no type checker, no coverage enforcement tool, and no task runner beyond npm scripts. See STACK.md for full rationale.
+The v2.0 test infrastructure (pytest 9.0.2, pytest-cov 7.0.0, ruff 0.15.2, jsonschema 4.26.0, lefthook, `unittest.mock` stdlib) requires only three additions for v3.0. All versions verified against PyPI as of 2026-02-25. No changes to `package.json`, the Playwright suite, or GitHub Actions workflows are required.
 
-**Core technologies:**
+**Core technologies added:**
 
-- **pytest 9.0.2**: Unit test runner — industry standard; parametrize and fixtures cover all use cases at this scale; requires Python >=3.8
-- **pytest-cov 7.0.0**: Coverage reporting — available for visibility but not enforced; coverage % is a vanity metric for this solo project
-- **pytest-mock 3.15.1**: HTTP mocking — thin wrapper over `unittest.mock`; needed to isolate scraper tests from live APIs
-- **jsonschema 4.26.0**: Data validation — declarative schema assertion for `status.json` contract; requires Python >=3.10 (compatible with project's Python 3.11)
-- **ruff 0.15.2**: Python linting + formatting — replaces flake8 + isort + black in one binary; released 2026-02-19; configured via `ruff.toml` (no pyproject.toml required)
-- **eslint 10.0.0**: JS linting — flat config only (v10 removed legacy `.eslintrc` entirely); released Feb 2026; targets `public/js/` IIFE modules
-- **@eslint/js 10.0.0 + globals 16.x**: ESLint recommended rules + browser global definitions (required for ESLint v10 flat config)
-- **lefthook 2.1.1**: Pre-push hook runner — language-agnostic, single YAML config, binary (no Node.js startup overhead); manages both Python and JS hooks in one file
+- **pytest-mock 3.15.1**: `mocker` fixture for clean multi-target mock trees — auto-resets after each test; use for tests with 3+ simultaneous mock targets; `monkeypatch.setattr` remains for single-target patches
+- **responses 0.26.0**: HTTP transport-layer interceptor (released 2026-02-19) — intercepts at `HTTPAdapter.send()` level before the socket blocker fires; HOWEVER, research determined `MagicMock` + `create_session` patching is simpler and sufficient for this codebase; `responses` is available if needed
+- **pytest-cov wired into addopts**: Already installed but not wired; add `--cov=pipeline --cov-report=term-missing --cov-report=json:.coverage.json` to `pyproject.toml addopts` so coverage is measured on every `pytest` invocation
+- **scripts/check_coverage.py**: ~30-line custom script parsing `.coverage.json` and asserting >=85% per `pipeline/` module; enforced in the lefthook pre-push sequence; necessary because `coverage.py` has no per-file `fail_under` configuration (GitHub issue #444, confirmed unimplemented)
 
-**Critical version requirements:**
-- Python 3.11+ required (matches GitHub Actions; jsonschema requires >=3.10)
-- Node.js v25.6.1 locally installed — satisfies ESLint v10's `>=20.19.0` requirement
-- ESLint v10 uses flat config (`eslint.config.js`) only; no `.eslintrc` supported
-
-**STACK.md recommends `pytest.ini` over `pyproject.toml`** for pytest config (project has no pyproject.toml and adding one just for tool config is overhead). **FEATURES.md and ARCHITECTURE.md both recommend `pyproject.toml`** as the single config hub for pytest + ruff. Recommendation: use `pyproject.toml` — it consolidates both tools in one file and is the direction both tools favour long-term.
+**What NOT to add:** vcrpy/betamax (cassette staleness), httpretty (conflicts with socket blocker), pytest-httpserver (port management overhead), reportlab (4MB for PDF generation), pytest-cov-threshold (unmaintained 2020), pytest-xdist (no payoff at 200-300 test scale), mypy/pyright (explicitly out of scope per PROJECT.md), tox (one Python version target).
 
 ### Expected Features
 
-All features are developer-facing quality infrastructure with no user-visible changes.
+The coverage gap is entirely in I/O-heavy modules. The path to 85% per module is systematic: cover pure functions first (highest effort-to-coverage ratio), then file-reading functions via `tmp_path`, then network-mocking tests for each scraper, then orchestration.
 
-**Must have (P1 — table stakes for "this project has CI"):**
-- `pyproject.toml` with pytest + ruff config — foundation that enables everything else; without it pytest finds no tests and ruff has no target-version
-- pytest unit tests for `zscore.py` and `gauge.py` — guards the mathematical core; pure functions, no fixtures required; highest value, lowest cost
-- `ruff check` + `ruff format --check` on `pipeline/` — enforces code quality on all current and future scraper code; single binary
-- ESLint flat config for `public/js/` — catches JS errors in 3 source files; must use `sourceType: 'script'` for IIFE modules
-- Pre-push hook via lefthook — makes checks automatic; delegates entirely to `npm run test:fast`; must complete in < 10 seconds
+**Must have (table stakes — structurally required to reach 85%):**
 
-**Should have (P2 — add within this milestone):**
-- `conftest.py` with `DATA_DIR` isolation (`autouse` monkeypatch to `tmp_path`) and network-blocking autouse fixture
-- pytest unit tests for `csv_handler.py` dedup logic — requires conftest `tmp_path` pattern first
-- pytest unit tests for `ratios.py` normalization — requires conftest with synthetic DataFrames
-- `status.json` JSON schema validation test — validates schema and constraints only, never specific float values
-- Two-tier marker system (`@pytest.mark.live` for opt-in API tests; default is unit tier)
+- Pure function tests for all zero-I/O functions: `_parse_abs_date`, `_derive_probabilities`, `_find_meeting_for_contract`, `get_candidate_urls`, `generate_interpretation`, `_check_staleness` — fastest wins, zero mocking overhead
+- `http_client.py` direct session inspection tests — call `create_session()` with custom params; assert adapter config; no mocking; gets module to 85%+
+- `build_gauge_entry` direct tests with synthetic `pd.Series`/`pd.DataFrame` — covers large portion of `engine.py` with no mock setup
+- HTML bytes fixture tests for NAB scraper (`extract_capacity_from_html`, `get_pdf_link`) — pure bytes in, value out, zero mocking
+- Mock-session tests for all 5 ingest modules: `abs_data`, `rba_data`, `asx_futures_scraper`, `corelogic_scraper`, `nab_scraper` — must cover happy path AND all error branches
+- `main.py` orchestration tests — patch all 4 ingest modules at `pipeline.main.*` level; test tier behavior and `sys.exit(1)` with `pytest.raises(SystemExit)`
+- pdfplumber mock tests for `extract_cotality_yoy` and `extract_capacity_from_pdf` — mock at `page.extract_text()` level, never use real PDF files
 
-**Defer (P3 — nice-to-have, can slip):**
-- `@pytest.mark.live` API health-check tests for ABS, RBA, ASX endpoints — opt-in only, never in pre-push hook
+**Should have (pushes coverage beyond 85%):**
 
-**Future / not this milestone:**
-- Type annotations + mypy — requires annotating all pipeline code; substantial effort; out of scope for v2.0
-- Playwright in GitHub Actions — requires display/browser CI setup; separate milestone
+- `abs_data.fetch_and_save` ABS filter-path tests (multi-dimensional CSV filter logic)
+- `asx_futures_scraper.scrape_asx_futures` full flow with fixture JSON response body
+- `engine.py:generate_status` assembly test with real fixture CSVs (not full mock of sub-functions)
+- `nab_scraper.discover_latest_survey_url` with two-archive-URL fallback logic
+- `nab_scraper.backfill_nab_history` month iteration logic
+
+**Defer to v4+ (future milestone):**
+
+- `engine.py:generate_status` full integration (more appropriate as a smoke test than a unit test)
+- `asx_futures_scraper._get_rba_meeting_dates` (reads from `public/data/meetings.json`, not under `DATA_DIR` — needs additional isolation strategy)
+- 100% coverage on `main.py` (the `if __name__ == '__main__':` guard is unreachable from pytest; 90-95% is the realistic ceiling)
 
 ### Architecture Approach
 
-The infrastructure integrates into the existing project without structural changes to `pipeline/` or the existing `tests/` Playwright directory. A new `tests/python/` directory holds all pytest tests alongside a `conftest.py` and a `fixtures/` subdirectory of static CSVs. A root `pyproject.toml` consolidates pytest and ruff configuration. `eslint.config.js` at root targets `public/js/`. The pre-push hook (managed by lefthook) delegates entirely to `npm run test:fast`, making the npm script the single source of truth for what "fast" means.
+The v3.0 test expansion adds 8 new test files and 3 new fixture files to `tests/python/`. No existing test files or `conftest.py` are modified. The existing autouse fixtures (`isolate_data_dir`, `block_network`) handle all new ingest tests automatically. The only new shared fixture needed is `engine_data_dir` (patches `STATUS_OUTPUT` in addition to `DATA_DIR`, copies all fixture CSVs and `weights.json` to `tmp_path`).
 
 **Major components:**
 
-1. **`pyproject.toml`** — Configuration hub: pytest `testpaths = ["tests/python"]`, `pythonpath = ["."]`, `markers`, `addopts = "--strict-markers -ra"`; ruff `target-version = "py311"`, `select`, `ignore`, `per-file-ignores`. Single file replaces pytest.ini + .flake8 + setup.cfg.
+1. **8 new test files** — `test_http_client.py`, `test_ingest_abs.py`, `test_ingest_rba.py`, `test_ingest_asx.py`, `test_ingest_corelogic.py`, `test_ingest_nab.py`, `test_engine.py`, `test_main.py` — each owning tests for the named module
+2. **`_make_mock_session` helper** — shared within each test file; builds `MagicMock` session/response object; patch target is always `pipeline.ingest.<module>.create_session`
+3. **3 new fixture files** — `asx_futures_api_response.json` (MarkitDigital API mock), `rba_a2_data.csv` (RBA A2 with metadata header rows), `nab_article.html` (optional; inline HTML bytes preferred)
+4. **`scripts/check_coverage.py`** — reads `.coverage.json`, iterates per-file coverage percentages, asserts each `pipeline/` module meets 85%, exits non-zero with diff table on failure
+5. **Updated `pyproject.toml` addopts** — adds `--cov=pipeline --cov-report=term-missing --cov-report=json:.coverage.json` so coverage runs automatically
+6. **Updated `requirements-dev.txt`** — adds `pytest-mock>=3.15,<4`, `responses>=0.26,<1`, `pytest-cov>=7.0,<8`
+7. **Updated lefthook pre-push** — adds `coverage-check` command after `unit-tests`: `python scripts/check_coverage.py --min 85`
 
-2. **`tests/python/conftest.py`** — Fixture hub (scoped to `tests/python/` only, not root): `autouse` `DATA_DIR` patch redirecting to `tmp_path`; `autouse` network blocker raising `RuntimeError` on any `requests.get/post`; static fixture loaders from `tests/python/fixtures/`; `tmp_csv` factory for write tests. Must exist before any file-touching test is written.
-
-3. **`tests/python/` test files** — Six files: `test_zscore.py`, `test_gauge.py`, `test_ratios.py`, `test_csv_handler.py`, `test_status_schema.py`, `test_live_apis.py`. Pure-function tests need no fixtures; file-I/O tests use `tmp_csv`; live tests marked `@pytest.mark.live`.
-
-4. **`eslint.config.js`** — Flat config with `sourceType: 'script'` (IIFE modules, not ES modules), `globals.browser`, explicit `Plotly`/`Decimal` globals for CDN-loaded libraries. Targets `public/js/**/*.js` only; ignores `tests/` and `node_modules/`.
-
-5. **`lefthook.yml`** — Pre-push hook: runs ruff check, ruff format check, eslint, pytest fast tier in sequence with fail-fast. Installed via `npm install` (using `package.json` `prepare` script).
-
-6. **npm scripts** — `test:fast` (the pre-push gate), `test:python`, `test:python:live`, `lint:py`, `lint:js`, `verify` (full: fast + live pytest + Playwright). `test:fast` chains with `&&` (first failure stops the chain).
-
-**Build order (critical path):**
-`pyproject.toml` → `conftest.py` + `fixtures/` → unit test files → ruff baseline audit → `eslint.config.js` → `lefthook.yml` + hook install
+**Four isolation layers that must all be respected:**
+- Layer 1: Socket level (`block_network` autouse — any real socket call raises `RuntimeError`)
+- Layer 2: HTTP session level (`patch("pipeline.ingest.X.create_session")` in each ingest test)
+- Layer 3: Data directory level (`isolate_data_dir` autouse — `DATA_DIR` → `tmp_path`)
+- Layer 4: Status output level (must patch `pipeline.config.STATUS_OUTPUT` explicitly in engine tests — NOT covered by autouse)
 
 ### Critical Pitfalls
 
-1. **External API calls in unit tests** — Never write a test for `abs_data.py` or any ingestor that calls real HTTP. The `autouse` network-blocking fixture in `conftest.py` enforces this. Any test hitting a live URL belongs in `test_live_apis.py` with `@pytest.mark.live`. Violating this makes the pre-push hook flaky and slow within weeks; developers start using `--no-verify` and the hook is dead.
+1. **Wrong patch target for `create_session`** — patch `"pipeline.ingest.abs_data.create_session"` (where it is USED), never `"pipeline.utils.http_client.create_session"` (where it is DEFINED). Patching the source has no effect on the already-bound name in the consuming module. Symptoms: `RuntimeError: Network access blocked in tests` even with a mock in place. Resolution: establish the correct target in the first test written for `test_ingest_abs.py` and replicate across all 5 ingest modules.
 
-2. **Tests reading from `data/*.csv` without patching `DATA_DIR`** — `config.py` sets `DATA_DIR = Path("data")` (relative path). Tests that inherit this read from the live, mutable data CSVs. Tests become "temporally fragile" — they break after each weekly pipeline run or, worse, silently corrupt committed CSVs by writing fixture data via `append_to_csv()`. The `autouse` `DATA_DIR` patch in `conftest.py` is load-bearing; it must be in place before any file-touching test is written.
+2. **Missing error-path coverage is the dominant coverage gap** — happy-path-only tests for ingest modules plateau at 60-70%. Each `fetch_abs_series()` has 7 distinct error branches; each `fetch_and_save()` has 4 exception types. Budget 3-6 tests per function, not 1. Symptoms: module stuck at 65% even after adding more tests; uncovered lines are all inside `except` blocks.
 
-3. **Ruff on an unaudited existing codebase** — First `ruff check pipeline/` on an unaudited codebase will produce 50-200+ violations. The pre-push hook fails on day one. Fix: create `pyproject.toml` with a conservative rule set (E, F, W, I, UP — no ANN, no D, no BLE001 for intentional bare excepts in scraper graceful-degradation paths), run a one-time `ruff check --fix` baseline commit, then enable the hook. Never use `ruff --fix` in the hook itself — it auto-modifies files the developer hasn't reviewed.
+3. **Date-dependent logic causes non-deterministic CI failures** — `_current_month_already_scraped()` in CoreLogic and NAB scrapers compares fixture CSV dates against `datetime.now()`. A fixture with `date = 2026-01-01` behaves differently in January vs February. Fix: patch `datetime` at the module level (`pipeline.ingest.corelogic_scraper.datetime`) or use `freezegun` `@freeze_time` decorator. Never use fixture CSVs with the actual current month's date for idempotency tests.
 
-4. **`status.json` validation tests asserting specific float values** — `status.json` changes every Monday after the pipeline runs. Tests asserting `hawk_score == 34.2` become false alarms and get permanently disabled. Validate schema and constraints only: required keys exist, `hawk_score` in [0, 100], zone is one of the valid enum values, no NaN gauge values, `staleness_days >= 0`. These constraints hold regardless of economic conditions.
+4. **STATUS_OUTPUT not isolated by autouse** — `pipeline.config.STATUS_OUTPUT = Path("public/data/status.json")` is computed at import time and not patched by `isolate_data_dir`. Any test calling `generate_status()` without explicit `monkeypatch.setattr(pipeline.config, "STATUS_OUTPUT", tmp_path / "status.json")` writes to the real production file. Encapsulate in an `engine_data_dir` fixture.
 
-5. **Pre-push hook that is too slow or fails without Node.js** — The hook must complete in under 10 seconds on a Python-only change. Lefthook runs commands in parallel where configured, but ESLint via `npx` can add 2-8 seconds on first run and fails entirely if `node_modules/` is not installed. Guard with a conditional check or make JS linting optional in the hook (Python lint + pytest is the primary gate).
+5. **`sys.exit(1)` terminates the entire test runner** — `main.run_pipeline()` calls `sys.exit(1)` on critical failure. Without `pytest.raises(SystemExit)` wrapping, this kills the entire pytest process. All subsequent tests are skipped; their coverage is not recorded. Always wrap critical-failure path tests in `with pytest.raises(SystemExit) as exc_info:` and assert `exc_info.value.code == 1`.
 
 ---
 
 ## Implications for Roadmap
 
-Based on research, the dependency graph dictates a clear 4-phase structure. Each phase is a prerequisite for the next — there are no optional orderings for the core phases.
+Based on combined research, the natural build sequence follows dependency order: no mocking needed → file I/O only → mock session → orchestration. This maps cleanly to two phases.
 
-### Phase 1: Foundation — Configuration and Test Harness
+### Phase 1: Ingest Module Tests (HTTP mocking layer)
 
-**Rationale:** `pyproject.toml` is required before pytest can discover tests and before ruff knows its target version. `conftest.py` with `DATA_DIR` isolation and network blocking is required before any test can be written safely. These are not optional prerequisites — skipping them and writing tests first causes pitfalls 2 and 1 immediately and irreversibly (correcting them later requires re-examining every test).
+**Rationale:** Five ingest modules dominate the coverage gap (0-24% each). Covering them requires the mock-session pattern. This pattern must be established first in `test_http_client.py` and `test_ingest_abs.py` because it is reused verbatim across all five modules. Build order within this phase is critical: pure functions first (zero setup), then file-reading functions, then mock-session functions, then error paths.
 
-**Delivers:**
-- `pyproject.toml` with pytest config (`testpaths`, `pythonpath = ["."]`, `markers`, `--strict-markers`) and ruff config (`target-version = "py311"`, `select = ["E", "F", "W", "I", "UP"]`, `ignore = ["E501", "BLE001"]`)
-- `tests/python/conftest.py` with `autouse` `DATA_DIR` patch and `autouse` network blocker
-- `tests/python/fixtures/` with minimal synthetic CSVs (CPI, employment, cash rate — 20-25 rows each, fixed known values)
-- Updated `requirements.txt` with pytest, pytest-cov, pytest-mock, jsonschema, ruff
-- Verified: `pytest tests/python/ -m "not live"` discovers and passes with zero tests (empty suite is the correct starting state)
+**Delivers:** 85%+ coverage on `http_client.py`, `abs_data.py`, `rba_data.py`, `asx_futures_scraper.py`, `corelogic_scraper.py`, `nab_scraper.py`. `scripts/check_coverage.py` created and wired into lefthook.
 
-**Addresses:** FEATURES.md P1 (pyproject.toml foundation), FEATURES.md P2 (conftest isolation)
+**Features from FEATURES.md:** P1 pure function tests (7 functions), P1 http_client tests, P1 HTML bytes tests, P1 idempotency tests, P2 mock-session tests for abs/rba/asx/corelogic/nab, P2 pdfplumber mock tests.
 
-**Avoids:** PITFALLS.md Pitfall 2 (DATA_DIR corruption), Pitfall 1 (live API calls in unit tests), Pitfall 6 (over-engineering — conftest stays under 50 lines, no custom plugins)
+**Pitfalls to avoid:** Pitfall 1 (wrong patch target), Pitfall 2 (error-path coverage), Pitfall 3 (date-dependent non-determinism), Pitfall 4 (binary PDF fixtures), Pitfall 8 (asx_futures dual path dependency for meetings.json).
 
-### Phase 2: Python Unit Tests — Pure Function Coverage
+**Build sequence within phase:**
+1. `test_http_client.py` — establishes direct inspection pattern; zero mocking
+2. `test_ingest_abs.py` — establishes `_make_mock_session` helper and correct patch target
+3. `test_ingest_rba.py` — same pattern; key difference is metadata header row handling
+4. `test_ingest_asx.py` — pure functions first; then mock session + meetings.json patch
+5. `test_ingest_corelogic.py` — get_candidate_urls pure; then pdfplumber mock pattern
+6. `test_ingest_nab.py` — most complex; HTML bytes first; pdfplumber last; backfill guard via pre-populated CSV
 
-**Rationale:** The highest-value, lowest-cost tests are for `zscore.py` and `gauge.py` — pure math functions with no I/O dependencies. These are the mathematical core of the hawk score; regressions here are catastrophic and invisible without tests. `ratios.py` and `csv_handler.py` follow because they require the `tmp_csv` and `DATA_DIR` isolation from Phase 1. `status.json` schema validation is last because it validates a contract rather than computation logic and requires jsonschema.
+### Phase 2: Engine and Orchestration Tests (multi-module wiring)
 
-**Delivers:**
-- `test_zscore.py`: rolling z-score min-window requirement, zero-MAD handling (returns 0.0, not NaN), confidence thresholds (HIGH/MEDIUM/LOW), NaN propagation through window
-- `test_gauge.py`: `zscore_to_gauge()` clamp at [0, 100], `classify_zone()` boundary values at zone thresholds, `compute_hawk_score()` weighted average correctness
-- `test_ratios.py`: `yoy_pct_change` with sparse data and quarterly cadence, `direct` normalization path, edge case of fewer rows than `yoy_periods`
-- `test_csv_handler.py`: dedup logic (new file creation, append with dedup on date column, sort order preserved)
-- `test_status_schema.py`: required top-level keys, `hawk_score` in [0, 100], zone enum validity, no NaN gauge values, `staleness_days >= 0` — schema constraints only, no value assertions
+**Rationale:** `engine.py` and `main.py` depend on all ingest modules being individually tested and their return contracts understood. Engine tests should use real sub-functions (normalize_indicator, compute_rolling_zscores) with fixture CSV data — not mocks of those functions — so wiring errors are caught. `main.py` tests mock entire ingest modules at `pipeline.main.*` level to test tier-failure behavior independently of ingest correctness.
 
-**Addresses:** FEATURES.md P1 (zscore/gauge tests), FEATURES.md P2 (csv_handler, ratios, status.json validation, two-tier markers)
+**Delivers:** 85%+ coverage on `engine.py` and `main.py`. Full 85%+ per-module milestone confirmed by `scripts/check_coverage.py` passing in lefthook.
 
-**Avoids:** PITFALLS.md Pitfall 5 (specific float assertions), Pitfall 2 (confirmed by autouse fixture from Phase 1), Pitfall 6 (target 8-15 test functions total, not 50)
+**Features from FEATURES.md:** P1 `build_gauge_entry` direct tests, P1 `build_asx_futures_entry` tmp_path tests, P2 `generate_status` assembly tests, P2 `main.py` orchestration tests.
 
-### Phase 3: Linting — Ruff and ESLint
+**Pitfalls to avoid:** Pitfall 4 (STATUS_OUTPUT not isolated — use `engine_data_dir` fixture), Pitfall 5 (coverage gaming with trivial assertions), Pitfall 6 (over-mocking generate_status — use real sub-functions for integration-style tests), Pitfall 7 (`sys.exit(1)` must be wrapped in `pytest.raises(SystemExit)`), Pitfall 9 (housing auxiliary file gap — create corelogic_housing.csv and nab_capacity.csv for build_gauge_entry tests).
 
-**Rationale:** Linting is logically independent of the pytest chain but is placed after it because the test suite should be green before adding another source of failures. The ruff baseline audit must happen before the hook is enabled — running `ruff check pipeline/` on an unaudited codebase produces noise that drowns real errors and poisons the signal. ESLint v10 flat config must be set up correctly from the start (`sourceType: 'script'` for IIFE modules, explicit Plotly/Decimal globals) or it will generate false positives on every push.
-
-**Delivers:**
-- One-time ruff baseline audit: `ruff check pipeline/ --statistics` to count violations; then `ruff check --fix pipeline/` baseline cleanup committed as "chore: ruff baseline"
-- `pyproject.toml` ruff section confirmed: `select = ["E", "F", "W", "I", "UP"]`, `ignore = ["E501", "BLE001"]`
-- `eslint.config.js` with `sourceType: 'script'`, `globals.browser`, Plotly/Decimal globals, `files: ["public/js/**/*.js"]`
-- npm devDependencies: `eslint@^10.0.0`, `@eslint/js@^10.0.0`, `globals@^16.0.0`
-- `npm run lint:py` and `npm run lint:js` scripts verified clean on existing codebase before hook is enabled
-
-**Addresses:** FEATURES.md P1 (ruff check/format, ESLint flat config, npm lint script)
-
-**Avoids:** PITFALLS.md Pitfall 3 (ruff noise on existing code), Pitfall 3 variant (`--fix` never runs in hook), Pitfall 7 (ESLint `sourceType: 'module'` false positives on IIFE files)
-
-### Phase 4: Pre-Push Hook — Automated Gate
-
-**Rationale:** The hook is the last phase because it depends on all previous phases working end-to-end. Enabling the hook before the test suite and linting are clean guarantees the hook rejects every push immediately, training developers to use `--no-verify`. The hook must be verified by deliberately pushing a violation (unused import) and confirming rejection, then pushing a clean commit and confirming it passes in under 10 seconds.
-
-**Delivers:**
-- `lefthook.yml` with `pre-push` hook: ruff check, ruff format check, eslint (conditional on `node_modules/` existing), pytest `-m "not live"`
-- `npm run test:fast` as the single source of truth for the fast gate (hook delegates here)
-- `npm run verify` (fast + live pytest + Playwright — on-demand full gate, never run in CI)
-- `npm run test:python:live` for opt-in API verification
-- lefthook installed as devDependency; `package.json` `prepare` script installs hook on `npm install`
-- Verified: hook completes < 10 seconds on Python-only change; `git push --no-verify` escape hatch documented
-- `.gitignore` updated with `.pytest_cache/`, `.ruff_cache/`
-
-**Addresses:** FEATURES.md P1 (pre-push hook), P3 (`@pytest.mark.live` tests can be added here as `test_live_apis.py` stub)
-
-**Avoids:** PITFALLS.md Pitfall 7 (slow/broken hook due to JS linting), Pitfall 4 (hook corrupting staging area — no `ruff --fix`, no DATA_DIR writes in tests), Pitfall 1 (live tests excluded via `-m "not live"`)
+**Build sequence within phase:**
+1. `generate_interpretation` parametrized — 35 combos (7 indicators × 5 zones), zero I/O
+2. `build_asx_futures_entry` with tmp_path CSV — uses existing `isolate_data_dir`
+3. `build_gauge_entry` with synthetic Series/DataFrame — standard, housing, and business_confidence enrichment branches
+4. `process_indicator` with fixture CSVs in `engine_data_dir`
+5. `generate_status` end-to-end with `engine_data_dir` fixture
+6. `test_main.py` — all tier behaviors, sys.exit contract, result dict structure
 
 ### Phase Ordering Rationale
 
-- Configuration before code: `pyproject.toml` is discovered by pytest at collection time; tests written without it have no `pythonpath`, no markers, and wrong discovery settings — everything breaks silently
-- Fixtures before tests: `conftest.py` `DATA_DIR` patch must exist before any test importing `pipeline.*` runs, or tests silently read from live `data/` CSVs on the first run
-- Test suite green before linting enabled: confirms lint failures in the hook are genuinely new violations, not pre-existing noise masking the signal
-- Hook last: once enabled, every push validates all previous phases; enabling it before they're stable creates pressure to disable it permanently
+- Phase 1 before Phase 2: `main.py` orchestration tests require understanding what each scraper's `fetch_and_save()` returns on success and failure. Those return contracts are only verified by writing Phase 1 tests first.
+- Pure functions before mock-session tests within Phase 1: pure function tests are zero-cost to write and immediately improve coverage percentages, confirming the module is importable and partially working before more complex setup is invested.
+- Error paths within each module immediately after happy paths: attempting to write all happy paths first, then all error paths, leads to over-mocking and coverage gaming. Error paths are harder the longer you wait.
+- Engine tests use real sub-functions (not mocked): avoids Pitfall 6 — mocking `normalize_indicator` in engine tests means wiring errors are invisible. Use real functions on fixture data.
 
 ### Research Flags
 
-Phases with standard patterns (skip research-phase — documentation is definitive):
-- **Phase 1 (Configuration):** pyproject.toml + conftest.py patterns are fully documented with working code examples in both FEATURES.md and ARCHITECTURE.md. No research needed.
-- **Phase 2 (Unit Tests):** Pure function testing with pytest is a solved problem. ARCHITECTURE.md provides production-ready code examples for all six test files.
-- **Phase 3 (Linting):** Ruff and ESLint v10 flat config are fully documented with official sources verified at current versions. STACK.md and ARCHITECTURE.md provide ready-to-use config blocks.
+Phases with standard patterns (research already complete — no further research needed):
+- **Phase 1 (Ingest tests):** All patterns are fully documented in ARCHITECTURE.md with production-ready code examples. The `_make_mock_session` helper, pdfplumber mock pattern, and HTML bytes fixture approach are all verified and ready to implement.
+- **Phase 2 (Engine/main tests):** `engine_data_dir` fixture pattern fully specified in ARCHITECTURE.md. `pytest.raises(SystemExit)` pattern for `sys.exit` testing is documented with code examples in both FEATURES.md and PITFALLS.md.
 
-Phases requiring care during execution (not research — just attention):
-- **Phase 4 (Pre-Push Hook):** Lefthook's interaction with the Python venv requires verifying that `ruff` and `pytest` are on PATH when lefthook runs. Configure lefthook to use explicit venv paths (`.venv/bin/ruff`, `.venv/bin/pytest`) or document the venv activation prerequisite clearly.
+Phases requiring attention during execution:
+- **Phase 1 — ASX futures scraper specifically:** Has two implicit file dependencies (`public/data/meetings.json` under a hardcoded relative path outside `DATA_DIR`; `rba_cash_rate.csv` under `DATA_DIR`). Both must be addressed before writing `scrape_asx_futures()` tests. Patch `_get_rba_meeting_dates` directly; create `rba_cash_rate.csv` in `tmp_path`.
+- **Phase 1 — NAB scraper specifically:** `backfill_nab_history()` is triggered if `nab_capacity.csv` has fewer than 3 rows. Pre-populate `tmp_path / "nab_capacity.csv"` with 5+ rows in any test for `scrape_nab_capacity()` to prevent inadvertent backfill execution that would make the test suite take 10-30 seconds.
 
 ---
 
@@ -188,22 +155,20 @@ Phases requiring care during execution (not research — just attention):
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | All packages verified against PyPI and npm with exact version numbers. Node.js v25.6.1 confirmed locally. ESLint v10 official release blog cited (Feb 2026). Version compatibility cross-checked against Python 3.11 requirement. |
-| Features | HIGH | Feature list derived from direct codebase analysis (live `pipeline/` read). Official docs cited for pytest, ruff, ESLint. Feature priorities are explicit and justified. Anti-features section is strong — clearly explains what NOT to add and why. |
-| Architecture | HIGH | All patterns verified against the live codebase. File paths, import structures, and config key names confirmed against actual project files. Code examples are production-ready, not illustrative. Build order dependencies are concrete. |
-| Pitfalls | HIGH | Pitfalls derived from direct codebase analysis — specifically identified `DATA_DIR = Path("data")` in `config.py`, pdfplumber lazy import pattern, `create_session()` injection point. Prevention strategies reference official patterns. |
+| Stack | HIGH | All 3 new packages verified against PyPI at current stable versions. `pytest-mock 3.15.1`, `responses 0.26.0` (released 2026-02-19), `pytest-cov 7.0.0` already locally installed. Version compatibility cross-checked against Python 3.11/3.13. `coverage.py` per-file limitation confirmed via official docs and open GitHub issue #444. |
+| Features | HIGH | Feature list derived entirely from direct codebase analysis of live `pipeline/` and `tests/python/` directories. Coverage percentages are real measurements, not estimates. Prioritization matrix is grounded in actual module structure. |
+| Architecture | HIGH | All patterns verified against the live codebase. Import paths, autouse fixture behaviors, `STATUS_OUTPUT` isolation gap — all confirmed by direct code inspection. Code examples in ARCHITECTURE.md are production-ready, not illustrative. Build order dependencies are concrete and grounded in Python import semantics. |
+| Pitfalls | HIGH | All 9 pitfalls derived from direct codebase analysis — not generic test-writing pitfalls. Specific line references (e.g., `asx_futures_scraper._get_rba_meeting_dates()` hardcoded `Path("public/data/meetings.json")`), confirmed in source. `conftest.py` gap for `STATUS_OUTPUT` verified by reading actual conftest implementation. |
 
 **Overall confidence: HIGH**
 
 ### Gaps to Address
 
-- **Lefthook venv activation:** Lefthook runs pre-push commands as separate processes. If the Python venv is not activated before `git push`, lefthook's `ruff` and `pytest` commands may find system Python. Resolution: configure lefthook to use explicit `.venv/bin/` paths, or document the venv activation prerequisite. Low risk — single developer project, easy to resolve in Phase 4.
+- **`freezegun` vs manual `datetime` patch:** PITFALLS.md documents both approaches for date-dependent tests. Neither `freezegun` is currently in `requirements-dev.txt` nor is manual `datetime` patching established in the existing test suite. Decision needed at implementation time: add `freezegun>=1.5,<2` to `requirements-dev.txt` (cleaner `@freeze_time` decorator) or use `monkeypatch.setattr("pipeline.ingest.MODULE.datetime", ...)` inline (no new dependency). Low risk — either approach works; consistent choice matters more than which choice.
 
-- **Ruff baseline violation count:** The exact number of ruff violations on the existing `pipeline/` codebase is unknown. This is a 30-second audit (`ruff check pipeline/ --statistics`), not a research gap. Run it on day one of Phase 3 before committing to the baseline approach.
+- **FEATURES.md vs STACK.md on `responses` library:** STACK.md recommends using `responses` for HTTP mocking. FEATURES.md recommends `MagicMock` + `create_session` patching as primary, with `responses` listed as an anti-feature (VCR cassette staleness concern extends to `responses` when used with recorded fixtures). Resolution: use `MagicMock` + `create_session` patching as the primary pattern; install `responses` in `requirements-dev.txt` in case specific tests need transport-layer interception, but do not use it as the default.
 
-- **ESLint violation count on `public/js/`:** The number of existing violations in the 3 JS source files is unknown. Run `npx eslint public/js/` before enabling in the hook; fix or configure-away existing violations as part of Phase 3.
-
-- **Conflict on config file choice (pytest.ini vs pyproject.toml):** STACK.md recommends `pytest.ini` (no pyproject.toml needed); FEATURES.md and ARCHITECTURE.md recommend `pyproject.toml` (single config hub). Resolution: use `pyproject.toml` — it is the long-term direction for both pytest and ruff, and the project has no conflicting use for it.
+- **`engine.py` deferred imports (`import pandas as _pd` inside function body):** PITFALLS.md identifies uncovered lines in `build_gauge_entry()` housing/business_confidence branches due to inline imports. Coverage tool may or may not count these import lines differently. Verify during implementation — the fix is simply to write tests that exercise those branches.
 
 ---
 
@@ -211,23 +176,30 @@ Phases requiring care during execution (not research — just attention):
 
 ### Primary (HIGH confidence)
 
-- PyPI: pytest 9.0.2, pytest-cov 7.0.0, pytest-mock 3.15.1, jsonschema 4.26.0, ruff 0.15.2 — confirmed stable versions
-- https://docs.astral.sh/ruff/configuration/ — `ruff.toml` supported; rule set documentation
-- https://eslint.org/blog/2026/02/eslint-v10.0.0-released/ — ESLint v10 flat config mandatory, Node.js >=20.19.0 requirement
-- https://eslint.org/docs/latest/use/configure/configuration-files — flat config structure and `sourceType` options
-- https://docs.pytest.org/en/stable/reference/customize.html — `pyproject.toml` pytest configuration keys
-- https://docs.pytest.org/en/stable/how-to/fixtures.html — conftest.py, autouse, monkeypatch patterns
-- https://docs.pytest.org/en/stable/explanation/goodpractices.html — `pythonpath`, discovery, `tests/python/` structure recommendation
-- https://www.npmjs.com/package/lefthook — lefthook 2.1.1, language-agnostic hook manager, YAML config format
-- Live codebase: `/Users/annon/projects/rba-hawko-meter/pipeline/` — `DATA_DIR` relative path pattern, import structure, pdfplumber lazy imports, `create_session()` injection point confirmed
+- PyPI: pytest-mock 3.15.1 — https://pypi.org/project/pytest-mock/ (verified Feb 2026)
+- PyPI: responses 0.26.0 — https://pypi.org/project/responses/ (released 2026-02-19, verified)
+- PyPI: pytest-cov 7.0.0 — https://pypi.org/project/pytest-cov/ (already installed locally)
+- coverage.py per-file threshold limitation — https://coverage.readthedocs.io/en/latest/config.html and https://github.com/pytest-dev/pytest-cov/issues/444 (confirmed unimplemented)
+- Python unittest.mock "where to patch" — https://docs.python.org/3/library/unittest.mock.html#where-to-patch (fundamental mock patching rule)
+- pytest.raises(SystemExit) — https://docs.pytest.org/en/stable/reference/reference.html (official docs)
+- pytest monkeypatch — https://docs.pytest.org/en/stable/how-to/monkeypatch.html (official docs)
+- Live codebase analysis: `/Users/annon/projects/rba-hawko-meter/pipeline/` — all modules read, coverage percentages confirmed, import structures verified
+- Live codebase analysis: `/Users/annon/projects/rba-hawko-meter/tests/python/` — conftest.py, existing test files, fixture CSVs verified
 
 ### Secondary (MEDIUM confidence)
 
-- https://python-jsonschema.readthedocs.io/en/stable/validate/ — schema validation pattern for use in pytest
-- https://pytest-with-eric.com/mocking/pytest-mocking/ — pytest-mock HTTP mocking patterns
-- https://dev.to/bowmanjd/two-methods-for-testing-https-api-calls-with-python-and-pytest — VCR.py vs live testing tradeoffs
+- responses + Session/HTTPAdapter: https://github.com/getsentry/responses — intercepts at HTTPAdapter.send(), confirmed Session support
+- pytest-cov configuration: https://pytest-cov.readthedocs.io/en/latest/config.html — addopts integration pattern
+- coverage.py JSON report format: https://coverage.readthedocs.io/en/latest/config.html — `--cov-report=json` supported
+- Web scraper mocking patterns: https://datawookie.dev/blog/2025/01/test-a-web-scraper-using-mocking/ (Jan 2025, practitioner source)
+- pdfplumber BytesIO/mock behaviour: https://github.com/jsvine/pdfplumber/issues/124 (confirms mock approach is correct)
+
+### Tertiary (LOW confidence — needs validation during implementation)
+
+- freezegun `@freeze_time` decorator — widely documented but not yet verified against this specific codebase's `datetime` import patterns; validate before committing to approach
+- `requests-mock` 1.12.1 — considered and deprioritized vs `responses` due to March 2024 last update; if `responses` proves problematic, `requests-mock` is a drop-in alternative
 
 ---
 
-*Research completed: 2026-02-24*
+*Research completed: 2026-02-25*
 *Ready for roadmap: yes*

@@ -1,374 +1,422 @@
 # Feature Research
 
-**Domain:** Local CI and test infrastructure — Python+vanilla JS automated economic dashboard
-**Researched:** 2026-02-24
-**Confidence:** HIGH (patterns verified against official pytest/ruff/ESLint docs and live codebase)
+**Domain:** Unit test coverage for Python I/O-heavy scraper/ingest/orchestration modules
+**Researched:** 2026-02-25
+**Confidence:** HIGH (derived from direct codebase analysis, verified against pytest/unittest.mock official docs)
 
 ---
 
 ## Context: What This Milestone Is Adding
 
-The v1.1 milestone completed the data pipeline (scrapers for CoreLogic, NAB, ASX). This new milestone adds
-**developer-facing quality infrastructure** to a project that currently has:
+v2.0 shipped the test *foundation*: pyproject.toml, conftest autouse fixtures (DATA_DIR isolation +
+socket-level network blocking), pytest markers, fixture CSVs from production snapshots, and 118 unit
+tests covering the pure-math core (zscore, gauge, ratios, csv_handler, config) at 96-100%.
 
-- 24 Playwright E2E tests (`npm test` → 3 suites: calculator, dashboard, UX)
-- 2 GitHub Actions workflows (daily ASX + weekly full pipeline)
-- Python pipeline across `pipeline/ingest/`, `pipeline/normalize/`, `pipeline/utils/`
-- No Python unit tests, no linting, no pre-push hooks, no data validation
+v3.0 adds **coverage for the I/O-heavy layer** — the modules that call the network, parse HTTP
+responses, scrape HTML/PDFs, and orchestrate the full pipeline. These modules are currently at 0-42%
+because they were not touched in v2.0.
 
-The codebase is Python + vanilla JS (no React/Next.js, no Django/Flask). Test infrastructure must fit
-that stack specifically.
+**Current coverage gaps (from milestone context):**
+
+| Module | Current % | Gap |
+|--------|-----------|-----|
+| `pipeline/main.py` | 0% | Full orchestration logic untested |
+| `pipeline/normalize/engine.py` | 0% | Status.json generation untested |
+| `pipeline/ingest/abs_data.py` | 17% | Only `_parse_abs_date` partially covered |
+| `pipeline/ingest/rba_data.py` | 24% | Fetch/parse logic untested |
+| `pipeline/ingest/asx_futures_scraper.py` | 13% | Most scraper logic untested |
+| `pipeline/ingest/corelogic_scraper.py` | 19% | PDF scraper logic untested |
+| `pipeline/ingest/nab_scraper.py` | 14% | HTML/PDF extraction untested |
+| `pipeline/utils/http_client.py` | 42% | Session config partially covered |
+| `pipeline/normalize/ratios.py` | 68% | `load_asx_futures_csv`, hybrid paths uncovered |
+| `pipeline/normalize/gauge.py` | 81% | `load_weights`, `generate_verdict` edge cases |
+
+**What already exists (do not rebuild):**
+- `conftest.py`: `isolate_data_dir` (autouse, monkeypatches `pipeline.config.DATA_DIR` to `tmp_path`),
+  `block_network` (autouse, replaces `socket.socket` with a `RuntimeError` raiser; exempt via `@pytest.mark.live`)
+- Named CSV fixture loaders for all 6 ABS/CoreLogic/NAB fixture CSVs
+- `@pytest.mark.live` registered and working for opt-in network tests
+- 118 passing unit tests for math core
 
 ---
 
 ## Feature Landscape
 
-### Table Stakes (Developers Expect These)
+### Table Stakes (Teams Expect These When Reaching 85% Coverage on I/O Modules)
 
-Features that are non-negotiable for a project claiming to have a CI pipeline. Missing these = CI
-feels incomplete or untrustworthy.
+These are the testing patterns that are non-negotiable for covering network/file I/O modules.
+Missing any of these means the 85% target is structurally unreachable for at least one module.
 
-#### Python Unit Tests (pytest)
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| **pytest test discovery via `pyproject.toml`** | Standard: running `pytest` from project root should find all Python tests without arguments | LOW | Set `testpaths = ["tests/python"]` in `[tool.pytest.ini_options]`. Keeps Python tests separate from Playwright's `tests/` JS files. No collision risk with existing JS test dir. |
-| **Pure function unit tests for `zscore.py` and `gauge.py`** | These modules are pure math — `calculate_mad()`, `robust_zscore()`, `zscore_to_gauge()`, `classify_zone()`, `compute_hawk_score()` — the highest-value unit test targets in the codebase | LOW | No fixtures needed. Input array → assert output value. Each function has well-defined edge cases: empty window, MAD=0, NaN propagation, clamp boundaries at 0 and 100. |
-| **Unit tests for `csv_handler.py` dedup logic** | `append_to_csv()` contains critical deduplication logic: existing file, no file, duplicate rows on date column. Bugs here silently corrupt data CSVs. | MEDIUM | Use `tmp_path` built-in pytest fixture — no temp dir management needed. Test: new file creation, append with dedup, sort order preserved. |
-| **Unit tests for `ratios.py` normalization** | `yoy_pct_change` and `direct` normalization paths are the contract between raw CSV data and the Z-score engine. Edge cases include sparse data, quarterly cadence, fewer rows than yoy_periods. | MEDIUM | Use minimal synthetic DataFrames. No file I/O needed — functions accept DataFrames directly. |
-| **Test isolation — no real file I/O or network in fast tests** | Unit tests must run offline and without touching `data/` CSVs or external APIs | LOW | Use `monkeypatch` and `tmp_path` fixtures for file operations. Use `mocker.patch` for any `requests` calls that leak through. An `autouse=True` fixture in `conftest.py` that patches `requests.get` to raise `RuntimeError` enforces this globally. |
-
-#### Python Linting (ruff)
+#### 1. Response Object Mocking for `requests.Session`
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **`ruff check` on all pipeline Python** | Catch unused imports, undefined names (F-rules), and bugbear issues (B-rules) before they reach CI | LOW | Single binary, zero config dependencies. `ruff check pipeline/` from project root. Configure in `pyproject.toml` under `[tool.ruff]`. |
-| **`ruff format --check` for code style** | Consistent formatting across a solo project prevents diff noise and keeps scraper code readable | LOW | Replaces Black. `ruff format --check pipeline/` in CI mode. Use `ruff format pipeline/` locally to auto-fix. |
-| **`pyproject.toml` as the single config file** | Project already has `requirements.txt` but no `pyproject.toml`. Adding one consolidates pytest + ruff config in one place. | LOW | No `setup.py`, no `setup.cfg`, no `.flake8`. Single file. Target Python 3.11 (matches GitHub Actions config). |
+| **`MagicMock` response objects with `.status_code`, `.text`, `.content`, `.json()`** | Every ingest module calls `session.get(url, ...)`. Without a mock response, all paths through the HTTP call are dead to tests — 0% coverage on the most important branches. | LOW | `unittest.mock.MagicMock()` with `.status_code = 200`, `.text = "..."`, `.json.return_value = {...}`. This covers happy path. Requires patching the session returned by `create_session()`. |
+| **Patching `create_session` at the call site (not at `requests` layer)** | The existing `block_network` fixture blocks at `socket.socket` level. Unit tests that mock `create_session` bypass the socket entirely — the mock session's `.get()` returns a fake response without touching the network. | LOW | Use `monkeypatch.setattr("pipeline.ingest.abs_data.create_session", lambda **kw: mock_session)` in test. The critical pattern: patch the name *in the module under test*, not in `pipeline.utils.http_client`. Import-path targeting is the most common mock pitfall. |
+| **Error path mocking (4xx/5xx, `requests.exceptions.Timeout`, `ConnectionError`)** | `abs_data.py`, `rba_data.py`, `asx_futures_scraper.py` all have explicit exception handlers. These branches are only reachable by making the mock raise or return a non-200 status code. Without them, coverage on exception handlers stays at 0%. | LOW | `mock_session.get.side_effect = requests.exceptions.Timeout()` for timeout paths. `mock_response.status_code = 500` + `mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError()` for 5xx paths. Each exception type in the handler needs its own test. |
+| **`raise_for_status` mock** | `rba_data.fetch_cash_rate()` calls `response.raise_for_status()`. A mock that does nothing by default means the no-error path is tested, but the raise path is not. | LOW | `mock_response.raise_for_status = MagicMock()` (does nothing) for happy path. `mock_response.raise_for_status.side_effect = HTTPError("404")` for error path test. |
 
-#### JS Linting (ESLint)
-
-| Feature | Why Expected | Complexity | Notes |
-|---------|--------------|------------|-------|
-| **ESLint with flat config (`eslint.config.js`)** | ESLint v10 (released Feb 2026) removed the legacy `.eslintrc` format entirely. Any new ESLint setup must use flat config. The project has 3 vanilla JS source files in `public/js/`. | LOW | `npm install --save-dev eslint @eslint/js`. Create `eslint.config.js` with `js.configs.recommended`. No framework plugins needed — vanilla JS only. Run via `npx eslint public/js/`. |
-| **ESLint scoped to `public/js/` only** | Playwright test files in `tests/` use CommonJS `require()` and Node-specific patterns (not browser JS). ESLint config should exclude `tests/` and `node_modules/`. | LOW | Flat config `files: ["public/js/**/*.js"]` glob targets only dashboard JS. `tests/*.spec.js` excluded by default or via explicit ignore. |
-| **`npm run lint` script** | Developers expect `npm run lint` to exist alongside `npm test`. Discoverability matters. | LOW | Add to `package.json` scripts: `"lint": "eslint public/js/"`. One command, no flags required. |
-
-#### Pre-Push Git Hook
+#### 2. CSV Response Body Fixtures for ABS/RBA Parsing
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **`pre-push` hook that runs fast tests + linting** | Prevents broken code from reaching remote. The most common expectation for a CI-capable project. | LOW | Shell script at `.git/hooks/pre-push`. Not version-controlled by default — install via a `scripts/setup-hooks.sh` that copies the hook and `chmod +x`. |
-| **Fast-tier only in pre-push (not Playwright)** | Playwright E2E takes 30+ seconds (needs webserver). Pre-push should complete in under 10 seconds. | LOW | Pre-push runs: `ruff check pipeline/`, `ruff format --check pipeline/`, `npx eslint public/js/`, `pytest tests/python/ -m "not live"`. Playwright (`npm test`) runs only in GitHub Actions, not pre-push. |
-| **`--no-verify` escape hatch documented** | Developers need to know they can bypass the hook in emergencies. | LOW | Add comment at top of pre-push script: "Skip with: git push --no-verify". |
+| **Minimal CSV strings that match real ABS SDMX response format** | `abs_data.fetch_abs_series()` parses `response.text` as a pandas CSV. Without a realistic response body, the column-detection logic (`TIME_PERIOD`, `OBS_VALUE`, filter columns) cannot be exercised. | LOW | Create inline string constants in the test file matching the ABS SDMX CSV format: `"TIME_PERIOD,OBS_VALUE,MEASURE: CPI\n2023-Q1,126.1,1\n"`. Do not use real production CSVs as inline strings — synthetic minimal ones suffice. |
+| **RBA CSV format string (metadata rows + data)** | `rba_data.fetch_cash_rate()` uses `skiprows` to skip metadata lines before the `Series ID` header row. The test CSV string must include those metadata rows or the row-detection loop produces wrong results. | LOW | Inline test string: `"Title Description Row\nSeries ID,Description,New Cash Rate Target\n01-Feb-2023,,4.35\n"`. Verifying the `skiprows` logic requires the header search to find `Series ID` at a non-zero row. |
+| **Filter-path CSV strings (ABS indicator-specific columns)** | `fetch_abs_series()` applies `filters` dict to narrow multi-dimensional ABS data. This path (lines 95-111 of `abs_data.py`) is 0% covered. Needs a CSV with a column like `"MEASURE: CPI Monthly"` to trigger the filter logic. | MEDIUM | Filter logic test: construct a CSV with two measure types, apply `filters={"MEASURE": "1"}`, assert only matching rows are returned. Tests both the column-matching regex and the row-filtering step. |
 
-#### Data Validation (status.json contract)
+#### 3. HTML/PDF Parsing Tests (No Network, Byte-Level Fixtures)
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **JSON schema validation of `public/data/status.json`** | The pipeline writes `status.json` and the frontend reads it. A malformed `status.json` silently breaks the dashboard. Schema validation catches pipeline output regressions. | MEDIUM | Use `jsonschema` Python library. Define a schema covering: `generated_at` (string), `overall.hawk_score` (0-100 number), `gauges` (object with known keys), `asx_futures` (object or null). Run as a pytest test against the actual `status.json` file. |
-| **Gauge range assertions (0-100, no NaN in production)** | Gauge values outside 0-100 or NaN values in `status.json` are silent bugs that corrupt the dashboard display. | LOW | A single pytest parametrized test: for each gauge in `status.json`, assert `0 <= value <= 100` and `value is not None`. Uses the real `status.json` file from `public/data/`. |
+| **Inline HTML bytes fixtures for NAB scraper** | `extract_capacity_from_html()` and `get_pdf_link()` in `nab_scraper.py` take raw `bytes`. Tests can pass synthetic HTML bytes without any mocking at all — no session, no requests. These functions are pure HTML parsing. | LOW | `html = b"<p>Capacity utilisation was 82.1%</p>"` → call `extract_capacity_from_html(html)` → assert `82.1`. Also test the "utilization" US spelling variant via the regex. Test missing pattern → assert `None`. |
+| **Inline PDF bytes via real minimal PDF OR patching pdfplumber** | `extract_capacity_from_pdf()` and `extract_cotality_yoy()` require actual PDF bytes (pdfplumber opens them). Generating real PDF bytes in tests is heavyweight. Patching pdfplumber is simpler. | MEDIUM | Two approaches: (a) `monkeypatch.setattr("pdfplumber.open", ...)` returning a mock PDF object with mock pages and `.extract_text()` returning a fixture string — works for coverage. (b) A pre-built minimal test PDF checked into `tests/python/fixtures/` — more realistic but adds a binary file. Approach (a) is strongly preferred: keeps tests fast, avoids binary fixtures. |
+| **Idempotency check tests for NAB and CoreLogic scrapers** | `_current_month_already_scraped()` in both scrapers is pure file I/O on `tmp_path` CSV. The `isolate_data_dir` autouse fixture means `DATA_DIR` already points to `tmp_path` — just write a fixture CSV there before calling the function. | LOW | Write a CSV with current-month date to `tmp_path / "nab_capacity.csv"`, call `_current_month_already_scraped(path)`, assert `True`. Write a CSV with last-month date, assert `False`. Write nothing, assert `False`. Three tests, zero mocking needed. |
+
+#### 4. Orchestration Testing (main.py and engine.py)
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| **Mock all ingest modules to test orchestration logic in `main.py`** | `run_pipeline()` imports and calls `rba_data`, `abs_data`, `corelogic_scraper`, `nab_scraper`. Testing it requires all four to be mocked so the orchestration logic (tier handling, exit code, partial success) can be exercised without any real I/O. | MEDIUM | `monkeypatch.setattr("pipeline.main.rba_data.fetch_and_save", lambda: 50)` for the module-level mocking pattern. Critical: patch the name in `pipeline.main`, not in the source module. Mock all three tiers independently to test critical-fail vs partial scenarios. |
+| **`sys.exit` testing with `pytest.raises(SystemExit)`** | `run_pipeline()` calls `sys.exit(1)` on critical source failure. This is a real `SystemExit` that will terminate the test process if not caught. Must use `pytest.raises(SystemExit)` context manager to intercept it. | LOW | `with pytest.raises(SystemExit) as exc_info: run_pipeline()` → `assert exc_info.value.code == 1`. This is the only safe way to test code paths that call `sys.exit`. The `monkeypatch.setattr(sys, "exit", lambda code: ...)` alternative is fragile and harder to reason about. |
+| **engine.py: mock `normalize_indicator` and `compute_rolling_zscores` to test JSON assembly** | `generate_status()` in `engine.py` calls `process_indicator()` for each indicator, then assembles the status dict, computes hawk score, and writes JSON. Mocking `normalize_indicator` to return a fixture DataFrame lets the assembly logic be tested without the full data stack. | MEDIUM | Patch `pipeline.normalize.engine.normalize_indicator` to return a synthetic DataFrame with known z-scores. Assert the output status dict has correct structure: `overall.hawk_score` in [0, 100], `gauges` keyed by indicator names, `metadata.indicators_available` count matches. |
+| **`build_gauge_entry` direct unit testing** | `build_gauge_entry()` takes a `latest_row` Series and `z_df` DataFrame. It can be called directly with synthetic inputs — no mocking needed. Tests `apply_polarity`, `zscore_to_gauge`, `classify_zone`, `determine_confidence`, `generate_interpretation` integration. | LOW | Create a minimal `pd.Series` and `pd.DataFrame` with known values, call `build_gauge_entry()`, assert all expected keys exist in the output dict with correct types. This alone covers a large portion of `engine.py`. |
+| **`build_asx_futures_entry` with tmp_path CSV** | `build_asx_futures_entry()` reads `asx_futures.csv` from `DATA_DIR`. Since `isolate_data_dir` patches `DATA_DIR` to `tmp_path`, writing a fixture CSV there and calling the function exercises the full code path. | LOW | Write a minimal `asx_futures.csv` to `tmp_path`, call `build_asx_futures_entry()`, assert `direction`, `probabilities`, `meetings` keys. Write nothing, assert return is `None`. |
+
+#### 5. http_client.py Coverage to 85%+
+
+| Feature | Why Expected | Complexity | Notes |
+|---------|--------------|------------|-------|
+| **Verify `create_session` returns a `requests.Session` with correct adapter config** | `http_client.py` is 42% covered. The untested paths are: non-default `retries`/`backoff_factor` parameters and custom `user_agent`. These are reachable through direct calls with different args. | LOW | Call `create_session(retries=5, backoff_factor=1.0, user_agent="TestBot/1.0")`. Assert the session's headers contain the custom user agent. The retry adapter configuration lives inside the `HTTPAdapter` — asserting `session.get_adapter("https://").max_retries.total == 5` validates the retry was applied. No mocking needed. |
+| **Session mounting on both http:// and https://**  | The `session.mount("http://", adapter)` and `session.mount("https://", adapter)` lines are in the function. Test by inspecting `session.get_adapter("http://example.com")` and `session.get_adapter("https://example.com")` — both should return the configured `HTTPAdapter`. | LOW | Direct assertion after `create_session()` call. No mocking needed. This is pure function-output testing. |
 
 ---
 
-### Differentiators (Competitive Advantage)
+### Differentiators (Valuable But Not Required for 85%)
 
-Features that make the CI infrastructure more robust than the minimum. Not required, but valuable.
+Features that improve test quality beyond the coverage number.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **Two-tier test execution (`fast` vs `full`)** | Separate fast pytest run (pure unit tests, <5s) from full run (includes data validation against real status.json). Enables quick local feedback without waiting for validation tests that need real pipeline output. | LOW | Use pytest markers: `@pytest.mark.unit` (pure math, no I/O) vs unmarked tests. `pytest -m unit` = fast tier. `pytest` = full tier. Register markers in `pyproject.toml` to suppress warnings. |
-| **`@pytest.mark.live` for opt-in API verification** | The MarkitDigital ASX endpoint and ABS SDMX API are confirmed live. A smoke test that actually hits these endpoints gives confidence before a major push. Should be opt-in, not part of the pre-push hook. | MEDIUM | Mark with `@pytest.mark.live`. Run via `pytest -m live` manually or in a separate GitHub Actions job. Separate from unit tests — avoids network dependency in fast tier. Skips gracefully if network is unavailable using `pytest.mark.skipif` + a connectivity fixture. |
-| **`conftest.py` with reusable fixtures for pipeline modules** | Pipeline functions depend on `config.py` constants (`DATA_DIR`, `ZSCORE_WINDOW_YEARS`, etc.). A shared conftest fixture that provides a temporary `DATA_DIR` pointing at `tmp_path` prevents tests from writing to real `data/`. | LOW | Root-level `tests/python/conftest.py` with `@pytest.fixture(autouse=True) def isolate_data_dir(tmp_path, monkeypatch)` patches `pipeline.config.DATA_DIR`. All tests that import pipeline modules get isolation automatically. |
-| **Ruff isort integration (`I` rule set)** | Import ordering is already inconsistent across scraper files. Ruff's `I` rule set replaces isort and auto-fixes on `ruff format`. Prevents future diff noise from import reordering. | LOW | Add `"I"` to `[tool.ruff.lint] select`. Run `ruff check --fix pipeline/` once to bulk-fix existing violations. |
-| **`npm run check` composite script** | Combines `npm run lint` + any future type-checking into one command that matches what CI runs. | LOW | `"check": "npm run lint"` now; extendable later. Makes developer mental model match CI exactly. |
+| **Parametrized tests for `_parse_abs_date`** | `abs_data._parse_abs_date()` has three code paths: quarterly (`2024-Q1`), monthly (`2024-01`), and generic ISO fallback. Parametrizing covers all three with one test function. | LOW | `@pytest.mark.parametrize("input,expected", [("2024-Q1", "2024-01-01"), ("2024-01", "2024-01-01"), ("2024-01-15", "2024-01-15")])`. Currently at 0% — covers a self-contained function with no I/O. |
+| **Parametrized tests for `_derive_probabilities`** | `asx_futures_scraper._derive_probabilities()` has three branches: cut (change_bp < -5), hike (change_bp > 5), hold (within deadband). Pure math with no I/O. | LOW | Same parametrize pattern. Tests the probability capping logic (`min(100, ...)`) at boundary values too. Covers one of the most decision-logic-dense functions in the scraper. |
+| **`discover_latest_survey_url` with mock BeautifulSoup responses** | The NAB tag-archive discovery loop tries multiple URLs. Testing it with a mock session that returns synthetic HTML confirms the `href` matching logic and the fallback to the second archive URL. | MEDIUM | Mock session with `.get()` returning different responses for each archive URL. Test: first URL returns HTML with a matching href → assert result URL. First URL 404s, second URL has matching href → assert fallback worked. Both fail → assert `None`. |
+| **`get_candidate_urls` direct unit tests (no mocking)** | `corelogic_scraper.get_candidate_urls(year, month)` is a pure function that builds URL strings. 0% covered currently. Four URL patterns are generated. Direct call with known inputs is enough. | LOW | `urls = get_candidate_urls(2026, 2)`. Assert `len(urls) == 4`. Assert expected substrings appear in each URL (e.g., `"Feb"`, `"2026"`, `"FINAL"`). No mocking. Covers URL construction logic completely. |
+| **`_find_meeting_for_contract` direct unit tests** | `asx_futures_scraper._find_meeting_for_contract()` is pure logic: same-month match, nearest-future fallback, no match. No I/O. | LOW | Call directly with synthetic `contract_expiry` dates and `meeting_dates` lists. Three parametrized scenarios: same month, future fallback, no match (returns `None`). |
+| **`_get_current_cash_rate` with tmp_path CSV** | Reads `rba_cash_rate.csv` from `DATA_DIR`. The `isolate_data_dir` fixture makes this a simple write-to-tmp-path test. Also test the fallback (no CSV → returns 4.35). | LOW | Write a CSV with a known rate to `tmp_path / "rba_cash_rate.csv"`, call `_get_current_cash_rate()`, assert return value. Delete the file, call again, assert `4.35` fallback. |
+| **`generate_interpretation` parametrized across all indicators and zones** | `engine.generate_interpretation()` has a static template dict. Pure function, no I/O. 35 combinations (7 indicators × 5 zones) can be parametrized. | LOW | One parametrized test covers the whole function. Tests the unknown-indicator fallback too. Zero mocking. Very high coverage return for a short test. |
 
 ---
 
-### Anti-Features (Commonly Requested, Often Problematic)
-
-Features that seem like good CI additions but create problems in this specific context.
+### Anti-Features (Commonly Requested, Will Not Help Here)
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| **`pre-commit` framework (via PyPI)** | Manages multi-language hooks in a version-controlled `.pre-commit-config.yaml`. Popular in Python ecosystem. | Adds a separate install step (`pip install pre-commit && pre-commit install`). Developers forget to install it after cloning. Since this is a solo project, the overhead of pre-commit's framework outweighs its benefits. | Simple `.git/hooks/pre-push` shell script copied by `scripts/setup-hooks.sh`. Explicit, no extra install, no framework dependency. |
-| **Playwright tests in pre-push hook** | Would catch E2E regressions before any push, not just in CI | Playwright tests take 30-90 seconds (webserver spin-up + 24 test cases). Pre-push hook must be under 10 seconds or developers bypass with `--no-verify`. E2E tests already run in GitHub Actions on every push — running them pre-push is redundant. | Keep Playwright in GitHub Actions only. Pre-push runs only: ruff + ESLint + pytest fast tier. |
-| **mypy or pyright type checking** | Would catch type errors in the pipeline's type-annotated functions | The pipeline uses few explicit type annotations (only `fetch_and_save() -> Dict[...]` return types on scrapers). Running mypy on unannotated code produces noise without value. Adding annotations project-wide is a large undertaking. | Ruff's `UP` rules modernize syntax without requiring full annotation. If type safety becomes a priority, annotate incrementally and add mypy then. |
-| **Coverage enforcement (pytest-cov with minimum %)** | Encourages thorough testing | Coverage % is a vanity metric for a solo project. Chasing 80% coverage forces tests for boilerplate that provides no insight. The pipeline has scraper code that is genuinely hard to unit test without live external dependencies. | Write tests for the pure functions (zscore, gauge, csv_handler). Scraper integration code is better covered by the existing Playwright E2E + live marker tests. |
-| **Jest/Vitest for vanilla JS unit tests** | React/Node ecosystems use Jest as standard. | The JS codebase has 3 source files with no module exports — all logic is driven by DOM manipulation on a static page. There are no pure functions to unit test independently of the browser. Playwright already covers JS behavior end-to-end. | Continue with Playwright for all JS testing. Add ESLint to catch JS errors statically. No need for Jest. |
-| **VCR.py / cassette recording for HTTP mocking** | Record real HTTP interactions once, replay without network | Cassettes go stale when APIs change (the MarkitDigital and ABS APIs both evolve). Stale cassettes pass tests against outdated API contracts. | Use `pytest-mock` / `unittest.mock` for unit tests (simple mock responses). Use `@pytest.mark.live` for real API verification when you actually need to confirm the live contract. |
-| **`tox` for multi-environment testing** | Tests across Python 3.9, 3.10, 3.11, 3.12 | GitHub Actions already pins Python 3.11. This is a single-environment project — there is no support matrix to test. Tox adds complexity (`.tox/` venvs, `tox.ini`) with zero benefit. | Pin `requires-python = ">=3.11"` in `pyproject.toml`. Test once, in the environment that deploys. |
+| **VCR.py / responses library cassette recording** | Record real HTTP interactions once, replay without network | Cassettes recorded against the ABS SDMX, MarkitDigital, and NAB/Cotality endpoints go stale when URL formats or response shapes change (they have changed multiple times in this codebase's history). A stale cassette passes tests against an outdated API contract. | Use `unittest.mock.MagicMock` with inline fixture strings. Less realistic but never stale. Reserve `@pytest.mark.live` for actual contract verification. |
+| **Full integration tests that run the real pipeline end-to-end** | Would test the system as a whole, not just units | `run_pipeline()` calls all ingestors which call the network. An integration test that runs the full pipeline requires network access, takes 30+ seconds, and fails non-deterministically on CI when external endpoints are down. The `@pytest.mark.live` live test suite already covers this. | Mock all ingestors in `main.py` unit tests to test orchestration logic. Run live tests manually with `pytest -m live` when endpoint contracts need verification. |
+| **Generating real PDF bytes for pdfplumber tests** | More realistic than mocking pdfplumber | Requires a PDF generation library (reportlab or fpdf2) as a test-only dependency, adds binary fixture files to the repo, and creates fragile tests that break when pdfplumber changes its internal API. The actual PDF-to-text extraction is pdfplumber's responsibility, not ours. | Patch `pdfplumber.open()` to return a mock object whose pages have `.extract_text()` returning a fixture string. Tests our regex logic without testing pdfplumber's PDF parser. |
+| **Achieving 100% coverage on `main.py`** | Completeness | The `if __name__ == '__main__':` block at the bottom of `main.py` (and other modules) is unreachable from pytest. Reaching 100% requires either removing the guard or using subprocess. This is not worth the effort. | Accept ~90-95% as the realistic ceiling for modules with `__main__` guards. The 85% milestone target accounts for this. |
+| **Mocking `datetime.now()` globally** | Some tests need deterministic dates | Patching `datetime.datetime.now` globally breaks other tests that legitimately need current time. Partial patching via `monkeypatch.setattr("pipeline.ingest.nab_scraper.datetime", ...)` is fragile because `datetime` is a C extension. | For idempotency tests that compare to "current month", write the test CSV with a date matching the *actual* current month (use `datetime.now()` in the test setup too). For tests that need a specific known date, use `monkeypatch.setattr` scoped to the specific test. |
+| **pytest-cov coverage gates in pre-push hook** | Enforce minimum coverage before every push | Coverage measurement adds 2-3 seconds to every test run. The pre-push hook must complete in <10s. Coverage is valuable to measure in CI, not in the hot path of every developer commit. | Run coverage manually: `pytest --cov=pipeline --cov-report=term-missing`. Add to a separate `npm run coverage` script. Do not put it in the pre-push hook. |
 
 ---
 
 ## Feature Dependencies
 
 ```
-[pyproject.toml]
-    └──enables──> [pytest configuration: testpaths, markers, addopts]
-    └──enables──> [ruff configuration: select, ignore, target-version]
-    (single file replaces: pytest.ini + .flake8 + setup.cfg)
+[Existing v2.0 infrastructure]
+    └──provides──> [isolate_data_dir autouse fixture]
+                       └──required by──> [all tmp_path-based tests for file-reading functions]
+                       └──required by──> [build_asx_futures_entry tests]
+                       └──required by──> [_get_current_cash_rate tests]
+                       └──required by──> [_current_month_already_scraped tests]
+    └──provides──> [block_network autouse fixture]
+                       └──required by: ensures mock-based tests do not accidentally hit network]
+    └──provides──> [@pytest.mark.live marker]
+                       └──exempts live tests from block_network]
+    └──provides──> [named CSV fixture loaders]
+                       └──not directly needed for v3.0 (new tests use inline synthetic data)]
 
-[tests/python/conftest.py]
-    └──provides──> [tmp_path-based DATA_DIR isolation fixture]
-                       └──required by──> [csv_handler tests]
-                       └──required by──> [ratios.py tests]
-    └──provides──> [autouse network guard fixture]
-                       └──required by──> [all unit tests — prevents accidental live calls]
+[unittest.mock.MagicMock session pattern]
+    └──required by──> [abs_data fetch tests]
+    └──required by──> [rba_data fetch tests]
+    └──required by──> [asx_futures_scraper scrape tests]
+    └──required by──> [corelogic_scraper download tests]
+    └──required by──> [nab_scraper discover/fetch tests]
+    └──enables──> [response body fixture strings for CSV parsing tests]
 
-[pytest unit tests — zscore.py, gauge.py]
-    └──no dependencies──> [run offline, no fixtures, pure math]
-    └──fastest to write, highest value]
+[Inline HTML bytes fixtures]
+    └──no dependencies (pure bytes passed to parsing functions)]
+    └──required by──> [extract_capacity_from_html tests]
+    └──required by──> [get_pdf_link tests]
 
-[pytest unit tests — csv_handler.py, ratios.py]
-    └──requires──> [conftest.py tmp_path fixture]
-    └──medium complexity]
+[pdfplumber mock pattern]
+    └──requires──> [monkeypatch on pdfplumber.open]
+    └──required by──> [extract_capacity_from_pdf tests]
+    └──required by──> [extract_cotality_yoy tests]
 
-[status.json schema validation test]
-    └──requires──> [real public/data/status.json exists]
-    └──requires──> [jsonschema pip dependency]
-    └──NOT in @pytest.mark.unit tier — depends on real pipeline output]
+[engine.py build_gauge_entry direct tests]
+    └──requires──> [synthetic pd.Series / pd.DataFrame inputs — no mocking]
+    └──enables partial coverage without needing full normalize pipeline]
 
-[@pytest.mark.live tests]
-    └──requires──> [network connectivity]
-    └──opt-in only, not run in pre-push hook]
-    └──validates: MarkitDigital API, ABS SDMX API response shapes]
+[engine.py generate_status mock pattern]
+    └──requires──> [normalize_indicator patched to return fixture DataFrame]
+    └──requires──> [load_weights patched OR real weights.json accessible from tests]
+    └──required by──> [full generate_status JSON assembly tests]
 
-[.git/hooks/pre-push]
-    └──requires──> [ruff installed in venv]
-    └──requires──> [eslint installed in node_modules]
-    └──requires──> [pytest installed with tests/python/ present]
-    └──installed via──> [scripts/setup-hooks.sh]
-    └──runs: ruff check + ruff format --check + eslint + pytest -m "not live"]
+[main.py orchestration tests]
+    └──requires──> [all ingest modules patched in pipeline.main namespace]
+    └──requires──> [pytest.raises(SystemExit) for sys.exit(1) testing]
+    └──independent of engine.py tests — can be written in parallel]
 
-[eslint.config.js]
-    └──requires──> [eslint @eslint/js installed]
-    └──targets──> [public/js/ only — NOT tests/*.spec.js]
-    └──no framework plugins needed — vanilla JS]
+[http_client.py tests]
+    └──no mocking dependencies — direct session inspection]
+    └──independent: write first or last, no ordering constraint]
+
+[Pure-function tests: _parse_abs_date, _derive_probabilities, get_candidate_urls,
+ _find_meeting_for_contract, generate_interpretation, _check_staleness]
+    └──no dependencies (pure logic, no I/O, no mocking needed)]
+    └──highest coverage return per line of test code: write these first]
 ```
 
 ### Dependency Notes
 
-- **`pyproject.toml` is the foundation:** Everything else depends on it existing. Create it first, populate pytest + ruff config sections before writing any tests.
-- **`conftest.py` DATA_DIR isolation is load-bearing:** Tests for `csv_handler.py` and `ratios.py` will corrupt real data files without it. Must be in place before those tests are written.
-- **Schema validation test is not in the unit tier:** It reads `public/data/status.json` which only exists after running the pipeline. Runs in the default `pytest` (full) tier, not `pytest -m unit`.
-- **`@pytest.mark.live` tests are fully independent:** Can be added in any phase, have no dependencies on the other features.
-- **ESLint is independent of all Python tooling:** Can be installed and configured before or after pytest work. No cross-dependencies.
+- **Pure functions first:** `_parse_abs_date`, `_derive_probabilities`, `get_candidate_urls`,
+  `_find_meeting_for_contract`, `generate_interpretation` — all have zero dependencies. These can be
+  written immediately and deliver immediate coverage percentage gains with minimal test code.
+- **Fixture-CSV tests second:** `_current_month_already_scraped` (NAB + CoreLogic), `_get_current_cash_rate`,
+  `build_asx_futures_entry` — all depend only on `isolate_data_dir` which already exists.
+- **Mock-session tests third:** The full fetch paths in abs_data, rba_data, asx_futures, corelogic, nab —
+  require the MagicMock session pattern. These are medium complexity but follow the same repeatable pattern
+  across all five modules.
+- **Orchestration tests last:** `main.py` and `engine.py:generate_status` depend on all ingest modules being
+  patchable. Write them after you have confidence the individual module tests work correctly.
 
 ---
 
 ## MVP Definition
 
-### Launch With (This Milestone)
+### For 85%+ Coverage (This Milestone)
 
-Minimum needed to say "this project has local CI infrastructure."
+Ordered by coverage return vs implementation effort:
 
-- [ ] **`pyproject.toml` with pytest + ruff config** — Foundation. Without it, pytest finds no tests and ruff has no target-version. One file, five minutes of setup.
-- [ ] **pytest unit tests for `zscore.py` and `gauge.py`** — Highest value, lowest cost. Pure math functions with zero external dependencies. These are the mathematical core of the hawk score — regressions here are catastrophic.
-- [ ] **`ruff check` + `ruff format --check` on `pipeline/`** — Enforces code quality on all current and future scraper code. Catches import errors and style violations before they accumulate.
-- [ ] **ESLint flat config for `public/js/`** — Catches JS errors in dashboard source. ESLint v10 is the required format; set it up correctly from the start.
-- [ ] **`.git/hooks/pre-push` installed via `scripts/setup-hooks.sh`** — Makes the fast test + lint gate automatic without requiring developers to remember to run checks.
+- [ ] **Pure function tests for all 7 zero-I/O functions** (`_parse_abs_date`, `_derive_probabilities`,
+  `get_candidate_urls`, `_find_meeting_for_contract`, `generate_interpretation`, `_find_meeting_for_contract`,
+  `_check_staleness`) — fastest wins, zero mocking overhead.
+- [ ] **`http_client.py` direct tests** (`create_session` with custom params, adapter assertion) — no mocking
+  needed, reaches 85%+ on this module immediately.
+- [ ] **`build_gauge_entry` direct tests** — synthetic Series/DataFrame inputs, covers large portion of engine.py.
+- [ ] **`build_asx_futures_entry` tmp_path tests** — needs only isolate_data_dir, already available.
+- [ ] **HTML bytes fixture tests** (`extract_capacity_from_html`, `get_pdf_link`) — direct call, no mocking.
+- [ ] **Idempotency tests for NAB + CoreLogic** (`_current_month_already_scraped`) — tmp_path only.
+- [ ] **Mock-session tests for `abs_data.fetch_abs_series`** — happy path + error paths.
+- [ ] **Mock-session tests for `rba_data.fetch_cash_rate`** — happy path + `raise_for_status` path.
+- [ ] **`main.py` orchestration tests** — patch all ingest modules, test all three tiers + sys.exit.
+- [ ] **pdfplumber mock tests** (`extract_capacity_from_pdf`, `extract_cotality_yoy`) — pdfplumber.open mock.
 
-### Add After Core Tests Are Green (Later in Milestone)
+### Add If Time Allows (Pushes Coverage Beyond 85%)
 
-- [ ] **pytest tests for `csv_handler.py`** — Important but lower priority than zscore/gauge. Requires `conftest.py` with `tmp_path` isolation first.
-- [ ] **pytest tests for `ratios.py` normalization** — Medium complexity. Add after csv_handler tests confirm the `conftest.py` pattern works.
-- [ ] **`status.json` JSON schema validation test** — Useful regression guard, but requires a real pipeline run to produce the file. Add after the unit tests are stable.
-- [ ] **`@pytest.mark.live` API health-check tests** — Nice-to-have for confirming live endpoints. Add last; opt-in only.
+- [ ] **`abs_data.fetch_and_save` filter-path tests** (ABS multi-dimensional CSV filter logic)
+- [ ] **`asx_futures_scraper.scrape_asx_futures` full flow** (mock session, fixture JSON response body)
+- [ ] **`engine.py:generate_status` assembly test** (mock normalize_indicator, verify JSON output structure)
+- [ ] **`nab_scraper.discover_latest_survey_url`** (mock session, two-archive-URL fallback logic)
+- [ ] **`nab_scraper.backfill_nab_history`** (mock session, verify month iteration logic)
 
-### Future Consideration (Not This Milestone)
+### Defer to Future Milestone
 
-- [ ] **Annotate pipeline Python with type hints** — Prerequisite for mypy. Current code has minimal annotations. Worthwhile eventually, but a substantial effort.
-- [ ] **Playwright tests in GitHub Actions on PR** — Currently only runs manually with `npm test`. Setting up a GHA job for Playwright requires display/browser setup. Separate milestone.
+- [ ] **`engine.py:generate_status` full integration** (requires real pipeline data, more appropriate as a
+  smoke test than a unit test)
+- [ ] **`asx_futures_scraper._get_rba_meeting_dates`** (reads `public/data/meetings.json` — path not under
+  DATA_DIR, needs additional monkeypatching of the `Path("public/data/meetings.json")` open call)
 
 ---
 
 ## Feature Prioritization Matrix
 
-| Feature | Developer Value | Implementation Cost | Priority |
+| Feature | Coverage Return | Implementation Cost | Priority |
 |---------|-----------------|---------------------|----------|
-| `pyproject.toml` (pytest + ruff config) | HIGH — enables everything else | LOW — one file | P1 |
-| pytest unit tests: zscore.py + gauge.py | HIGH — guards mathematical core | LOW — pure functions, no fixtures | P1 |
-| `ruff check` + `ruff format --check` | HIGH — enforces code quality on all scraper code | LOW — single binary | P1 |
-| ESLint flat config for public/js/ | MEDIUM — catches JS errors | LOW — 3 source files, no framework | P1 |
-| Pre-push hook via setup-hooks.sh | HIGH — makes checks automatic | LOW — shell script | P1 |
-| conftest.py DATA_DIR isolation | HIGH — prerequisite for file-touching tests | LOW — monkeypatch pattern | P2 |
-| pytest tests: csv_handler.py | MEDIUM — guards dedup logic | MEDIUM — needs tmp_path fixtures | P2 |
-| pytest tests: ratios.py | MEDIUM — guards normalization | MEDIUM — needs synthetic DataFrames | P2 |
-| status.json schema validation | MEDIUM — guards frontend contract | MEDIUM — needs jsonschema, real file | P2 |
-| Two-tier markers (unit vs full) | LOW — nice organisation | LOW — just marker registration | P2 |
-| @pytest.mark.live API tests | LOW — opt-in confidence check | LOW — simple requests + assertions | P3 |
+| Pure function tests (7 functions, no I/O) | HIGH — each function is 100% uncovered | LOW — parametrize + direct call | P1 |
+| `http_client.py` direct session inspection | HIGH — module at 42%, gets to 85%+ | LOW — no mocking | P1 |
+| `build_gauge_entry` direct tests | HIGH — covers large engine.py section | LOW — synthetic data | P1 |
+| HTML bytes tests (NAB extract, pdf link) | HIGH — 0% covered functions | LOW — pass bytes directly | P1 |
+| Idempotency tests (tmp_path CSV) | MEDIUM — covers important guard logic | LOW — write CSV, call function | P1 |
+| `build_asx_futures_entry` tmp_path tests | MEDIUM — covers engine.py branch | LOW — isolate_data_dir already exists | P1 |
+| Mock-session tests: abs_data | HIGH — abs_data at 17% → ~70%+ | MEDIUM — MagicMock session pattern | P2 |
+| Mock-session tests: rba_data | HIGH — rba_data at 24% → ~80%+ | MEDIUM — same pattern | P2 |
+| `main.py` orchestration tests | HIGH — 0% → ~85%+ | MEDIUM — patch 4 modules + sys.exit | P2 |
+| pdfplumber mock tests | MEDIUM — covers fallback paths | MEDIUM — mock pdfplumber.open | P2 |
+| `asx_futures_scraper.scrape_asx_futures` | HIGH — 13% → ~70%+ | MEDIUM — fixture JSON response | P2 |
+| `engine.py:generate_status` assembly | HIGH — covers JSON assembly | HIGH — many dependencies to mock | P3 |
+| `nab_scraper.backfill_nab_history` | MEDIUM — complex backfill loop | HIGH — many mock interactions | P3 |
 
 **Priority key:**
-- P1: Must have for milestone to be "done"
-- P2: Should have, add within this milestone
-- P3: Nice to have, can slip to next milestone
+- P1: Direct call or tmp_path only — write immediately, highest effort-to-coverage ratio
+- P2: Requires MagicMock session — write after confirming the mock pattern in one module works
+- P3: Multiple layers of mocking — write if 85% not yet reached after P1+P2
 
 ---
 
 ## Implementation Patterns
 
-### Pattern 1: pytest Discovery Configuration
-
-```toml
-# pyproject.toml
-[tool.pytest.ini_options]
-testpaths = ["tests/python"]
-addopts = "-ra -q"
-markers = [
-    "unit: pure unit tests — no I/O, no network (fast)",
-    "live: tests that make real network calls (opt-in only)",
-]
-```
-
-Why `tests/python/` and not `tests/`? The existing `tests/` directory contains Playwright `.spec.js` files. Pointing pytest at `tests/` causes it to discover JS files and error. Separate directories prevent collision.
-
-### Pattern 2: ruff Configuration for This Codebase
-
-```toml
-# pyproject.toml
-[tool.ruff]
-target-version = "py311"   # matches GitHub Actions python-version: '3.11'
-line-length = 88
-
-[tool.ruff.lint]
-select = ["E", "F", "W", "B", "I", "UP"]
-ignore = ["E501"]           # line length handled by formatter
-per-file-ignores = {"pipeline/__init__.py" = ["F401"]}
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-```
-
-Rules selected: `E/F/W` (pycodestyle + pyflakes, core), `B` (bugbear, catches real bugs), `I` (isort, fixes import order), `UP` (pyupgrade, modernizes Python syntax). Avoids `N` (naming conventions would require renaming existing config constants).
-
-### Pattern 3: ESLint Flat Config (Vanilla JS, ESLint v10)
-
-```js
-// eslint.config.js
-import js from "@eslint/js";
-
-export default [
-  js.configs.recommended,
-  {
-    files: ["public/js/**/*.js"],
-    rules: {
-      "no-unused-vars": "warn",
-      "no-console": "off",   // dashboard uses console.log for debug output
-    }
-  }
-];
-```
-
-Note: ESLint v10 removed `.eslintrc` format entirely. The `eslint.config.js` flat config is the only valid format. Running `npx eslint --init` generates a starting point, then narrow it to `public/js/`.
-
-### Pattern 4: Pre-Push Hook Structure
-
-```bash
-#!/bin/bash
-# .git/hooks/pre-push
-# Skip with: git push --no-verify
-
-set -e
-
-echo "Running pre-push checks..."
-
-echo "  [1/4] ruff lint..."
-ruff check pipeline/
-
-echo "  [2/4] ruff format check..."
-ruff format --check pipeline/
-
-echo "  [3/4] ESLint..."
-npx eslint public/js/
-
-echo "  [4/4] pytest (fast tier)..."
-pytest tests/python/ -m "not live" -q
-
-echo "Pre-push checks passed."
-```
-
-Note: `set -e` exits immediately on any non-zero return code. Each step runs in order; a failure in step 2 stops step 3. This is intentional — no point linting JS if Python is broken.
-
-### Pattern 5: conftest.py DATA_DIR Isolation
+### Pattern 1: MagicMock Session (Core Pattern for All Ingest Tests)
 
 ```python
-# tests/python/conftest.py
-import pytest
-from pathlib import Path
-import pipeline.config as config
+from unittest.mock import MagicMock
+import requests
 
-@pytest.fixture(autouse=True)
-def isolate_data_dir(tmp_path, monkeypatch):
-    """Redirect pipeline DATA_DIR to a tmp directory for test isolation."""
-    fake_data = tmp_path / "data"
-    fake_data.mkdir()
-    monkeypatch.setattr(config, "DATA_DIR", fake_data)
-    return fake_data
+def test_fetch_abs_series_happy_path(monkeypatch):
+    """fetch_abs_series returns a DataFrame with expected columns on 200 response."""
+    csv_body = (
+        "TIME_PERIOD,OBS_VALUE\n"
+        "2023-Q1,126.1\n"
+        "2023-Q2,127.8\n"
+    )
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.text = csv_body
 
-@pytest.fixture(autouse=True)
-def block_network(monkeypatch):
-    """Prevent accidental live HTTP calls from unit tests."""
-    import requests
-    def _blocked(*args, **kwargs):
-        raise RuntimeError(
-            f"Unit test made a live network call to: {args[0]!r}. "
-            "Use @pytest.mark.live for tests that need real network."
-        )
-    monkeypatch.setattr(requests, "get", _blocked)
-    monkeypatch.setattr(requests, "post", _blocked)
+    mock_session = MagicMock()
+    mock_session.get.return_value = mock_response
+
+    # Patch create_session IN THE MODULE UNDER TEST, not in http_client
+    monkeypatch.setattr(
+        "pipeline.ingest.abs_data.create_session",
+        lambda **kw: mock_session,
+    )
+
+    from pipeline.ingest.abs_data import fetch_abs_series
+    df = fetch_abs_series("CPI", "all")
+
+    assert list(df.columns) == ["date", "value", "source", "series_id"]
+    assert len(df) == 2
 ```
 
-The `autouse=True` on both fixtures means every test in `tests/python/` gets isolation without needing to declare the fixture explicitly. Tests marked `@pytest.mark.live` override this by declaring a `requests_session` fixture that bypasses the block.
+Key rule: always patch `"pipeline.ingest.<module>.create_session"`, not
+`"pipeline.utils.http_client.create_session"`. The mock must replace the name
+*as it appears in the module being tested*.
 
-### Pattern 6: API Mocking vs Live Testing Decision
+### Pattern 2: sys.exit Testing
 
-| Test goal | Use | Reason |
-|-----------|-----|--------|
-| Test `asx_futures_scraper.py` parses JSON correctly | `mocker.patch("requests.Session.get")` returning fixture JSON | Fast, deterministic, no network needed |
-| Test MarkitDigital API is still live and returning expected shape | `@pytest.mark.live` test with real `requests.get()` | Confirms actual API contract, not mocked data |
-| Test `csv_handler.py` dedup logic | `tmp_path` fixture with synthetic CSV files | Pure I/O test, no network, no real data dir |
-| Test status.json schema is correct | Load real `public/data/status.json` file | Validates actual pipeline output, not a mock |
+```python
+import pytest
 
-The rule: if you're testing your code's logic, mock the dependency. If you're testing the dependency itself (is the API alive? does it return the fields we expect?), use a live test with `@pytest.mark.live`.
+def test_run_pipeline_critical_failure_exits(monkeypatch):
+    """Critical source failure triggers sys.exit(1)."""
+    monkeypatch.setattr(
+        "pipeline.main.rba_data.fetch_and_save",
+        lambda: (_ for _ in ()).throw(RuntimeError("RBA API down")),
+    )
+    # Mock the lambda sources too
+    monkeypatch.setattr(
+        "pipeline.main.CRITICAL_SOURCES",
+        [("RBA Cash Rate", lambda: (_ for _ in ()).throw(RuntimeError("down")))],
+    )
 
----
+    from pipeline.main import run_pipeline
+    with pytest.raises(SystemExit) as exc:
+        run_pipeline()
 
-## Competitor Feature Analysis
+    assert exc.value.code == 1
+```
 
-This table compares local CI approaches across similar Python+JS data dashboard projects.
+Alternative: patch `sys.exit` with a side_effect that raises a custom exception,
+then catch that exception. `pytest.raises(SystemExit)` is simpler and preferred.
 
-| Feature | Typical Python data project | Typical Node-first project | This project |
-|---------|----------------------------|---------------------------|--------------|
-| Python testing | pytest + pytest-cov | N/A | pytest, no coverage enforcement |
-| Python linting | flake8 + black + isort | N/A | ruff (replaces all three) |
-| JS testing | N/A | Jest / Vitest | Playwright (E2E only — no unit JS tests needed for vanilla JS) |
-| JS linting | N/A | ESLint | ESLint v10 flat config |
-| Hook management | pre-commit framework | husky + lint-staged | Shell script (simpler, solo project) |
-| Test tiers | pytest-cov with markers | separate jest/playwright | pytest markers (unit vs live) |
-| Data validation | manual inspection | N/A | jsonschema on status.json |
-| Config consolidation | multiple files | package.json | pyproject.toml + package.json |
+### Pattern 3: pdfplumber Mocking
+
+```python
+from unittest.mock import MagicMock, patch
+
+def test_extract_cotality_yoy_happy_path():
+    """Regex matches 'Australia X% X% X%' pattern in PDF text."""
+    mock_page = MagicMock()
+    mock_page.extract_text.return_value = (
+        "CoreLogic HVI February 2026\n"
+        "Australia 0.8% 2.4% 9.4%\n"
+    )
+    mock_pdf = MagicMock()
+    mock_pdf.pages = [mock_page]
+    mock_pdf.__enter__ = lambda s: mock_pdf
+    mock_pdf.__exit__ = MagicMock(return_value=False)
+
+    with patch("pdfplumber.open", return_value=mock_pdf):
+        from pipeline.ingest.corelogic_scraper import extract_cotality_yoy
+        result = extract_cotality_yoy(b"fake-pdf-bytes")
+
+    assert result == pytest.approx(9.4)
+```
+
+Note: `pdfplumber.open()` is used as a context manager. The mock must implement
+`__enter__`/`__exit__` to avoid `AttributeError: __enter__`. Using `MagicMock`
+automatically provides context manager protocol, but the return value of `__enter__`
+must be configured explicitly.
+
+### Pattern 4: HTML Bytes Fixture Tests (No Mocking)
+
+```python
+def test_extract_capacity_from_html_finds_australian_spelling():
+    """CAPACITY_REGEX matches 'utilisation' (Australian spelling)."""
+    from pipeline.ingest.nab_scraper import extract_capacity_from_html
+
+    html = b"<p>Capacity utilisation was 82.1% in November.</p>"
+    result = extract_capacity_from_html(html)
+    assert result == pytest.approx(82.1)
+
+
+def test_extract_capacity_from_html_finds_us_spelling():
+    """CAPACITY_REGEX matches 'utilization' (US spelling variant)."""
+    from pipeline.ingest.nab_scraper import extract_capacity_from_html
+
+    html = b"<div>Capacity utilization reached 79.5%.</div>"
+    result = extract_capacity_from_html(html)
+    assert result == pytest.approx(79.5)
+
+
+def test_extract_capacity_from_html_returns_none_when_no_match():
+    """Returns None when CAPACITY_REGEX pattern is absent."""
+    from pipeline.ingest.nab_scraper import extract_capacity_from_html
+
+    html = b"<p>Business conditions improved in the quarter.</p>"
+    result = extract_capacity_from_html(html)
+    assert result is None
+```
+
+These require zero mocking and zero fixtures — just bytes in, value out.
+
+### Pattern 5: Pure Function Parametrize
+
+```python
+import pytest
+
+@pytest.mark.parametrize("date_str,expected", [
+    ("2024-Q1", "2024-01-01"),
+    ("2024-Q2", "2024-04-01"),
+    ("2024-Q3", "2024-07-01"),
+    ("2024-Q4", "2024-10-01"),
+    ("2024-01", "2024-01-01"),
+    ("2024-12", "2024-12-01"),
+    ("2024-01-15", "2024-01-15"),
+])
+def test_parse_abs_date(date_str, expected):
+    """_parse_abs_date handles quarterly, monthly, and full ISO formats."""
+    from pipeline.ingest.abs_data import _parse_abs_date
+    assert _parse_abs_date(date_str) == expected
+```
 
 ---
 
 ## Sources
 
-- pytest discovery and `testpaths`: https://docs.pytest.org/en/stable/reference/customize.html (HIGH confidence)
-- pytest fixtures and `conftest.py`: https://docs.pytest.org/en/stable/how-to/fixtures.html (HIGH confidence)
-- pytest markers (unit/integration split): https://docs.pytest.org/en/stable/reference/reference.html (HIGH confidence)
-- ruff configuration in `pyproject.toml`: https://docs.astral.sh/ruff/configuration/ (HIGH confidence)
-- ruff rule sets: https://docs.astral.sh/ruff/linter/ (HIGH confidence)
-- ESLint v10 flat config announcement: https://eslint.org/blog/2026/02/eslint-v10.0.0-released/ (HIGH confidence — published Feb 2026)
-- ESLint flat config basics: https://eslint.org/docs/latest/use/configure/migration-guide (HIGH confidence)
-- pytest-mock for HTTP mocking: https://pytest-with-eric.com/mocking/pytest-mocking/ (MEDIUM confidence)
-- VCR.py vs live testing tradeoffs: https://dev.to/bowmanjd/two-methods-for-testing-https-api-calls-with-python-and-pytest (MEDIUM confidence)
-- jsonschema validation in pytest: https://python-jsonschema.readthedocs.io/en/stable/validate/ (HIGH confidence)
-- Git pre-push hooks pattern: https://www.dolpa.me/automating-tasks-with-git-hooks-code-linting-and-running-tests/ (MEDIUM confidence)
-- Two-tier test split with markers: https://www.pythontutorials.net/blog/how-to-keep-unit-tests-and-integrations-tests-separate-in-pytest/ (MEDIUM confidence)
-- Live project codebase: `/Users/annon/projects/rba-hawko-meter/pipeline/` (HIGH confidence — verified directly)
+- pytest `unittest.mock` patterns: https://docs.python.org/3/library/unittest.mock.html (HIGH confidence)
+- pytest monkeypatch docs: https://docs.pytest.org/en/stable/how-to/monkeypatch.html (HIGH confidence)
+- `pytest.raises(SystemExit)` for `sys.exit` testing: https://docs.pytest.org/en/stable/reference/reference.html (HIGH confidence)
+- requests mocking with MagicMock: https://www.pythontutorial.net/python-unit-testing/python-mock-requests/ (MEDIUM confidence — pattern verified against official mock docs)
+- Web scraper testing with mocking: https://datawookie.dev/blog/2025/01/test-a-web-scraper-using-mocking/ (MEDIUM confidence)
+- responses library (considered, rejected): https://github.com/getsentry/responses (MEDIUM confidence — see anti-features rationale)
+- pdfplumber BytesIO known behaviour: https://github.com/jsvine/pdfplumber/issues/124 (MEDIUM confidence — confirms mock approach is correct)
+- Import-path targeting for mocks ("where to patch"): https://docs.python.org/3/library/unittest.mock.html#where-to-patch (HIGH confidence — critical rule)
+- Live codebase analysis: `/Users/annon/projects/rba-hawko-meter/pipeline/` (HIGH confidence — verified directly)
 
 ---
 
-*Feature research for: RBA Hawk-O-Meter v1.2 — local CI and test infrastructure*
-*Researched: 2026-02-24*
+*Feature research for: RBA Hawk-O-Meter v3.0 — 85%+ per-module unit test coverage*
+*Researched: 2026-02-25*

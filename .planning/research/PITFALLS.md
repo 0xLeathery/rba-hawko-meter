@@ -1,246 +1,485 @@
 # Pitfalls Research
 
-**Domain:** Adding local CI and test infrastructure to an existing Python+JS pipeline project
-**Researched:** 2026-02-24
-**Confidence:** HIGH (based on direct codebase analysis, established pytest/ruff/git-hooks patterns)
+**Domain:** Adding 85%+ unit test coverage to existing Python scraper/pipeline modules
+**Researched:** 2026-02-25
+**Confidence:** HIGH (direct codebase analysis + verified patterns from pytest/requests-mock ecosystem)
 
 ---
 
 ## Critical Pitfalls
 
-### Pitfall 1: Testing External APIs Directly in the Unit Test Suite
+### Pitfall 1: Mocking the Session But Not the Module That Creates It
 
 **What goes wrong:**
-Tests for `abs_data.py`, `asx_futures_scraper.py`, `nab_scraper.py`, and `corelogic_scraper.py` call out to real government and market APIs. The pre-push hook runs these tests on every push. After a few weeks, the suite is "slow and flaky" — developers start bypassing the hook with `git push --no-verify`. The hook is dead.
+Tests for `abs_data.py`, `rba_data.py`, `asx_futures_scraper.py`, `corelogic_scraper.py`,
+and `nab_scraper.py` all call `create_session()` from `pipeline.utils.http_client`, then
+call `session.get(...)`. The test patches `requests.get` directly, or patches
+`pipeline.utils.http_client.requests.Session`, but the actual code creates the session via
+`create_session()`. The patch targets the wrong object — the real network call goes through,
+hits the socket blocker (`RuntimeError: Network access blocked in tests`), and the test fails
+with a confusing error that looks like an infrastructure problem.
 
 **Why it happens:**
-The natural instinct when adding tests to an ingestor is to write a test that calls `fetch_and_save()` and checks the return value. This is an integration test disguised as a unit test. External APIs (ABS SDMX, ASX MarkitDigital, NAB, Cotality) have no SLA guarantees for developer test traffic. The ABS API returns HTTP 429 during scraper development load. NAB has Cloudflare bot detection that trips on automated requests from CI IPs.
-
-**Consequences:**
-- Pre-push hook takes 30+ seconds for a change to a CSS file.
-- Tests pass locally, fail in CI because ABS is temporarily down.
-- Developers learn `--no-verify`. The hook provides no protection.
-- Test run marks the whole suite red due to a 503 from a government server.
-
-**How to avoid:**
-Strictly separate unit tests from integration tests at the architecture level:
-- **Unit tests** (`pytest tests/unit/`): Only use fixtures/mocks. Never call `requests.get()`. Use `pytest-mock` or `responses` library to intercept HTTP calls. These are what the pre-push hook runs.
-- **Integration/live tests** (`pytest tests/live/`): Call real APIs. Run manually via `npm run verify`. Marked with `@pytest.mark.live` so `pytest -m "not live"` excludes them automatically.
-
-The `pipeline/utils/http_client.py` `create_session()` function is the injection point — unit tests pass a mock session.
-
-**Warning signs:**
-- Any test file in `tests/unit/` that imports `requests` and does not import `responses` or `unittest.mock`.
-- Test runtime for the unit suite exceeds 5 seconds.
-- Intermittent CI failures not caused by code changes.
-
-**Phase to address:**
-Phase 1 (pytest unit tests). Establish the two-tier architecture before writing the first test.
-
----
-
-### Pitfall 2: Testing Against Committed CSVs Instead of Isolated Fixtures
-
-**What goes wrong:**
-Tests for normalization (`ratios.py`, `zscore.py`, `engine.py`) read from `data/abs_cpi.csv`, `data/rba_cash_rate.csv`, etc. — the real committed data files. When the pipeline updates these CSVs, tests that previously passed now fail because a new data point changes the latest z-score or gauge value. A test asserting `gauge_value == 42.3` breaks the week after a new CPI release.
-
-**Why it happens:**
-The normalize/engine functions use `DATA_DIR` from `config.py`, which resolves to `./data/` relative to the working directory. Tests that call these functions without redirecting the data path inherit this implicit dependency on the working repo state.
-
-**Consequences:**
-- Tests become "temporally fragile" — they pass when written and fail three months later.
-- To fix, developers start hardcoding the expected value to whatever the latest run produces. Now the tests assert nothing meaningful.
-- Tests can only be run from the repo root in a specific directory, breaking in any CI environment that has a different working directory.
+Python's `unittest.mock.patch` must target the name where it is **used**, not where it is
+**defined**. The code under test calls `create_session()` which internally calls
+`requests.Session()`. Patching `requests.Session` at the `requests` module level does not
+intercept the already-imported `Session` reference inside `http_client.py`. The correct
+target is `pipeline.utils.http_client.requests.Session` or, more practically, mock the
+return value of `create_session` itself via
+`monkeypatch.setattr("pipeline.ingest.abs_data.create_session", lambda **kw: mock_session)`.
 
 **How to avoid:**
-Create isolated fixture CSVs in `tests/fixtures/` with a fixed, known dataset (e.g., 20 rows of synthetic quarterly data). Patch `pipeline.config.DATA_DIR` in conftest.py to point to the fixtures directory for all unit tests:
+Patch `create_session` at the point of import in the module under test, not at the
+`requests` library level:
 
 ```python
-# tests/conftest.py
-import pytest
-from pathlib import Path
-from unittest.mock import patch
+# Good: patches create_session where abs_data.py imports it
+def test_fetch_abs_success(monkeypatch):
+    mock_session = MagicMock()
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.text = SAMPLE_ABS_CSV
+    mock_session.get.return_value = mock_resp
+    monkeypatch.setattr("pipeline.ingest.abs_data.create_session", lambda **kw: mock_session)
+    df = fetch_abs_series("CPI", "all")
+    assert len(df) > 0
 
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
-
-@pytest.fixture(autouse=True)
-def mock_data_dir():
-    with patch("pipeline.config.DATA_DIR", FIXTURES_DIR):
-        with patch("pipeline.normalize.ratios.DATA_DIR", FIXTURES_DIR):
-            with patch("pipeline.normalize.engine.DATA_DIR", FIXTURES_DIR):
-                yield FIXTURES_DIR
+# Bad: patches requests.Session at the library level — create_session already has
+# the real requests.Session reference captured at import time in http_client.py
+monkeypatch.setattr("requests.Session", lambda: mock_session)  # Does not work
 ```
 
-The fixture CSVs never change unless intentionally updated. Tests assert against known expected outputs (e.g., "with these 20 CPI values, YoY pct change for row 13 is 3.2%").
-
 **Warning signs:**
-- Any test that reads from `Path("data/")` without patching `DATA_DIR`.
-- Tests that pass today but are silently wrong (asserting the computed value equals whatever the current data produces without an independent expected value).
-- Test output changes after a pipeline run even without code changes.
+- Test for an ingestor raises `RuntimeError: Network access blocked` even with a mock in place.
+- The mock `assert_called_once_with()` check passes but the function still makes network calls.
+- Coverage report shows ingestor lines covered but the test was patching the wrong target.
 
 **Phase to address:**
-Phase 1 (pytest unit tests). Fixtures must be established before normalization tests are written.
+Phase 1 (ingest module tests). Establish the correct patching target in the first test
+written for each ingestor — this pattern is reused for all 5 ingest modules.
 
 ---
 
-### Pitfall 3: Pre-Push Hook That Blocks on Linting an Existing Codebase
+### Pitfall 2: Missing Error-Path Coverage — The Dominant Coverage Gap
 
 **What goes wrong:**
-Ruff is installed and run for the first time on 3,227 lines of existing Python. It returns 200+ warnings across 19 files. The pre-push hook runs `ruff check pipeline/` and exits non-zero. Every push fails until all 200+ warnings are fixed. Developer spends a day on linting cleanup instead of the actual milestone work. Or worse: `ruff check` is commented out of the hook "temporarily" and never restored.
+Each ingestor has explicit error paths: HTTP 4xx/5xx responses, empty response bodies,
+malformed CSV/JSON, `pd.errors.ParserError`, and per-module graceful-degradation returns
+(`{'status': 'failed', ...}`). Tests are written for the happy path only.
+Coverage reaches 60-70% and then plateaus. The remaining uncovered lines are almost entirely
+error branches. To reach 85%, these paths must be tested.
+
+For `abs_data.py` specifically: the `fetch_abs_series()` function has guards for
+`status_code != 200`, empty response body, body too short, `ParserError`, zero rows after
+filtering, and missing columns after renaming. Each is a branch that takes 4-6 lines.
+Testing only the success path covers ~50% of `fetch_abs_series`.
 
 **Why it happens:**
-Ruff is strict by default. An existing codebase that has never been linted will have real issues (missing type annotations, unused imports, line length violations) mixed with stylistic preferences (`E501` line-too-long is frequently noisy on data pipelines with long URLs and pandas chains). Running `--select ALL` on an existing codebase produces noise that obscures real errors.
-
-**Consequences:**
-- The linter hook is neutered immediately because the signal-to-noise ratio is too low.
-- OR: 3+ hours of mechanical linting changes create a large diff that makes the actual feature diff hard to review.
-- OR: The existing code's intentional patterns (e.g., `logging.basicConfig()` at module level in scrapers, bare `except` in graceful-degradation paths) get "fixed" in ways that change runtime behavior.
+Error paths feel "obvious" and are easy to deprioritize. The temptation is to write one
+success test and one generic "raises on failure" test, but neither covers the specific
+branches. `fetch_and_save()` in all ingestors catches exceptions per-source and returns
+`{'status': 'failed'}` — this branch is invisible to a success-path-only test.
 
 **How to avoid:**
-A two-step process:
-1. **Baseline pass before writing any tests**: Run `ruff check pipeline/ --output-format=json | jq 'length'` to count violations. Create `pyproject.toml` (or `ruff.toml`) that selects only the rules that matter for correctness (E, F, W categories) and explicitly ignores line-length (`E501`) and stylistic rules (`ANN`, `D`). Fix the baseline violations. Commit this as a separate "chore: ruff baseline cleanup" commit.
-2. **Hook runs this specific ruff config**: The hook only fails on the agreed-upon ruleset, not the full `--select ALL` ruleset.
+For every public function in the ingest layer, explicitly enumerate its error branches:
 
-Critical: The existing `except Exception: pass` patterns in scraper code (e.g., `csv_handler.py`, `nab_scraper.py`) are intentional. Ruff `BLE001` (blind exception) should be in the ignore list — do not refactor graceful-degradation patterns based on linter suggestions without understanding why they exist.
+```
+abs_data.fetch_abs_series():
+  [ ] HTTP status != 200
+  [ ] response.text is empty
+  [ ] response.text shorter than 100 bytes
+  [ ] pd.errors.ParserError on malformed CSV
+  [ ] len(df) == 0 after parse
+  [ ] filters produce 0 rows
+  [x] happy path
+
+abs_data.fetch_and_save():
+  [ ] ChunkedEncodingError during fetch
+  [ ] Timeout during fetch
+  [ ] ConnectionError during fetch
+  [ ] Generic Exception
+  [x] single-series happy path
+  [x] all-series happy path
+```
+
+Write one test per error branch. Each test configures the mock to trigger that specific
+condition. This is the only reliable way to reach 85%.
 
 **Warning signs:**
-- First `ruff check` run exits with code 1 and 50+ violations.
-- Any ruff rule in the `ANN` (type annotations) or `D` (docstrings) category is enabled for a codebase that has no type annotations or docstrings.
-- The ruff config enables `--fix` in the hook — this auto-modifies files on push, which surprises developers.
+- Module coverage is 60-70% and adding more success-path tests doesn't move the number.
+- Running `pytest --cov-report=html` and the uncovered lines are all inside `except` blocks
+  or `if status_code != 200` guards.
+- Test file has 1 test per module function instead of 3-6.
 
 **Phase to address:**
-Phase 3 (linting). Run the baseline audit before enabling the hook.
+Phase 1 (ingest module tests). Budget ~3-6 tests per ingestor function, not 1.
 
 ---
 
-### Pitfall 4: The Pre-Push Hook Corrupts the Git Staging Area
+### Pitfall 3: Date-Dependent Logic Makes Tests Non-Deterministic
 
 **What goes wrong:**
-The pre-push hook runs `python -m pytest tests/unit/` and then runs `ruff check`. Both commands succeed. But during the test run, `conftest.py` inadvertently wrote a file to `data/` (because `DATA_DIR` was not properly patched). Git now shows a modified `data/abs_cpi.csv`. The developer's `git push` succeeds but they've just committed unexpected test artifacts to the repo.
+`corelogic_scraper.scrape_cotality()` and `nab_scraper.scrape_nab_capacity()` both call
+`datetime.now()` internally to determine which month's PDF to fetch, whether current-month
+data is already scraped, and what date to assign the output row. Tests written today pass.
+Tests written in January fail in February because `now.month` changed and the idempotency
+check returns a different value.
 
-Variant: the hook runs `ruff --fix` automatically, modifying staged files. The push goes through but the committed code is different from what the developer reviewed before pushing.
+`asx_futures_scraper.scrape_asx_futures()` writes `datetime.now().strftime('%Y-%m-%d')` as
+the `date` column. A test asserting the date value in the output DataFrame will fail the
+next day.
+
+`nab_scraper._current_month_already_scraped()` compares `latest.year == now.year and
+latest.month == now.month`. A fixture CSV with `date = 2026-01-01` passes this check in
+January 2026 but fails (correctly) in February 2026, meaning the test produces a different
+code path depending on when it runs.
 
 **Why it happens:**
-- Tests that use real `DATA_DIR` without isolation will write to committed data files as side effects.
-- `ruff --fix` in hooks is tempting but dangerous: it modifies files, and the developer hasn't reviewed the fixes.
-- Hook scripts that `cd` to different directories can leave the shell in an unexpected state if they exit early.
-
-**Consequences:**
-- Committed test artifacts pollute the data history.
-- Developers lose trust in the hook — it "does things" they didn't intend.
-- In the worst case, a test run calls `append_to_csv()` with fixture data and appends garbage rows to a committed CSV.
+`datetime.now()` is a global side effect. It is easy to miss when writing tests because
+the function "works" — it just produces different behavior at different calendar times.
 
 **How to avoid:**
-- Unit tests must NEVER write to `data/`. The `DATA_DIR` patch in conftest.py must redirect all writes to a `tmp_path` (pytest's temporary directory fixture) or `tests/fixtures/`.
-- The hook must NEVER use `ruff --fix`. Check only, never auto-fix.
-- The hook should `stash --include-untracked` before running if it needs to be safe, but more practically: ensure tests have no side effects by design, not by stashing.
-- Verify with `git status` after the first hook run that no files are modified.
+Freeze time for any test that exercises date-dependent logic. Use `freezegun` or patch
+`datetime` directly:
+
+```python
+from unittest.mock import patch
+from datetime import datetime
+
+def test_current_month_already_scraped_false(tmp_path):
+    # Fixture has data from Jan 2026. Test runs as if it's Feb 2026.
+    # Without time-freeze, this test fails in Jan 2026 (returns True, not False).
+    with patch("pipeline.ingest.corelogic_scraper.datetime") as mock_dt:
+        mock_dt.now.return_value = datetime(2026, 2, 15)
+        csv = tmp_path / "corelogic_housing.csv"
+        csv.write_text("date,value,source\n2026-01-31,9.4,Cotality HVI\n")
+        assert _current_month_already_scraped(csv) is False
+```
+
+Alternatively, install `freezegun` and use `@freeze_time("2026-02-15")`.
+
+For the ASX futures `date` column: assert only that the date column exists and is a valid
+date string, not its exact value.
 
 **Warning signs:**
-- `data/*.csv` files appear in `git status` after running `pytest`.
-- `public/data/status.json` is modified after running tests (normalization engine wrote to it during test).
-- Any test that calls `generate_status()` without patching `STATUS_OUTPUT`.
+- A test passes today and fails next month with no code changes.
+- Test for `_current_month_already_scraped()` with a fixture CSV containing the current
+  month's date produces `True` when the test intends to test the "not scraped" path.
+- Test for `scrape_cotality()` "months_to_try" logic fails depending on what month it is.
 
 **Phase to address:**
-Phase 1 (pytest setup) and Phase 4 (pre-push hook). The DATA_DIR isolation must be verified before the hook is enabled.
+Phase 1 (ingest module tests). Identify all `datetime.now()` calls before writing the
+first test for corelogic and NAB scrapers.
 
 ---
 
-### Pitfall 5: status.json Validation Tests That Break on Every Pipeline Run
+### Pitfall 4: PDF Fixture Brittleness — Testing the Parser Not the PDF
 
 **What goes wrong:**
-A test validates `public/data/status.json` and asserts specific field values: `assert status['overall']['hawk_score'] == 34.2`. The pipeline runs Monday morning. The hawk score is now `31.1`. The test fails. This is treated as a pipeline failure when the pipeline actually succeeded.
+`corelogic_scraper.extract_cotality_yoy()` and `nab_scraper.extract_capacity_from_pdf()`
+open a real PDF file via pdfplumber. A test creates a fixture by saving a real Cotality
+HVI PDF to `tests/python/fixtures/cotality_sample.pdf`. This introduces three problems:
+
+1. **Binary fixture size**: Real PDFs are 500KB-5MB. The repository gains megabytes of
+   binary test fixtures that diff poorly and inflate clone size.
+2. **Fragility**: The regex `r'Australia\s+([-\d.]+)%\s+([-\d.]+)%\s+([-\d.]+)%'` relies
+   on pdfplumber extracting text in a specific order from a specific PDF version. When
+   Cotality changes their PDF layout (quarterly), the fixture becomes invalid.
+3. **Copyright**: Committing a Cotality PDF to a public repo may violate their Terms of
+   Service.
 
 **Why it happens:**
-`status.json` is a live data file whose contents change every time the pipeline runs. It is also committed to the repo. Tests that assert on its exact values are testing the wrong thing: they're testing the current economic data, not the software that generates the file.
-
-**Consequences:**
-- Developers manually update the assertion after every pipeline run. After two months, nobody updates it. The test is permanently disabled.
-- CI fails on Monday after every weekly run, creating a false alarm pattern.
+The most obvious way to test `extract_cotality_yoy(pdf_bytes: bytes)` is to call it with
+real PDF bytes. Creating a minimal synthetic PDF requires more effort upfront.
 
 **How to avoid:**
-`status.json` validation tests must validate **schema and constraints**, not values:
-- All required top-level keys exist (`generated_at`, `overall`, `gauges`, `metadata`).
-- `overall.hawk_score` is a float in `[0, 100]`.
-- `overall.zone` is one of `['cold', 'cool', 'neutral', 'warm', 'hot']`.
-- Each gauge entry has `value`, `zone`, `z_score`, `raw_value`, `data_date`, `confidence`, `staleness_days`.
-- `staleness_days` for critical indicators (inflation, employment) is `< 90`.
-- No gauge `value` is `null` or `NaN`.
-- `generated_at` is a valid ISO 8601 timestamp.
+Mock pdfplumber at the page-text level, not at the file level. The function under test
+only calls `pdfplumber.open()` and `page.extract_text()`. Mock those two things:
 
-These constraints hold regardless of what the data is. They would catch: a missing indicator, a NaN z-score propagating through to the gauge, a timestamp field set to an empty string, a gauge value outside [0, 100].
+```python
+from unittest.mock import patch, MagicMock
+
+def test_extract_cotality_yoy_found():
+    """Test successful extraction when pattern is present in page text."""
+    mock_page = MagicMock()
+    mock_page.extract_text.return_value = (
+        "Housing Values\n"
+        "Australia 0.8% 2.4% 9.4%\n"
+        "Sydney 1.2% 3.1% 11.2%\n"
+    )
+    mock_pdf = MagicMock()
+    mock_pdf.pages = [mock_page]
+    mock_pdf.__enter__ = MagicMock(return_value=mock_pdf)
+    mock_pdf.__exit__ = MagicMock(return_value=False)
+
+    with patch("pipeline.ingest.corelogic_scraper.pdfplumber.open", return_value=mock_pdf):
+        result = extract_cotality_yoy(b"fake-pdf-bytes")
+    assert result == 9.4
+```
+
+This tests the regex and extraction logic without a real PDF. It is immune to PDF format
+changes, has no binary fixture overhead, and is fast (<1ms).
 
 **Warning signs:**
-- Any assertion of the form `assert status['overall']['hawk_score'] == <specific_float>`.
-- Tests that regenerate `status.json` using real CSVs and then validate the output value.
-- Test file that was last updated before a pipeline run.
+- `tests/python/fixtures/` contains any `.pdf` file.
+- `extract_cotality_yoy` or `extract_capacity_from_pdf` test takes more than 1 second.
+- Test requires a specific Cotality PDF URL to be accessible.
 
 **Phase to address:**
-Phase 2 (status.json validation).
+Phase 1 (corelogic and NAB scraper tests). Establish the pdfplumber mock pattern before
+writing any PDF extraction tests.
 
 ---
 
-### Pitfall 6: Over-Engineering the Test Infrastructure
+### Pitfall 5: Coverage Gaming — Testing Trivial Paths to Hit the Number
 
 **What goes wrong:**
-The v2.0 milestone gets captured by building a test framework. By the end of the milestone, there are: a conftest with 15 fixtures, a custom pytest plugin for API mocking, a Makefile with 8 targets, a `scripts/run-tests.sh` with 4 environment modes, a `pyproject.toml` with 40 ruff rules and 8 ignore lists, and a coverage report uploaded to a coverage badge service. Zero of the 6 actual pipeline modules have meaningful test coverage. The developer wrote more test infrastructure code than production code.
+After reaching 70% coverage on a module, the remaining 30% consists of complex error paths,
+branching logic, and boundary conditions. Instead of testing these, additional trivial tests
+are written: testing that `MONTH_ABBREV[1] == "Jan"`, testing the `__name__ == '__main__'`
+block, testing that a config constant has the expected string value. Coverage climbs to 85%
+but the tested lines provide no regression protection.
+
+In `nab_scraper.py`, the `MONTH_URL_PATTERNS` list contains three lambda functions. Testing
+each lambda's URL format is straightforward and covers 6 lines. But these lambdas only fail
+if NAB changes their URL structure — a runtime concern, not a unit test concern. Meanwhile,
+`backfill_nab_history()`'s inner loop through `MONTH_URL_PATTERNS` with session fallback
+logic remains at 0% coverage.
 
 **Why it happens:**
-Testing is an engineering domain. Engineers apply engineering instincts: abstractions, reusability, configurability. The first test reveals the need for a fixture. The fixture reveals the need for a factory. The factory reveals the need for a base class. This pattern compounds quickly when starting from zero.
-
-**Consequences:**
-- The milestone is consumed by framework work that doesn't test the actual pipeline.
-- Subsequent phases inherit a test framework with assumptions that don't fit their needs.
-- The "framework" becomes a maintenance burden that developers work around rather than with.
+Coverage tools measure which lines are executed, not whether the assertions test meaningful
+behavior. A test that calls a function and asserts `result is not None` covers every line
+in that function. Chasing the percentage target without reviewing what the assertions
+actually verify leads to tests that are executed but not meaningful.
 
 **How to avoid:**
-Apply the "simplest thing that works" constraint aggressively:
-- `conftest.py` starts with 3 fixtures: `mock_data_dir`, `sample_cpi_df`, `sample_config`.
-- No custom pytest plugins in this milestone.
-- `npm run test:fast` calls `pytest tests/unit/ -q`. That's the entire fast-test infrastructure.
-- `npm run verify` calls `pytest tests/live/ -v -m live`. That's the entire live infrastructure.
-- No coverage targets until coverage is a stated milestone goal.
+For each module, before writing tests, list the behaviors that would constitute a regression
+if they broke silently:
 
-The test count goal should be: all pure functions in `zscore.py`, `ratios.py`, `gauge.py`, `csv_handler.py` are tested. That is ~8-12 test functions. Not 50.
+```
+corelogic_scraper.scrape_cotality():
+  - If current month already scraped: returns empty DataFrame, does not re-download
+  - If PDF found for current month: returns 1-row DataFrame with correct date
+  - If current month PDF missing: tries previous month
+  - If both months fail: returns empty DataFrame
+  - Date assigned is last day of the reference month, not today's date
+```
+
+Every test should assert at least one of these behaviors. If a test passes regardless of
+whether the behavior is correct, the test is not protecting against regression.
 
 **Warning signs:**
-- The conftest.py is longer than the module being tested.
-- A test fixture abstracts over another test fixture.
-- The PR for "Phase 1: unit tests" adds more lines to test infrastructure files than to actual test files.
-- Any reference to `pytest-xdist`, `hypothesis`, or coverage badges in the v2.0 milestone scope.
+- A test asserts `result is not None` or `result['status'] in ('success', 'failed')` as
+  its primary assertion.
+- Tests covering config constants, `__main__` blocks, or module-level `MONTH_ABBREV` dict.
+- Coverage number climbs but the test descriptions do not describe behaviors.
 
 **Phase to address:**
-Phase 1 (pytest setup). Establish scope constraints in the plan before writing any code.
+Phase 1 (ingest module tests) and Phase 2 (engine/main tests). Define behavior
+assertions before writing each test, not after.
 
 ---
 
-### Pitfall 7: Linting JS and Python in the Same Hook Without Isolation
+### Pitfall 6: Mocking Too Much in engine.py and main.py Tests
 
 **What goes wrong:**
-The pre-push hook script calls `ruff check pipeline/` then `npx eslint public/js/`. `npx eslint` takes 8-12 seconds on first run (downloading ESLint on demand). The Python lint step passes in 0.3 seconds; the whole hook takes 15 seconds due to JS linting. Developers pushing a 2-line Python change wait 15 seconds for JS lint they didn't change.
+`engine.generate_status()` calls `normalize_indicator()`, `compute_rolling_zscores()`,
+`build_gauge_entry()`, `compute_hawk_score()`, and writes `status.json`. A test for
+`generate_status()` mocks all of these functions to return fixture data, then asserts the
+output JSON matches expectations. Coverage of `generate_status()` reaches 90%.
 
-Variant: ESLint is not installed (no `node_modules/`) because the developer only works on Python. The hook crashes with `npx: command not found` or `Cannot find module eslint`. The hook fails on a machine that only has Python set up.
+But now the tests for `generate_status()` tell us nothing about whether the function
+correctly wires its components together — they only verify that it calls the mocks in
+the expected sequence. If `build_gauge_entry()` changes its return schema, the test for
+`generate_status()` still passes (because the mock returns the old schema).
+
+The same pattern in `main.run_pipeline()`: mocking all three tiers' `fetch_and_save()`
+functions and asserting the result dict structure covers the orchestration logic, but tests
+nothing about how failures in one tier affect the others.
 
 **Why it happens:**
-The hook is written as a single sequential script that always runs both linters. There is no check for whether the linter is available or whether relevant files have changed.
-
-**Consequences:**
-- Slow hook frustrates Python-only changes.
-- Missing ESLint installation breaks the hook entirely on Python-focused machines.
-- Developers disable the hook because it's unreliable.
+Mocking everything is the path of least resistance for complex orchestration functions.
+It avoids fixture setup complexity and runs instantly. The coverage report shows green.
 
 **How to avoid:**
-- The hook should check if a linter is available before running it: `if command -v npx &>/dev/null && [ -d node_modules ]; then npx eslint public/js/ --quiet; fi`.
-- ESLint in the pre-push hook is optional for v2.0. The primary gate is Python linting and the Python test suite. JS linting can be a `npm run lint` command that developers run manually.
-- If both linters are included, scope them to changed files only: `git diff --name-only HEAD | grep '\.py$'` to decide whether to run ruff.
+Distinguish between two types of tests for orchestration functions:
+
+**Integration-style unit tests** (preferred for engine/main): Use real sub-functions with
+fixture CSV files as input. Patch only external I/O (file writes, network). Let
+`normalize_indicator()`, `compute_rolling_zscores()`, and `build_gauge_entry()` run
+for real on fixture data. This catches wiring errors and schema mismatches.
+
+```python
+def test_process_indicator_with_fixture_cpi(monkeypatch, tmp_path, fixture_cpi_df):
+    # Write fixture to tmp_path (DATA_DIR is already patched by autouse)
+    fixture_cpi_df.to_csv(tmp_path / "abs_cpi.csv", index=False)
+    weights = {"inflation": {"weight": 1.0, "polarity": 1}}
+    entry, value = process_indicator("inflation", CPI_CONFIG, weights["inflation"])
+    assert entry is not None
+    assert 0 <= entry['value'] <= 100
+    assert entry['zone'] in ('cold', 'cool', 'neutral', 'warm', 'hot')
+```
+
+**Behavior-focused mock tests** (for edge cases): When testing that `generate_status()`
+correctly handles a missing indicator (no data for one source), mock only the specific
+`normalize_indicator()` call for that source to return `None`, leaving others real.
 
 **Warning signs:**
-- The hook takes > 5 seconds on a warm machine.
-- Hook fails on machines without Node.js installed.
-- Hook runs ESLint even when only Python files changed.
+- A test for `generate_status()` has more than 5 `monkeypatch.setattr()` calls.
+- The test for `run_pipeline()` mocks `rba_data.fetch_and_save`, `abs_data.fetch_and_save`,
+  and all scrapers simultaneously.
+- Removing an assertion from the test does not change which mock calls are made.
 
 **Phase to address:**
-Phase 4 (pre-push hook). Define the hook's minimum viable scope: Python only. Add JS linting as optional.
+Phase 2 (engine and main tests). Use real fixture data for integration-style orchestration
+tests; reserve full mocking for specific error-path tests.
+
+---
+
+### Pitfall 7: The `main.py` `sys.exit(1)` Terminating the Test Process
+
+**What goes wrong:**
+`main.run_pipeline()` calls `sys.exit(1)` when a critical source fails. A test that
+triggers the critical failure path — e.g., `rba_data.fetch_and_save()` raises an exception
+— causes the entire pytest process to exit with code 1. All subsequent tests are not run.
+Coverage for those tests is not recorded.
+
+**Why it happens:**
+`sys.exit()` raises `SystemExit`, which propagates out of all function calls unless caught.
+Pytest does not catch `SystemExit` by default in collected tests — it propagates up and
+terminates the test runner.
+
+**How to avoid:**
+Use `pytest.raises(SystemExit)` as a context manager for tests that exercise the critical
+failure path:
+
+```python
+def test_run_pipeline_critical_failure_exits(monkeypatch):
+    def raise_exception():
+        raise Exception("RBA API down")
+    monkeypatch.setattr("pipeline.main.rba_data.fetch_and_save", raise_exception)
+    monkeypatch.setattr("pipeline.main.abs_data.fetch_and_save", lambda s=None: {})
+
+    with pytest.raises(SystemExit) as exc_info:
+        run_pipeline()
+
+    assert exc_info.value.code == 1
+```
+
+Do not allow `sys.exit()` to propagate unhandled in any test. Verify with
+`pytest.raises(SystemExit)` for the specific code.
+
+**Warning signs:**
+- `pytest` output shows "INTERNALERROR" or truncated test results.
+- Test count from `pytest --collect-only` does not match the number of tests that ran.
+- Test for `run_pipeline()` critical path is listed as "ERROR" rather than "PASSED/FAILED".
+
+**Phase to address:**
+Phase 2 (main.py tests). Identify `sys.exit()` calls before writing the first test.
+
+---
+
+### Pitfall 8: `asx_futures_scraper` Path Dependencies Breaking Isolation
+
+**What goes wrong:**
+`asx_futures_scraper._get_rba_meeting_dates()` opens `public/data/meetings.json` using a
+relative path: `Path("public/data/meetings.json")`. Unlike `DATA_DIR` (which is patched by
+the autouse `isolate_data_dir` fixture in conftest.py), this path is not under `DATA_DIR`
+and is not patched. When tests run in a directory other than the repo root, this file is
+not found. When the `tmp_path` doesn't contain this file, the function falls back to
+returning `[]` — silently changing the behavior under test.
+
+Similarly, `_get_current_cash_rate()` reads from `pipeline.config.DATA_DIR / "rba_cash_rate.csv"`.
+This path IS under `DATA_DIR` and IS patched. But tests for `scrape_asx_futures()` may not
+create the `rba_cash_rate.csv` in `tmp_path`, causing fallback to `rate = 4.35` silently.
+
+**Why it happens:**
+`asx_futures_scraper.py` has two implicit file dependencies: one under `DATA_DIR` (patched)
+and one under `public/data/` (not patched). The `isolate_data_dir` autouse fixture only
+covers `DATA_DIR`.
+
+**How to avoid:**
+For tests of `scrape_asx_futures()`:
+1. Create a fixture `rba_cash_rate.csv` in `tmp_path` (already covered by `DATA_DIR` patch).
+2. Patch `_get_rba_meeting_dates` to return controlled fixture meeting dates, or patch
+   `pipeline.ingest.asx_futures_scraper.Path` for the meetings.json path.
+
+```python
+def test_scrape_asx_futures_uses_rba_cash_rate(monkeypatch, tmp_path):
+    # Create fixture cash rate CSV in the patched DATA_DIR
+    cash_rate_csv = tmp_path / "rba_cash_rate.csv"
+    cash_rate_csv.write_text("date,value\n2026-01-01,4.10\n")
+
+    # Patch meetings to avoid the unpatched public/data/ path
+    monkeypatch.setattr(
+        "pipeline.ingest.asx_futures_scraper._get_rba_meeting_dates",
+        lambda: ["2026-03-18", "2026-05-06"]
+    )
+
+    # Mock the HTTP session
+    mock_session = MagicMock()
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = SAMPLE_ASX_FUTURES_JSON
+    mock_session.get.return_value = mock_resp
+    monkeypatch.setattr(
+        "pipeline.ingest.asx_futures_scraper.create_session",
+        lambda **kw: mock_session
+    )
+
+    df = scrape_asx_futures()
+    assert df['implied_rate'].gt(0).all()
+```
+
+**Warning signs:**
+- `scrape_asx_futures()` test passes but uses `current_rate = 4.35` (fallback), not the
+  fixture value — verify by asserting `change_bp` is computed from 4.10, not 4.35.
+- Test for `_find_meeting_for_contract()` is skipped because meeting dates are always empty.
+- Coverage shows `_get_rba_meeting_dates()` and `_get_current_cash_rate()` at 0%.
+
+**Phase to address:**
+Phase 1 (ASX futures scraper tests). Document the two path dependencies in the test plan
+before writing tests.
+
+---
+
+### Pitfall 9: `engine.py` Housing Source Attribution Inline Import
+
+**What goes wrong:**
+`engine.build_gauge_entry()` contains `import pandas as _pd` and
+`import pipeline.config as pipeline` inside the function body for the `housing` and
+`business_confidence` branches. These deferred imports are there for scoping reasons but
+create an invisible coverage gap: if neither branch is exercised in tests, those import
+lines show as uncovered.
+
+More importantly, the `housing` branch reads from `corelogic_housing.csv` to determine
+`data_source`. A test that processes the `housing` indicator with fixture data but
+does not create a `corelogic_housing.csv` in `tmp_path` will exercise the "csv_path.exists()
+is False" code path, missing the `data_source` assignment logic.
+
+**Why it happens:**
+The `housing` and `business_confidence` enrichment blocks in `build_gauge_entry()` require
+specific fixture CSV files beyond the primary indicator CSV. Tests written for the happy
+path of these indicators may not think to create the auxiliary files.
+
+**How to avoid:**
+When writing tests for `build_gauge_entry()` with the housing indicator:
+1. Create `corelogic_housing.csv` in `tmp_path` with a `source` column.
+2. Test both the `source == 'ABS'` → `data_source = 'ABS RPPI'` path and the
+   `source == 'Cotality HVI'` path.
+3. Test the `csv_path.exists() is False` path (no file).
+
+For `business_confidence`: create `nab_capacity.csv` in `tmp_path` with at least 2 rows
+to trigger both the `long_run_avg` computation and the `direction` logic.
+
+**Warning signs:**
+- `engine.py` coverage shows uncovered lines in `build_gauge_entry()` after tests are written.
+- The `data_source` and `stale_display` keys are absent from all test assertions.
+- Test for `business_confidence` indicator only checks `entry['value']` and `entry['zone']`,
+  not `entry['direction']`, `entry['long_run_avg']`, or `entry['data_source']`.
+
+**Phase to address:**
+Phase 2 (engine tests). Enumerate all auxiliary file reads in `build_gauge_entry()` before
+writing housing and business_confidence tests.
 
 ---
 
@@ -248,13 +487,13 @@ Phase 4 (pre-push hook). Define the hook's minimum viable scope: Python only. Ad
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Call real ABS API in unit tests | Tests "feel more real" | Flaky tests, slow suite, pre-push hook bypassed with `--no-verify` | Never — mock HTTP at the session level |
-| Read from `data/*.csv` in unit tests without patching DATA_DIR | No fixture setup required | Tests break on every pipeline run; tests can corrupt committed data | Never — patch DATA_DIR in conftest.py |
-| Assert specific float values from status.json | Easy to write | Breaks every Monday after pipeline run; test becomes meaningless boilerplate | Never — assert schema and range constraints only |
-| Run `ruff --select ALL` on existing code | Maximally strict | 200+ violations, noise drowns signal, hook immediately bypassed | Never — baseline with E/F/W only, add rules incrementally |
-| `ruff --fix` in the pre-push hook | Auto-fixes style | Modifies files the developer hasn't reviewed; corrupts staging area | Never — lint with check-only in hooks |
-| Single `npm test` that runs Playwright + pytest + lint | One command simplicity | Playwright tests require a running server; confusing to run in isolation | Never — keep `npm run test:fast` (Python only) and `npm test` (Playwright) separate |
-| Add pyfakefs or full filesystem mocking | Truly isolates filesystem | Significant setup complexity; harder to debug fixture issues | Only if `DATA_DIR` patching proves insufficient |
+| Patching `requests.Session` instead of `create_session` | Looks right | Patch misses; test exercises real network; fails at socket level | Never — always patch the module-level reference |
+| Assert `result is not None` as the primary assertion | Gets coverage | Zero regression protection; test passes even when function is broken | Never — assert specific structure or values |
+| Using a real Cotality/NAB PDF as fixture | No mock setup required | Binary in repo; breaks when PDF format changes; potential ToS violation | Never — mock pdfplumber at `page.extract_text()` level |
+| Not patching `datetime.now()` in date-dependent tests | Simpler test code | Test passes in Jan, fails in Feb; non-deterministic CI | Never for `_current_month_already_scraped()`, `scrape_cotality()`, `scrape_nab_capacity()` |
+| Testing only happy path to get 60-70% quickly | Fast initial progress | Remaining 30% requires 3x more effort; error paths have higher bug density | Only if explicitly scoped to a "start" phase — must plan error-path phase |
+| Full mock of all sub-functions in `generate_status()` | Easy to write | Catches zero wiring errors; test becomes a call-sequence verification | Only for specific error-path tests; use real sub-functions for integration-style tests |
+| Skipping `sys.exit()` tests for `run_pipeline()` | Avoids complexity | Exit-on-failure path is untested; entire test runner terminates if test is wrong | Never — use `pytest.raises(SystemExit)` |
 
 ---
 
@@ -262,13 +501,14 @@ Phase 4 (pre-push hook). Define the hook's minimum viable scope: Python only. Ad
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| pytest + existing Python pipeline | Tests run from wrong directory; relative paths in `config.py` (`DATA_DIR = Path("data")`) resolve to unexpected locations | Run pytest from repo root; verify `DATA_DIR` resolves correctly before writing first test; patch in conftest.py |
-| pytest + Playwright | Running `npm test` (Playwright) after adding pytest; test commands overlap; `npm test` runs only Playwright | Keep commands separate: `npm test` stays Playwright, `npm run test:fast` runs pytest |
-| ruff + existing code with intentional `bare except` | Ruff `BLE001` flags `except Exception: pass` in graceful-degradation scrapers | Add `# noqa: BLE001` inline or add BLE001 to ignore list in `ruff.toml`; do NOT refactor the error handling |
-| ESLint + no `.eslintrc` | ESLint uses default flat config, applies wrong rules to Plotly/Tailwind browser JS | Configure `eslintrc` or `eslint.config.js` with `env: { browser: true }` before first run |
-| pre-push hook + `git stash` | Hook stashes changes, runs tests, fails to unstash on error — developer loses changes | Do NOT stash in hooks; instead ensure tests have no side effects by design |
-| pre-push hook + Python venv | Hook uses system Python, not venv Python; pytest not found; imports fail | Hook must activate venv or use explicit path: `.venv/bin/pytest` or `python -m pytest` |
-| responses library + session retries | `responses` intercepts the `requests` library but the retry adapter in `create_session()` may interfere with mock interception | Use `responses` with `assert_all_requests_are_fired=False`; verify mock is hit by checking call count |
+| `requests` + `create_session()` | Patch `requests.Session` globally | Patch `pipeline.ingest.MODULE.create_session` at point of use |
+| `pdfplumber` + PDF bytes | Pass real PDF bytes or save PDF fixture | Mock `pdfplumber.open()` to return controlled `page.extract_text()` output |
+| `BeautifulSoup` + HTML scraping (NAB) | Fixture HTML that mirrors live site exactly | Use minimal HTML with only the elements the parser needs; keep fixture small |
+| `asx_futures_scraper` + `public/data/meetings.json` | Forget this path is NOT under `DATA_DIR` | Patch `_get_rba_meeting_dates()` directly or create the file in test setup |
+| `engine.build_gauge_entry()` + housing/NAB auxiliary CSVs | Only create the primary indicator CSV | Create auxiliary `corelogic_housing.csv` and `nab_capacity.csv` in `tmp_path` |
+| `main.run_pipeline()` + `sys.exit(1)` | Let SystemExit propagate — crashes test runner | Wrap in `pytest.raises(SystemExit)` for critical failure path tests |
+| `freezegun` or `datetime` patch + `nab_scraper` | Patch `datetime.datetime.now` — wrong target | Patch `pipeline.ingest.nab_scraper.datetime` (the module-level `datetime` import) |
+| `abs_data.fetch_abs_series()` + column name format | Fixture CSV column name differs from ABS API format | ABS API returns columns like `TIME_PERIOD: Time Period` with label appended; fixture must match or the `startswith` filter fails |
 
 ---
 
@@ -276,34 +516,36 @@ Phase 4 (pre-push hook). Define the hook's minimum viable scope: Python only. Ad
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| pytest importing all pipeline modules at collection time triggers network calls | `pytest tests/unit/` hangs for 5 seconds before any test runs | Ensure module-level code in ingestors does not make network calls; `logging.basicConfig()` at module level in scrapers is fine; `session.get()` at module level is not | First run of pytest on this codebase |
-| Live tests mixed with unit tests without markers | `pytest tests/` runs live tests on every invocation including pre-push hook | Use `@pytest.mark.live` and configure `addopts = -m "not live"` in `pyproject.toml` | When a developer runs `pytest` without `-m` flag |
-| pdfplumber import in `nab_scraper.py` and `corelogic_scraper.py` at test time | Tests that import scrapers trigger pdfplumber C extension loading | pdfplumber is imported lazily (`import pdfplumber` inside functions) — this is already the case in the codebase; do not move the import to module level | Immediately if pdfplumber is imported at module level |
-| Generating `status.json` in a test to validate it | Test takes 3-8 seconds to run the full normalization engine | Test schema validation against a pre-generated fixture `status.json`, not against a freshly-generated one | Immediately — normalization engine should not run in unit tests |
-
----
-
-## Security Mistakes
-
-| Mistake | Risk | Prevention |
-|---------|------|------------|
-| Live test hits ABS/RBA APIs from a developer machine with a project-identifiable User-Agent | API provider rate-limits or blocks the User-Agent string | Live tests use the same session as production; this is acceptable since live tests run infrequently. Do not add a test-specific User-Agent that would confuse production logs |
-| Git hook script committed with wrong permissions | Hook never runs because it's not executable | `chmod +x .git/hooks/pre-push` in the hook installation step; document this in the setup guide |
-| Hook script added to `.git/hooks/` (not version-controlled) | New team member clones the repo and has no hook | Commit the hook to a version-controlled location (e.g., `scripts/pre-push`) and document: `cp scripts/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push`; or use a hook manager like `pre-commit` |
-| `npm run verify` accidentally runs in GitHub Actions | Full live API call from CI triggers rate-limiting on ABS/RBA | Ensure `verify` script is not called by any GitHub Actions workflow; tag it clearly as "local only" in package.json comments |
+| `nab_scraper.backfill_nab_history()` running in test | Test takes 10-30 seconds; makes 36 HTTP calls (12 months × 3 URL patterns) | Patch `backfill_nab_history` or prevent the backfill trigger by pre-populating `tmp_path` with ≥3 rows in `nab_capacity.csv` | Any test for `scrape_nab_capacity()` that doesn't pre-create the CSV with ≥3 rows |
+| Running `generate_status()` with real fixture CSVs for schema validation | 2-5 seconds per test; adds up with parametrized cases | Validate schema against a pre-built fixture `status.json`; run `generate_status()` only in targeted integration tests | When more than 3 schema tests call `generate_status()` |
+| `asx_futures_scraper._check_staleness()` writing to real `DATA_DIR` | If `tmp_path` is not set up with the CSV first, falls through; if it is, reads from fixture — usually fine | Ensure `tmp_path / "asx_futures.csv"` exists before calling `fetch_and_save()`; `_check_staleness()` is called internally | Any test for `fetch_and_save()` that doesn't create the CSV first |
+| pdfplumber loading real PDF files in tests | Tests take 0.5-2 seconds each (PDF parsing is slow) | Mock at `pdfplumber.open()` level, not at the file level | Any test that calls `extract_cotality_yoy(real_pdf_bytes)` |
 
 ---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Unit test suite:** Tests pass with `DATA_DIR` pointing to `tests/fixtures/`, not `data/`. Run `git status` after `pytest tests/unit/` — zero files should be modified.
-- [ ] **HTTP mocking:** Every test for an ingestor that would otherwise call a real URL has the HTTP call mocked. Verify by disconnecting from the network and running `pytest tests/unit/` — every test still passes.
-- [ ] **status.json validation:** The validator is tested against a deliberately broken `status.json` (missing a required field, NaN gauge value, staleness > threshold) — the validator must catch each broken case.
-- [ ] **ruff baseline:** Run `ruff check pipeline/ --statistics` before and after the baseline cleanup commit. No rules that would catch real bugs (F401 unused import, F821 undefined name, E711 comparison to None) should be in the ignore list.
-- [ ] **Pre-push hook:** Push a commit that introduces a ruff violation (e.g., `import os` unused) — the hook must reject it. Push a passing commit — it goes through. Push without a venv activated — verify the error message is clear (not a Python traceback).
-- [ ] **Two-tier separation:** Run `npm run test:fast` (must complete in < 10 seconds). Run `npm run verify` (may take 30-120 seconds, calls real APIs). The outputs are clearly distinct.
-- [ ] **ESLint (JS linting):** Run `npx eslint public/js/` without errors on the existing codebase before enabling in any hook. Verify `env: { browser: true }` is set (Plotly, Decimal are browser globals, not Node.js globals).
-- [ ] **Playwright isolation:** `npm test` (Playwright) still passes after adding pytest. The two test suites do not interfere with each other.
+- [ ] **Error path coverage:** Run `pytest --cov=pipeline --cov-report=term-missing` and
+  check that uncovered lines are not `except` blocks or error guards. Every module should
+  have at least one test per distinct error condition.
+- [ ] **Patching targets verified:** For each ingestor test, confirm the mock is actually
+  intercepted by running the test with the `block_network` autouse fixture active (no
+  `@pytest.mark.live`). If the test raises `RuntimeError: Network access blocked`, the
+  patch is wrong.
+- [ ] **Date independence:** Run each scraper test twice: once with `freeze_time("2026-01-15")`
+  and once with `freeze_time("2026-07-15")`. Both should pass with the same assertion.
+- [ ] **No binary fixtures:** `find tests/python/fixtures/ -name "*.pdf" -o -name "*.xlsx"`
+  should return nothing.
+- [ ] **`sys.exit()` coverage:** `main.py`'s critical failure path is tested with
+  `pytest.raises(SystemExit)`. Run `pytest --cov=pipeline.main --cov-report=term-missing`
+  — the `sys.exit(1)` line must be covered.
+- [ ] **Auxiliary file coverage in engine:** `build_gauge_entry()` for `housing` and
+  `business_confidence` is tested with the auxiliary CSV present AND absent.
+- [ ] **`asx_futures` dual path dependency:** Both `_get_current_cash_rate()` and
+  `_get_rba_meeting_dates()` are exercised in tests (not both silently returning fallbacks).
+- [ ] **85% per-module, not aggregate:** `pytest --cov=pipeline --cov-fail-under=85` passes
+  without `--cov-config` ignoring any module. Verify each module individually with
+  `--cov-report=term-missing` before declaring the milestone complete.
 
 ---
 
@@ -311,12 +553,13 @@ Phase 4 (pre-push hook). Define the hook's minimum viable scope: Python only. Ad
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Hook bypassed with `--no-verify` due to slow/flaky tests | MEDIUM | Audit which tests are hitting real APIs; move them to `tests/live/`; add HTTP mocks for unit equivalents; re-enable hook |
-| Committed data files modified by test run | LOW | `git restore data/*.csv public/data/status.json`; add DATA_DIR patch to conftest.py; re-run tests to confirm no side effects |
-| Ruff baseline too strict — developers disable the hook | LOW | Loosen the ruleset to E/F/W categories; re-run baseline; get buy-in before re-enabling; document the agreed ruleset |
-| status.json validation tests fail every Monday | LOW | Replace value assertions with range/schema assertions; delete the specific float assertions |
-| Pre-push hook not installed on a new machine | LOW | Document the one-time setup: `cp scripts/pre-push .git/hooks/pre-push && chmod +x .git/hooks/pre-push` |
-| ESLint fails on Plotly browser globals | LOW | Add `/* global Plotly, Decimal */` to JS files or add `env: { browser: true }` to ESLint config; do not add `eslint-disable` lines to the source code |
+| Wrong patch target (patch misses, network blocked error) | LOW | Check the import path in the module under test; change `patch("requests.Session")` to `patch("pipeline.ingest.MODULE.create_session", ...)` |
+| Test suite stalls at 65% due to untested error paths | MEDIUM | Run `pytest --cov-report=html`; open the HTML report; sort by missing lines; write one test per distinct error branch starting from the most-covered module |
+| Date-dependent test failures on CI | LOW | Add `@freeze_time("2026-02-25")` or `patch("pipeline.ingest.MODULE.datetime")` to the offending tests; run once to verify |
+| PDF fixture in repo | LOW | Delete the PDF file; replace the test with a pdfplumber mock; `git rm tests/python/fixtures/*.pdf` |
+| `sys.exit()` terminates pytest run | LOW | Wrap the test body in `with pytest.raises(SystemExit) as exc_info:` and assert `exc_info.value.code == 1` |
+| Coverage stuck at 85% aggregate but one module at 60% | MEDIUM | Identify the low-coverage module; enumerate its error branches; write targeted tests; do not add trivial tests to other modules to inflate aggregate |
+| `backfill_nab_history()` running in every NAB test | LOW | Pre-create `tmp_path / "nab_capacity.csv"` with 5+ rows; the backfill trigger checks `len(existing) < 3` |
 
 ---
 
@@ -324,31 +567,45 @@ Phase 4 (pre-push hook). Define the hook's minimum viable scope: Python only. Ad
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| External API calls in unit tests | Phase 1: pytest setup | Run `pytest tests/unit/` with network disconnected — all pass |
-| Tests reading from `data/*.csv` | Phase 1: pytest setup | `git status` after `pytest tests/unit/` shows no modified files |
-| status.json tests asserting specific values | Phase 2: status.json validation | Validator passes on `status.json` generated 3 months from now without modification |
-| Ruff noise on existing codebase | Phase 3: linting | `ruff check pipeline/` exits 0 on existing code before new code is written |
-| `ruff --fix` corrupting hook staging | Phase 4: pre-push hook | Hook uses `--check` flag only; verified with `ruff check --help` |
-| Slow/broken hook due to JS linting | Phase 4: pre-push hook | Hook completes in < 5 seconds on a Python-only change |
-| Over-engineering test infrastructure | Phase 1: pytest setup | conftest.py < 50 lines; test count for this phase is 8-15 functions |
-| DATA_DIR patch not covering all module paths | Phase 1: pytest setup | Grep `pipeline/` for `DATA_DIR` usages; verify each is patched in conftest.py |
-| Live tests mixed with unit tests | Phase 1 + Phase 5: live verification | `pytest -m "not live"` runs in < 10 seconds; `pytest -m live` calls real APIs |
-| Hook not version-controlled | Phase 4: pre-push hook | Hook script committed to `scripts/pre-push`; README updated with setup step |
+| Wrong patching target for `create_session` | Phase 1 (ingest tests — first test written) | Test passes with `block_network` autouse active and no `@pytest.mark.live` |
+| Missing error-path coverage | Phase 1 (ingest tests — all ingestors) | `pytest --cov-report=term-missing` shows no uncovered `except` blocks |
+| Date-dependent non-determinism | Phase 1 (corelogic, NAB, ASX ingest tests) | Test passes identically with `freeze_time("2026-01-15")` and `freeze_time("2026-07-15")` |
+| Binary PDF fixtures | Phase 1 (corelogic and NAB tests) | `find tests/python/fixtures/ -name "*.pdf"` returns nothing |
+| Coverage gaming (trivial assertions) | Phase 1 and Phase 2 (all test phases) | Every test has at least one assertion that would fail if the function returned wrong data |
+| Over-mocking `generate_status()` | Phase 2 (engine tests) | At least one test for `generate_status()` uses real `normalize_indicator()` with fixture CSV |
+| `sys.exit()` terminating test runner | Phase 2 (main.py tests) | `run_pipeline()` critical failure path is in `pytest.raises(SystemExit)` context |
+| `asx_futures` unpatched `meetings.json` path | Phase 1 (ASX futures tests) | `_get_rba_meeting_dates()` coverage > 80%; meeting dates in output match fixture, not fallback `[]` |
+| Housing auxiliary file gap | Phase 2 (engine tests) | `build_gauge_entry()` tested with and without `corelogic_housing.csv`; `data_source` key asserted |
+| `backfill_nab_history()` running in unit tests | Phase 1 (NAB scraper tests) | NAB scraper unit test suite runs in < 5 seconds total |
 
 ---
 
 ## Sources
 
-- Direct codebase analysis: `pipeline/config.py` uses `DATA_DIR = Path("data")` (relative path — requires conftest.py patching strategy)
-- Direct codebase analysis: `pipeline/utils/http_client.py` `create_session()` — injection point for HTTP mocking in tests
-- Direct codebase analysis: `pipeline/ingest/nab_scraper.py` and `corelogic_scraper.py` — pdfplumber imported lazily inside functions (test-safe pattern)
-- Direct codebase analysis: `pipeline/main.py` tiered failure handling — unit tests must not test against real API responses or test becomes an integration test of Australian government APIs
-- pytest documentation — `pytest.mark` and `addopts` for test tier separation (HIGH confidence — official docs)
-- ruff documentation — `--select` / `--ignore` for baseline configuration (HIGH confidence — official docs)
-- Established pattern: pre-commit framework vs. manual `.git/hooks/` — manual hooks are simpler for a single-developer project; `pre-commit` framework adds complexity without benefit at this scale
-- `responses` library — HTTP mocking for `requests`-based code (HIGH confidence — widely used, well-documented)
-- ESLint flat config documentation — `env: { browser: true }` requirement for browser JS (HIGH confidence — official docs)
+- Direct codebase analysis: `pipeline/ingest/abs_data.py` — 7 distinct error paths in
+  `fetch_abs_series()`, each a separate coverage branch
+- Direct codebase analysis: `pipeline/ingest/asx_futures_scraper.py` — `public/data/meetings.json`
+  is NOT under `DATA_DIR`; requires separate patching strategy
+- Direct codebase analysis: `pipeline/ingest/corelogic_scraper.py` and `nab_scraper.py` —
+  both call `datetime.now()` internally; tests must freeze time
+- Direct codebase analysis: `pipeline/normalize/engine.py` — `build_gauge_entry()` has
+  deferred `import pandas as _pd` inside housing and business_confidence branches
+- Direct codebase analysis: `pipeline/main.py` — `sys.exit(1)` on critical failure; must
+  be caught with `pytest.raises(SystemExit)` in tests
+- Direct codebase analysis: `tests/python/conftest.py` — `isolate_data_dir` patches
+  `pipeline.config.DATA_DIR` but does NOT patch `public/data/` paths
+- pytest documentation — `pytest.raises(SystemExit)` for testing exit codes (HIGH confidence)
+- pytest documentation — `monkeypatch.setattr` with dotted path for correct patch targeting
+  (HIGH confidence — official docs)
+- freezegun library — `@freeze_time` decorator for deterministic date-dependent tests
+  (HIGH confidence — widely used, maintained 2025)
+- Datawookie blog (Jan 2025) — "Test a Web Scraper using Mocking" — `responses` library
+  and `unittest.mock` pattern comparison (MEDIUM confidence — recent, practitioner source)
+- Python unittest.mock documentation — patch target must be where the name is used, not
+  where it is defined (HIGH confidence — official docs, fundamental mock pitfall)
+- Community pattern: HTML fixture minimalism — use only the markup the parser needs, not
+  a full page snapshot (MEDIUM confidence — established scraper testing practice)
 
 ---
-*Pitfalls research for: Adding local CI and test infrastructure (v2.0 milestone) — rba-hawko-meter*
-*Researched: 2026-02-24*
+*Pitfalls research for: Adding 85%+ unit test coverage to Python scraper/pipeline modules (v3.0 milestone)*
+*Researched: 2026-02-25*
