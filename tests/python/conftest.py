@@ -11,6 +11,7 @@ Provides:
     CSVs in tests/python/fixtures/.
 """
 
+import json
 import socket
 from pathlib import Path
 
@@ -123,3 +124,68 @@ def fixture_housing_df():
 def fixture_nab_capacity_df():
     """Return NAB capacity utilisation fixture DataFrame."""
     return pd.read_csv(FIXTURES_DIR / "nab_capacity.csv")
+
+
+# =============================================================================
+# Non-CSV fixture loaders (text, JSON, HTML)
+# =============================================================================
+
+
+@pytest.fixture
+def fixture_abs_response():
+    """Return ABS API response CSV text (abs_response.csv)."""
+    return (FIXTURES_DIR / "abs_response.csv").read_text()
+
+
+@pytest.fixture
+def fixture_abs_response_empty():
+    """Return ABS API empty response CSV text (abs_response_empty.csv)."""
+    return (FIXTURES_DIR / "abs_response_empty.csv").read_text()
+
+
+@pytest.fixture
+def fixture_rba_response():
+    """Return RBA CSV response text (rba_cashrate.csv)."""
+    return (FIXTURES_DIR / "rba_cashrate.csv").read_text()
+
+
+@pytest.fixture
+def fixture_rba_response_empty():
+    """Return RBA empty CSV response text (rba_cashrate_empty.csv)."""
+    return (FIXTURES_DIR / "rba_cashrate_empty.csv").read_text()
+
+
+@pytest.fixture
+def fixture_asx_response():
+    """Return ASX API JSON response as dict (asx_response.json)."""
+    return json.loads((FIXTURES_DIR / "asx_response.json").read_text())
+
+
+@pytest.fixture
+def fixture_asx_response_empty():
+    """Return ASX API empty JSON response as dict (asx_response_empty.json)."""
+    return json.loads((FIXTURES_DIR / "asx_response_empty.json").read_text())
+
+
+@pytest.fixture
+def fixture_nab_html():
+    """Return NAB article HTML bytes (nab_article.html)."""
+    return (FIXTURES_DIR / "nab_article.html").read_bytes()
+
+
+@pytest.fixture
+def fixture_nab_html_no_data():
+    """Return NAB article HTML bytes without capacity data."""
+    return (FIXTURES_DIR / "nab_article_no_data.html").read_bytes()
+
+
+@pytest.fixture
+def fixture_corelogic_html():
+    """Return Cotality article HTML bytes (corelogic_article.html)."""
+    return (FIXTURES_DIR / "corelogic_article.html").read_bytes()
+
+
+@pytest.fixture
+def fixture_corelogic_html_no_pdf():
+    """Return Cotality article HTML bytes without PDF link."""
+    return (FIXTURES_DIR / "corelogic_article_no_pdf.html").read_bytes()
