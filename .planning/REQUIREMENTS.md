@@ -25,16 +25,16 @@ Requirements for v2.0 Local CI & Test Infrastructure. Each maps to roadmap phase
 
 ### Linting
 
-- [x] **LINT-01**: Python code passes ruff checks (E/F/W/B/I/UP rules)
-- [x] **LINT-02**: Existing Python violations cleaned up in baseline commit
-- [x] **LINT-03**: JavaScript code passes ESLint v10 checks (IIFE sourceType, browser globals)
-- [x] **LINT-04**: Linting runnable via npm scripts (`lint:py`, `lint:js`, `lint`)
+- [ ] **LINT-01**: Python code passes ruff checks (E/F/W/B/I/UP rules)
+- [ ] **LINT-02**: Existing Python violations cleaned up in baseline commit
+- [ ] **LINT-03**: JavaScript code passes ESLint v10 checks (IIFE sourceType, browser globals)
+- [ ] **LINT-04**: Linting runnable via npm scripts (`lint:py`, `lint:js`, `lint`)
 
 ### Live Verification
 
-- [x] **LIVE-01**: Developer can verify ABS, RBA, ASX API ingestion works with real endpoints
-- [x] **LIVE-02**: Developer can verify Cotality and NAB scrapers work against live pages
-- [x] **LIVE-03**: Full pipeline run produces valid status.json with all indicators
+- [ ] **LIVE-01**: Developer can verify ABS, RBA, ASX API ingestion works with real endpoints
+- [ ] **LIVE-02**: Developer can verify Cotality and NAB scrapers work against live pages
+- [ ] **LIVE-03**: Full pipeline run produces valid status.json with all indicators
 - [x] **LIVE-04**: Live test failures are non-blocking warnings (graceful degradation preserved)
 
 ### Pre-Push Hook
@@ -42,7 +42,7 @@ Requirements for v2.0 Local CI & Test Infrastructure. Each maps to roadmap phase
 - [x] **HOOK-01**: Pre-push git hook automatically runs fast test suite before push
 - [x] **HOOK-02**: Fast test suite completes in under 10 seconds
 - [x] **HOOK-03**: Developer can run fast tests manually via `npm run test:fast`
-- [x] **HOOK-04**: Developer can run full verification manually via `npm run verify`
+- [ ] **HOOK-04**: Developer can run full verification manually via `npm run verify`
 
 ## Future Requirements
 
@@ -79,18 +79,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UNIT-03 | Phase 12 | Complete |
 | UNIT-04 | Phase 12 | Complete |
 | UNIT-05 | Phase 12 | Complete |
-| LINT-01 | Phase 13 | Complete (13-01) |
-| LINT-02 | Phase 13 | Complete (13-01) |
-| LINT-03 | Phase 13 | Complete (13-02) |
-| LINT-04 | Phase 13 | Complete (13-02) |
-| LIVE-01 | Phase 14 | Complete |
-| LIVE-02 | Phase 14 | Complete |
-| LIVE-03 | Phase 14 | Complete |
+| LINT-01 | Phase 16 | Pending |
+| LINT-02 | Phase 16 | Pending |
+| LINT-03 | Phase 16 | Pending |
+| LINT-04 | Phase 16 | Pending |
+| LIVE-01 | Phase 17 | Pending |
+| LIVE-02 | Phase 17 | Pending |
+| LIVE-03 | Phase 17 | Pending |
 | LIVE-04 | Phase 14 | Complete |
 | HOOK-01 | Phase 15 | Complete |
 | HOOK-02 | Phase 15 | Complete |
 | HOOK-03 | Phase 15 | Complete |
-| HOOK-04 | Phase 15 | Complete |
+| HOOK-04 | Phase 17 | Pending |
 
 **Coverage:**
 - v2.0 requirements: 22 total
@@ -99,4 +99,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-24*
-*Last updated: 2026-02-25 after Phase 13 execution (LINT-01, LINT-02, LINT-03, LINT-04 complete)*
+*Last updated: 2026-02-25 after gap closure phases added (LINT-01-04, LIVE-01-03, HOOK-04 reset to Pending)*

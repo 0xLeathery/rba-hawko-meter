@@ -4,7 +4,7 @@
 
 - ✅ **v1.0 MVP** — Phases 1-7 (shipped 2026-02-24)
 - ✅ **v1.1 Full Indicator Coverage** — Phases 8-10 (shipped 2026-02-24)
-- **v2.0 Local CI & Test Infrastructure** — Phases 11-15 (active)
+- **v2.0 Local CI & Test Infrastructure** — Phases 11-17 (active)
 
 ## Phases
 
@@ -26,13 +26,15 @@ Delivered: ASX futures multi-meeting probability table, ABS RPPI + Cotality HVI 
 
 </details>
 
-### v2.0 Local CI & Test Infrastructure (Phases 11-15)
+### v2.0 Local CI & Test Infrastructure (Phases 11-17)
 
 - [x] **Phase 11: Test Foundation** — pyproject.toml config hub + isolated test harness (conftest.py + fixtures)
 - [x] **Phase 12: Python Unit Tests** — Pure-function coverage for zscore, gauge, ratios, csv_handler, status.json schema (completed 2026-02-24)
 - [x] **Phase 13: Linting Baseline** — Ruff (Python) + ESLint v10 (JS) verified clean before hook is enabled (completed 2026-02-25)
 - [x] **Phase 14: Live Verification** — On-demand end-to-end verification against real APIs and live scrapers (completed 2026-02-25)
 - [x] **Phase 15: Pre-Push Hook** — Automated fast gate via lefthook + unified npm scripts (completed 2026-02-25)
+- [ ] **Phase 16: Verify Linting Baseline** — Independent verification of Phase 13 linting work (gap closure)
+- [ ] **Phase 17: Fix DATA_DIR Wiring & npm verify Chain** — Fix import-time binding bug + restore verify_summary.py (gap closure)
 
 ## Phase Details
 
@@ -106,6 +108,28 @@ Plans:
 Plans:
 - [ ] 15-01-PLAN.md -- Lefthook pre-push hook + test:fast/verify npm scripts
 
+### Phase 16: Verify Linting Baseline
+**Goal**: Phase 13 linting work is independently verified, confirming all lint commands pass cleanly
+**Depends on**: Phase 13
+**Requirements**: LINT-01, LINT-02, LINT-03, LINT-04
+**Gap Closure**: Closes verification gap from v2.0 audit — Phase 13 was never verified by gsd-verifier
+**Success Criteria** (what must be TRUE):
+  1. `npm run lint:py` reports 0 ruff violations across `pipeline/`
+  2. `npm run lint:js` reports 0 ESLint violations across `public/js/`
+  3. `npm run lint` runs both linters in sequence and both exit 0
+  4. VERIFICATION.md exists for Phase 13 confirming all 4 LINT requirements satisfied
+
+### Phase 17: Fix DATA_DIR Wiring & npm verify Chain
+**Goal**: `npm run verify` runs all three tiers (fast + live + Playwright) without DATA_DIR assertion failures, and verify_summary.py is included in automation
+**Depends on**: Phase 14, Phase 15
+**Requirements**: LIVE-01, LIVE-02, LIVE-03, HOOK-04
+**Gap Closure**: Closes DATA_DIR import-time binding bug and verify_summary.py orphan from v2.0 audit
+**Success Criteria** (what must be TRUE):
+  1. All 5 ingestors use late-bound `pipeline.config.DATA_DIR` instead of import-time binding
+  2. Live tests pass with `isolate_data_dir` fixture correctly redirecting ingestor writes to tmp_path
+  3. `npm run verify` chain includes `verify_summary.py` execution
+  4. `npm run verify` completes all three tiers (fast tests + live pytest + Playwright) without DATA_DIR assertion failures
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -119,3 +143,5 @@ Plans:
 | 13. Linting Baseline | v2.0 | 2/2 | Complete | 2026-02-25 |
 | 14. Live Verification | 1/1 | Complete    | 2026-02-25 | - |
 | 15. Pre-Push Hook | 1/1 | Complete    | 2026-02-25 | - |
+| 16. Verify Linting Baseline | v2.0 | 0/0 | Pending | - |
+| 17. Fix DATA_DIR & verify Chain | v2.0 | 0/0 | Pending | - |
