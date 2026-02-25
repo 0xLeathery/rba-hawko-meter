@@ -4,14 +4,28 @@ Fetches economic indicators via ABS Data API (SDMX 2.1).
 """
 
 import sys
-import requests
+
 import pandas as pd
-from pipeline.config import ABS_API_BASE, ABS_CONFIG, DATA_DIR, DEFAULT_TIMEOUT, TIMEOUT_OVERRIDES
+import requests
+
+from pipeline.config import (
+    ABS_API_BASE,
+    ABS_CONFIG,
+    DATA_DIR,
+    DEFAULT_TIMEOUT,
+    TIMEOUT_OVERRIDES,
+)
 from pipeline.utils.csv_handler import append_to_csv
 from pipeline.utils.http_client import create_session
 
 
-def fetch_abs_series(dataflow_id: str, key: str, params: dict = None, filters: dict = None, timeout: int = None) -> pd.DataFrame:
+def fetch_abs_series(
+    dataflow_id: str,
+    key: str,
+    params: dict = None,
+    filters: dict = None,
+    timeout: int = None,
+) -> pd.DataFrame:
     """
     Fetch a data series from ABS Data API.
 
@@ -43,20 +57,29 @@ def fetch_abs_series(dataflow_id: str, key: str, params: dict = None, filters: d
     response = session.get(url, headers=headers, params=params, timeout=request_timeout)
 
     if response.status_code != 200:
-        raise Exception(f"ABS API error: {response.status_code} for {url}\nResponse: {response.text[:500]}")
+        raise Exception(
+            f"ABS API error: {response.status_code} for {url}\n"
+            f"Response: {response.text[:500]}"
+        )
 
     # Defensive check: Ensure response body is complete
     if not response.text:
         raise Exception(f"Empty response body from ABS API for {dataflow_id}/{key}")
 
     if len(response.text) < 100:
-        raise Exception(f"Response too short ({len(response.text)} bytes) - likely incomplete")
+        raise Exception(
+            f"Response too short ({len(response.text)} bytes)"
+            " - likely incomplete"
+        )
 
     # Parse CSV response
     try:
         df = pd.read_csv(pd.io.common.StringIO(response.text))
     except pd.errors.ParserError as e:
-        raise Exception(f"Failed to parse CSV response: {e}\nPreview: {response.text[:500]}")
+        raise Exception(
+            f"Failed to parse CSV response: {e}\n"
+            f"Preview: {response.text[:500]}"
+        ) from e
 
     if len(df) == 0:
         raise Exception(f"No data returned from ABS API for {dataflow_id}/{key}")
@@ -72,8 +95,15 @@ def fetch_abs_series(dataflow_id: str, key: str, params: dict = None, filters: d
             matching_cols = [c for c in df.columns if c.startswith(f"{col_name}:")]
             if matching_cols:
                 col = matching_cols[0]
-                # Filter by checking if value starts with the filter (handles "code: label" format)
-                df = df[df[col].astype(str).str.contains(f"^{filter_value}:", regex=True, na=False)]
+                # Filter by checking if value starts with
+                # the filter (handles "code: label" format)
+                df = df[
+                    df[col].astype(str).str.contains(
+                        f"^{filter_value}:",
+                        regex=True,
+                        na=False,
+                    )
+                ]
 
         print(f"After filtering: {len(df)} rows")
 
@@ -216,12 +246,28 @@ def fetch_rppi() -> pd.DataFrame:
 
 # Fetcher registry
 FETCHERS = {
-    'cpi': (fetch_cpi, ABS_CONFIG["cpi"]["output_file"]),
-    'employment': (fetch_employment, ABS_CONFIG["employment"]["output_file"]),
-    'household_spending': (fetch_household_spending, ABS_CONFIG["household_spending"]["output_file"]),
-    'wage_price_index': (fetch_wage_price_index, ABS_CONFIG["wage_price_index"]["output_file"]),
-    'building_approvals': (fetch_building_approvals, ABS_CONFIG["building_approvals"]["output_file"]),
-    'rppi': (fetch_rppi, ABS_CONFIG["rppi"]["output_file"]),
+    'cpi': (
+        fetch_cpi, ABS_CONFIG["cpi"]["output_file"]
+    ),
+    'employment': (
+        fetch_employment,
+        ABS_CONFIG["employment"]["output_file"],
+    ),
+    'household_spending': (
+        fetch_household_spending,
+        ABS_CONFIG["household_spending"]["output_file"],
+    ),
+    'wage_price_index': (
+        fetch_wage_price_index,
+        ABS_CONFIG["wage_price_index"]["output_file"],
+    ),
+    'building_approvals': (
+        fetch_building_approvals,
+        ABS_CONFIG["building_approvals"]["output_file"],
+    ),
+    'rppi': (
+        fetch_rppi, ABS_CONFIG["rppi"]["output_file"]
+    ),
 }
 
 
@@ -240,7 +286,10 @@ def fetch_and_save(series: str = None) -> dict:
     if series:
         # Fetch single series
         if series not in FETCHERS:
-            raise ValueError(f"Unknown series: {series}. Available: {list(FETCHERS.keys())}")
+            raise ValueError(
+                f"Unknown series: {series}. "
+                f"Available: {list(FETCHERS.keys())}"
+            )
 
         fetch_func, output_file = FETCHERS[series]
         df = fetch_func()

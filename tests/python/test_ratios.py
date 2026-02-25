@@ -2,11 +2,13 @@
 Unit tests for pipeline.normalize.ratios module.
 
 Tests:
-  - load_indicator_csv: happy path, missing file, empty file, missing column, header-only
+  - load_indicator_csv: happy path, missing file, empty file,
+    missing column, header-only
   - compute_yoy_pct_change: quarterly/monthly data, fixture data, edge case
   - filter_valid_data: mixed, all-valid, all-invalid data
   - resample_to_quarterly: 12-month -> 4-quarter, last value semantics
-  - normalize_indicator: standard path, missing CSV, hybrid Cotality/ABS path, direct normalization
+  - normalize_indicator: standard path, missing CSV,
+    hybrid Cotality/ABS path, direct normalization
 """
 
 import shutil
@@ -14,7 +16,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from pipeline.normalize.ratios import (
     compute_yoy_pct_change,
@@ -244,7 +245,8 @@ def test_resample_to_quarterly_uses_last_value():
 
 
 def test_normalize_indicator_standard_path(tmp_path, monkeypatch):
-    """Standard path: CPI fixture CSV produces non-empty DataFrame with date/value columns."""
+    """Standard path: CPI fixture CSV produces non-empty
+    DataFrame with date/value columns."""
     import pipeline.config
     monkeypatch.setattr(pipeline.config, "DATA_DIR", tmp_path)
 
@@ -321,7 +323,8 @@ def test_normalize_indicator_hybrid_cotality_abs_path(tmp_path, monkeypatch):
     assert "date" in result.columns
     assert "value" in result.columns
 
-    # (a) Cotality HVI value (9.4) must appear in output — pre-computed, not double-normalized
+    # (a) Cotality HVI value (9.4) must appear in output —
+    # pre-computed, not double-normalized
     assert 9.4 in result["value"].values
 
     # (b) ABS YoY rows must be present (first ABS row after YoY: 105/100 - 1 = 5%)

@@ -12,7 +12,6 @@ Tests append_to_csv with:
 """
 
 import pandas as pd
-import pytest
 
 from pipeline.utils.csv_handler import append_to_csv
 
@@ -50,7 +49,10 @@ def test_append_to_csv_appends_new_rows(tmp_path):
     written = pd.read_csv(csv_path)
     assert len(written) == 4
     # Dates should be in ascending order
-    assert list(written["date"]) == ["2024-01-01", "2024-02-01", "2024-03-01", "2024-04-01"]
+    assert list(written["date"]) == [
+        "2024-01-01", "2024-02-01",
+        "2024-03-01", "2024-04-01",
+    ]
 
 
 def test_append_to_csv_deduplicates_last_wins(tmp_path):

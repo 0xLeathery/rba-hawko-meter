@@ -4,8 +4,10 @@ Fetches cash rate target from RBA statistical tables.
 """
 
 import io
+
 import pandas as pd
-from pipeline.config import RBA_BASE_URL, RBA_CONFIG, DATA_DIR, DEFAULT_TIMEOUT
+
+from pipeline.config import DATA_DIR, DEFAULT_TIMEOUT, RBA_BASE_URL, RBA_CONFIG
 from pipeline.utils.csv_handler import append_to_csv
 from pipeline.utils.http_client import create_session
 
@@ -57,7 +59,8 @@ def fetch_cash_rate() -> pd.DataFrame:
     # Drop rows with invalid dates
     df = df.dropna(subset=['date'])
 
-    # Clean value column - remove ranges like "17.00 to 17.50" and keep only the upper value
+    # Clean value column - remove ranges like "17.00 to 17.50"
+    # and keep only the upper value
     # Some early entries have ranges, extract the number
     df['value'] = df['value'].astype(str).str.extract(r'([\d.]+)$')[0]
 

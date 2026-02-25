@@ -4,7 +4,8 @@ Unit tests for pipeline.normalize.gauge.
 Covers:
   - zscore_to_gauge: linear map z->gauge, clipped to [0,100], NaN passthrough
   - classify_zone: 5-zone classification at exact boundary values
-  - compute_hawk_score: weighted average with rebalancing, empty fallback, benchmark exclusion
+  - compute_hawk_score: weighted average with rebalancing,
+    empty fallback, benchmark exclusion
   - generate_verdict: threshold-based verdict strings at all 5 zones
 
 All tests are pure math — no network access, no disk I/O to the live data/ folder.
@@ -20,7 +21,6 @@ from pipeline.normalize.gauge import (
     generate_verdict,
     zscore_to_gauge,
 )
-
 
 # =============================================================================
 # zscore_to_gauge
@@ -103,7 +103,8 @@ def test_classify_zone_boundaries(gauge, expected_zone_id, expected_zone_label):
         f"gauge={gauge}: expected zone_id='{expected_zone_id}', got '{zone_id}'"
     )
     assert zone_label == expected_zone_label, (
-        f"gauge={gauge}: expected zone_label='{expected_zone_label}', got '{zone_label}'"
+        f"gauge={gauge}: expected zone_label="
+        f"'{expected_zone_label}', got '{zone_label}'"
     )
 
 

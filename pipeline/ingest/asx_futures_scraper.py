@@ -16,11 +16,15 @@ import logging
 import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
 
-from pipeline.config import ASX_FUTURES_URLS, DATA_DIR, BROWSER_USER_AGENT, DEFAULT_TIMEOUT
+from pipeline.config import (
+    ASX_FUTURES_URLS,
+    BROWSER_USER_AGENT,
+    DATA_DIR,
+    DEFAULT_TIMEOUT,
+)
 from pipeline.utils.http_client import create_session
 
 logging.basicConfig(level=logging.INFO)
@@ -48,7 +52,7 @@ def _get_current_cash_rate() -> float:
         return 4.35
 
 
-def _get_rba_meeting_dates() -> List[str]:
+def _get_rba_meeting_dates() -> list[str]:
     """
     Load RBA meeting dates from public/data/meetings.json.
 
@@ -71,7 +75,9 @@ def _get_rba_meeting_dates() -> List[str]:
         return []
 
 
-def _find_meeting_for_contract(contract_expiry: str, meeting_dates: List[str]) -> Optional[str]:
+def _find_meeting_for_contract(
+    contract_expiry: str, meeting_dates: list[str]
+) -> str | None:
     """
     Find the RBA meeting date that a futures contract most closely covers.
 
@@ -104,7 +110,9 @@ def _find_meeting_for_contract(contract_expiry: str, meeting_dates: List[str]) -
     return None
 
 
-def _derive_probabilities(implied_rate: float, current_rate: float) -> Tuple[float, int, int, int]:
+def _derive_probabilities(
+    implied_rate: float, current_rate: float
+) -> tuple[float, int, int, int]:
     """
     Derive rate movement probabilities from implied vs current rate.
 
@@ -151,7 +159,10 @@ def scrape_asx_futures() -> pd.DataFrame:
     Raises:
         Exception: If fetching or parsing fails.
     """
-    session = create_session(retries=3, backoff_factor=0.5, user_agent=BROWSER_USER_AGENT)
+    session = create_session(
+        retries=3, backoff_factor=0.5,
+        user_agent=BROWSER_USER_AGENT,
+    )
 
     url = ASX_FUTURES_URLS["ib_futures"]
     logger.info(f"Fetching IB futures from {url}")
@@ -197,7 +208,9 @@ def scrape_asx_futures() -> pd.DataFrame:
             meeting_date = expiry
 
         # Derive probabilities
-        change_bp, prob_cut, prob_hold, prob_hike = _derive_probabilities(implied_rate, current_rate)
+        change_bp, prob_cut, prob_hold, prob_hike = (
+            _derive_probabilities(implied_rate, current_rate)
+        )
 
         rows.append({
             "date": scrape_date,
@@ -243,7 +256,7 @@ def _check_staleness(csv_path: Path) -> None:
         logger.warning(f"Could not check ASX staleness: {e}")
 
 
-def fetch_and_save() -> Dict[str, Union[str, int]]:
+def fetch_and_save() -> dict[str, str | int]:
     """
     Fetch ASX futures data and save to CSV.
     Returns status dict — logs errors but doesn't raise (graceful degradation).
@@ -269,7 +282,10 @@ def fetch_and_save() -> Dict[str, Union[str, int]]:
                 existing_df = pd.read_csv(output_path)
                 combined_df = pd.concat([existing_df, df], ignore_index=True)
                 # Deduplicate on composite key [date, meeting_date], keeping latest
-                result_df = combined_df.drop_duplicates(subset=['date', 'meeting_date'], keep='last')
+                result_df = combined_df.drop_duplicates(
+                    subset=['date', 'meeting_date'],
+                    keep='last',
+                )
             except (pd.errors.EmptyDataError, pd.errors.ParserError):
                 logger.warning("Existing CSV unreadable, overwriting")
                 result_df = df
@@ -283,7 +299,10 @@ def fetch_and_save() -> Dict[str, Union[str, int]]:
         # may return data but the max date may still be old
         _check_staleness(output_path)
 
-        logger.info(f"ASX futures data saved: {len(result_df)} total rows, {len(df)} new")
+        logger.info(
+            f"ASX futures data saved: "
+            f"{len(result_df)} total rows, {len(df)} new"
+        )
         return {
             'status': 'success',
             'rows': len(result_df),
@@ -309,7 +328,7 @@ if __name__ == '__main__':
     if result['status'] == 'success':
         try:
             df = pd.read_csv(DATA_DIR / "asx_futures.csv")
-            print(f"\nData sample (first 5 rows):")
+            print("\nData sample (first 5 rows):")
             print(df.head())
         except Exception as e:
             print(f"Could not read CSV: {e}")

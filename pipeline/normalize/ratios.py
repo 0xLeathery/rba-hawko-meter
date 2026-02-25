@@ -5,9 +5,10 @@ Converts raw CSV data to normalized ratios (primarily YoY % change).
 Ensures no nominal currency values pass through to the gauge engine.
 """
 
-import pandas as pd
-import numpy as np
 from pathlib import Path
+
+import numpy as np
+import pandas as pd
 
 from pipeline.config import DATA_DIR
 
@@ -141,16 +142,28 @@ def normalize_indicator(name, config):
                     # Extract pre-computed YoY rows (latest one only)
                     _precomp = _full[mask][['date', 'value']].copy()
                     _precomp['date'] = pd.to_datetime(_precomp['date'])
-                    _precomp['value'] = pd.to_numeric(_precomp['value'], errors='coerce')
-                    _precomp = _precomp.dropna(subset=['value']).sort_values('date').tail(1)
+                    _precomp['value'] = pd.to_numeric(
+                        _precomp['value'], errors='coerce'
+                    )
+                    _precomp = (
+                        _precomp.dropna(subset=['value'])
+                        .sort_values('date')
+                        .tail(1)
+                    )
                     if len(_precomp) > 0:
                         precomputed_rows = _precomp
 
-                    # Build a filtered DataFrame (only non-precomputed rows) for standard pipeline
+                    # Build a filtered DataFrame (only
+                    # non-precomputed rows) for standard pipeline
                     _index_rows = _full[~mask][['date', 'value']].copy()
                     _index_rows['date'] = pd.to_datetime(_index_rows['date'])
-                    _index_rows['value'] = pd.to_numeric(_index_rows['value'], errors='coerce')
-                    _index_rows = _index_rows.sort_values('date').reset_index(drop=True)
+                    _index_rows['value'] = pd.to_numeric(
+                        _index_rows['value'], errors='coerce'
+                    )
+                    _index_rows = (
+                        _index_rows.sort_values('date')
+                        .reset_index(drop=True)
+                    )
                     df_override = _index_rows
         except Exception:
             pass  # Fall through to standard load path

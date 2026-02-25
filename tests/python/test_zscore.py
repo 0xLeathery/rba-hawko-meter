@@ -21,7 +21,6 @@ from pipeline.normalize.zscore import (
     robust_zscore,
 )
 
-
 # =============================================================================
 # calculate_mad
 # =============================================================================
@@ -150,7 +149,8 @@ def test_compute_rolling_zscores_nan_for_insufficient_window():
     # Row 2+ (window size >= 2) has valid z_score
     for i in range(2, len(result)):
         assert not pd.isna(result["z_score"].iloc[i]), (
-            f"Row {i} z_score should not be NaN (window size {result['window_size'].iloc[i]})"
+            f"Row {i} z_score should not be NaN "
+            f"(window size {result['window_size'].iloc[i]})"
         )
 
 
@@ -164,7 +164,8 @@ def test_compute_rolling_zscores_zero_mad_produces_zero_not_nan():
 
     for i in range(2, len(result)):
         assert result["z_score"].iloc[i] == pytest.approx(0.0, abs=1e-9), (
-            f"Row {i}: expected 0.0 for all-identical window, got {result['z_score'].iloc[i]}"
+            f"Row {i}: expected 0.0 for all-identical "
+            f"window, got {result['z_score'].iloc[i]}"
         )
 
 
@@ -201,7 +202,8 @@ def test_compute_rolling_zscores_window_size_column():
     expected_sizes = [0, 1, 2, 3, 4, 4, 4]
     for i, expected in enumerate(expected_sizes):
         assert result["window_size"].iloc[i] == expected, (
-            f"Row {i}: expected window_size={expected}, got {result['window_size'].iloc[i]}"
+            f"Row {i}: expected window_size={expected}, "
+            f"got {result['window_size'].iloc[i]}"
         )
 
 

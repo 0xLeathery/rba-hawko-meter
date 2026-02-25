@@ -12,13 +12,12 @@ for normally distributed data.
 """
 
 import numpy as np
-import pandas as pd
 
 from pipeline.config import (
-    ZSCORE_WINDOW_YEARS,
-    ZSCORE_MIN_YEARS,
     CONFIDENCE_HIGH_MIN_OBS,
     CONFIDENCE_MEDIUM_MIN_OBS,
+    ZSCORE_MIN_YEARS,
+    ZSCORE_WINDOW_YEARS,
 )
 
 

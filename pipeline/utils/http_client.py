@@ -6,6 +6,7 @@ Handles transient network failures automatically.
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
 from pipeline.config import USER_AGENT
 
 

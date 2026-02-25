@@ -12,13 +12,12 @@ import logging
 import re
 import traceback
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Union
 
 import pandas as pd
 from bs4 import BeautifulSoup
 from dateutil.relativedelta import relativedelta
 
-from pipeline.config import DATA_DIR, BROWSER_USER_AGENT, DEFAULT_TIMEOUT
+from pipeline.config import BROWSER_USER_AGENT, DATA_DIR, DEFAULT_TIMEOUT
 from pipeline.utils.csv_handler import append_to_csv
 from pipeline.utils.http_client import create_session
 
@@ -38,19 +37,29 @@ CAPACITY_REGEX = re.compile(
     re.IGNORECASE
 )
 
-# URL patterns for backfill (historical months where tag archive doesn't list old articles).
-# This is the ONLY place URLs are constructed from date templates — never for current-month discovery.
-MONTH_URL_PATTERNS: List = [
-    # Pattern A: /tag/economic-commentary/ slug with triple hyphens (late 2025+)
-    lambda m, y: f"{NAB_BASE}/tag/economic-commentary/nab-monthly-business-survey---{m}-{y}",
-    # Pattern B: root-level with trailing slash (2024 and earlier)
-    lambda m, y: f"{NAB_BASE}/nab-monthly-business-survey-{m}-{y}/",
-    # Pattern C: root-level without trailing slash (some 2025 articles)
-    lambda m, y: f"{NAB_BASE}/nab-monthly-business-survey-{m}-{y}",
+# URL patterns for backfill (historical months where tag
+# archive doesn't list old articles).
+# This is the ONLY place URLs are constructed from date
+# templates — never for current-month discovery.
+MONTH_URL_PATTERNS: list = [
+    # Pattern A: /tag/economic-commentary/ slug with triple
+    # hyphens (late 2025+)
+    lambda m, y: (
+        f"{NAB_BASE}/tag/economic-commentary/"
+        f"nab-monthly-business-survey---{m}-{y}"
+    ),
+    # Pattern B: root-level with trailing slash (2024-)
+    lambda m, y: (
+        f"{NAB_BASE}/nab-monthly-business-survey-{m}-{y}/"
+    ),
+    # Pattern C: root-level without trailing slash (2025)
+    lambda m, y: (
+        f"{NAB_BASE}/nab-monthly-business-survey-{m}-{y}"
+    ),
 ]
 
 
-def discover_latest_survey_url(session) -> Optional[str]:
+def discover_latest_survey_url(session) -> str | None:
     """
     Crawl NAB tag archive pages to find the most recent Monthly Business Survey URL.
 
@@ -64,7 +73,10 @@ def discover_latest_survey_url(session) -> Optional[str]:
         try:
             resp = session.get(archive_url, timeout=DEFAULT_TIMEOUT)
             if resp.status_code != 200:
-                logger.warning(f"NAB: tag archive {archive_url} returned {resp.status_code}")
+                logger.warning(
+                    f"NAB: tag archive {archive_url} "
+                    f"returned {resp.status_code}"
+                )
                 continue
             soup = BeautifulSoup(resp.content, 'lxml')
             for a in soup.find_all('a', href=True):
@@ -76,7 +88,7 @@ def discover_latest_survey_url(session) -> Optional[str]:
     return None
 
 
-def fetch_article(url: str, session) -> Optional[bytes]:
+def fetch_article(url: str, session) -> bytes | None:
     """Fetch article HTML, return bytes or None on any error."""
     try:
         resp = session.get(url, timeout=DEFAULT_TIMEOUT)
@@ -88,7 +100,7 @@ def fetch_article(url: str, session) -> Optional[bytes]:
     return None
 
 
-def extract_capacity_from_html(html_bytes: bytes) -> Optional[float]:
+def extract_capacity_from_html(html_bytes: bytes) -> float | None:
     """
     Extract capacity utilisation % from NAB Monthly Business Survey article HTML.
 
@@ -104,7 +116,7 @@ def extract_capacity_from_html(html_bytes: bytes) -> Optional[float]:
     return None
 
 
-def get_pdf_link(html_bytes: bytes) -> Optional[str]:
+def get_pdf_link(html_bytes: bytes) -> str | None:
     """
     Extract the first PDF link from article HTML anchor tags.
 
@@ -118,7 +130,7 @@ def get_pdf_link(html_bytes: bytes) -> Optional[str]:
     return None
 
 
-def extract_capacity_from_pdf(pdf_bytes: bytes) -> Optional[float]:
+def extract_capacity_from_pdf(pdf_bytes: bytes) -> float | None:
     """
     PDF fallback: apply the same CAPACITY_REGEX to pdfplumber-extracted text.
 
@@ -170,7 +182,8 @@ def backfill_nab_history(session, months: int = 12) -> int:
 
     For each historical month, tries MONTH_URL_PATTERNS (constructed URLs) in order.
     This is the ONLY place URL construction from date templates is used — the tag
-    archive does not list historical articles, so pattern-based construction is required.
+    archive does not list historical articles, so
+    pattern-based construction is required.
 
     Returns the number of months successfully scraped and appended.
     """
@@ -191,7 +204,10 @@ def backfill_nab_history(session, months: int = 12) -> int:
             url = pattern_fn(month_str, year)
             html_bytes = fetch_article(url, session)
             if html_bytes:
-                logger.debug(f"NAB backfill: found article for {month_str} {year} at {url}")
+                logger.debug(
+                    f"NAB backfill: found article for "
+                    f"{month_str} {year} at {url}"
+                )
                 break
 
         if not html_bytes:
@@ -201,7 +217,10 @@ def backfill_nab_history(session, months: int = 12) -> int:
         capacity_pct = extract_capacity_from_html(html_bytes)
 
         if capacity_pct is None:
-            logger.debug(f"NAB backfill: HTML extraction failed for {month_str} {year} — trying PDF")
+            logger.debug(
+                f"NAB backfill: HTML extraction failed for "
+                f"{month_str} {year} — trying PDF"
+            )
             pdf_url = get_pdf_link(html_bytes)
             if pdf_url:
                 try:
@@ -209,10 +228,17 @@ def backfill_nab_history(session, months: int = 12) -> int:
                     if pdf_resp.status_code == 200:
                         capacity_pct = extract_capacity_from_pdf(pdf_resp.content)
                 except Exception as e:
-                    logger.debug(f"NAB backfill: PDF fetch failed for {month_str} {year}: {e}")
+                    logger.debug(
+                        f"NAB backfill: PDF fetch "
+                        f"failed for {month_str} "
+                        f"{year}: {e}"
+                    )
 
         if capacity_pct is None:
-            logger.debug(f"NAB backfill: both HTML and PDF failed for {month_str} {year} — skipping")
+            logger.debug(
+                f"NAB backfill: both HTML and PDF failed "
+                f"for {month_str} {year} — skipping"
+            )
             continue
 
         row = pd.DataFrame([{
@@ -221,7 +247,10 @@ def backfill_nab_history(session, months: int = 12) -> int:
             'source': 'NAB Monthly Business Survey',
         }])
         append_to_csv(output_path, row, date_column='date')
-        logger.info(f"NAB backfill: {month_str} {year} — capacity utilisation {capacity_pct}%")
+        logger.info(
+            f"NAB backfill: {month_str} {year} — "
+            f"capacity utilisation {capacity_pct}%"
+        )
         scraped += 1
 
     logger.info(f"NAB backfill complete: {scraped}/{months} months scraped")
@@ -242,9 +271,12 @@ def scrape_nab_capacity() -> pd.DataFrame:
     if _current_month_already_scraped(output_path):
         return pd.DataFrame(columns=['date', 'value', 'source'])
 
-    session = create_session(retries=3, backoff_factor=0.5, user_agent=BROWSER_USER_AGENT)
+    session = create_session(
+        retries=3, backoff_factor=0.5,
+        user_agent=BROWSER_USER_AGENT,
+    )
 
-    # Trigger backfill if CSV is missing or has fewer than 3 rows
+    # Trigger backfill if CSV is missing or fewer than 3 rows
     if not output_path.exists():
         logger.info("NAB: CSV missing — running backfill before current-month scrape")
         backfill_nab_history(session, months=12)
@@ -252,7 +284,10 @@ def scrape_nab_capacity() -> pd.DataFrame:
         try:
             existing = pd.read_csv(output_path)
             if len(existing) < 3:
-                logger.info(f"NAB: CSV has only {len(existing)} rows — running backfill")
+                logger.info(
+                    f"NAB: CSV has only {len(existing)} "
+                    "rows — running backfill"
+                )
                 backfill_nab_history(session, months=12)
         except Exception:
             pass
@@ -263,7 +298,10 @@ def scrape_nab_capacity() -> pd.DataFrame:
 
     survey_url = discover_latest_survey_url(session)
     if not survey_url:
-        logger.warning("NAB: no survey URL discovered from tag archive — skipping indicator")
+        logger.warning(
+            "NAB: no survey URL discovered from "
+            "tag archive — skipping indicator"
+        )
         return pd.DataFrame(columns=['date', 'value', 'source'])
 
     logger.info(f"NAB: fetching survey article {survey_url}")
@@ -304,12 +342,13 @@ def scrape_nab_capacity() -> pd.DataFrame:
         'source': 'NAB Monthly Business Survey',
     }])
     logger.info(
-        f"NAB: capacity utilisation {capacity_pct}% for {period_start.strftime('%b %Y')}"
+        f"NAB: capacity utilisation {capacity_pct}% "
+        f"for {period_start.strftime('%b %Y')}"
     )
     return row
 
 
-def fetch_and_save() -> Dict[str, Union[str, int]]:
+def fetch_and_save() -> dict[str, str | int]:
     """
     Fetch NAB capacity utilisation and save to CSV.
 

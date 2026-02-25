@@ -11,12 +11,11 @@ import logging
 import re
 import traceback
 from datetime import datetime, timedelta
-from typing import Dict, Optional, Union
 
 import pandas as pd
 import requests
 
-from pipeline.config import DATA_DIR, BROWSER_USER_AGENT, DEFAULT_TIMEOUT
+from pipeline.config import BROWSER_USER_AGENT, DATA_DIR, DEFAULT_TIMEOUT
 from pipeline.utils.csv_handler import append_to_csv
 from pipeline.utils.http_client import create_session
 
@@ -36,7 +35,8 @@ def get_candidate_urls(year: int, month: int) -> list:
     Return candidate Cotality HVI PDF URLs to try in order.
 
     URL pattern is inconsistent across months (confirmed by research):
-    - Jan/Feb 2026: discover.cotality.com/hubfs/Article-Reports/COTALITY HVI {Mon} {Year} FINAL.pdf
+    - Jan/Feb 2026: discover.cotality.com/hubfs/
+      Article-Reports/COTALITY HVI {Mon} {Year} FINAL.pdf
     - Dec 2025: discover.cotality.com/hubfs/Article-Reports/Cotality_HVI_December.pdf
     - Nov 2025: different pattern entirely (404 on standard patterns)
 
@@ -56,7 +56,9 @@ def get_candidate_urls(year: int, month: int) -> list:
     ]
 
 
-def download_cotality_pdf(year: int, month: int, session: requests.Session) -> Optional[bytes]:
+def download_cotality_pdf(
+    year: int, month: int, session: requests.Session
+) -> bytes | None:
     """
     Try candidate URLs to download Cotality HVI PDF for given month.
 
@@ -68,8 +70,11 @@ def download_cotality_pdf(year: int, month: int, session: requests.Session) -> O
     for url in candidates:
         try:
             resp = session.get(url, timeout=DEFAULT_TIMEOUT)
+            content_type = resp.headers.get(
+                'content-type', ''
+            )
             if (resp.status_code == 200
-                    and resp.headers.get('content-type', '').startswith('application/pdf')):
+                    and content_type.startswith('application/pdf')):
                 logger.info(f"Cotality PDF found at: {url}")
                 return resp.content
         except Exception:
@@ -82,7 +87,7 @@ def download_cotality_pdf(year: int, month: int, session: requests.Session) -> O
     return None
 
 
-def extract_cotality_yoy(pdf_bytes: bytes) -> Optional[float]:
+def extract_cotality_yoy(pdf_bytes: bytes) -> float | None:
     """
     Extract national annual YoY % from Cotality HVI PDF bytes.
 
@@ -95,7 +100,10 @@ def extract_cotality_yoy(pdf_bytes: bytes) -> Optional[float]:
     try:
         import pdfplumber
     except ImportError:
-        logger.error("pdfplumber not installed -- run: pip install pdfplumber>=0.11,<1.0")
+        logger.error(
+            "pdfplumber not installed -- "
+            "run: pip install pdfplumber>=0.11,<1.0"
+        )
         return None
 
     with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
@@ -138,7 +146,10 @@ def _current_month_already_scraped(output_path) -> bool:
 
         # If latest Cotality row is from current month, skip
         if latest.year == now.year and latest.month == now.month:
-            logger.info(f"Current month ({now.strftime('%b %Y')}) already scraped -- skipping")
+            logger.info(
+                f"Current month ({now.strftime('%b %Y')}) "
+                "already scraped -- skipping"
+            )
             return True
     except Exception:
         pass
@@ -159,7 +170,10 @@ def scrape_cotality() -> pd.DataFrame:
     if _current_month_already_scraped(output_path):
         return pd.DataFrame(columns=['date', 'value', 'source', 'series_id'])
 
-    session = create_session(retries=3, backoff_factor=0.5, user_agent=BROWSER_USER_AGENT)
+    session = create_session(
+        retries=3, backoff_factor=0.5,
+        user_agent=BROWSER_USER_AGENT,
+    )
 
     now = datetime.now()
 
@@ -192,14 +206,17 @@ def scrape_cotality() -> pd.DataFrame:
             'series_id': 'Cotality/HVI/National/Annual',
         }])
 
-        logger.info(f"Cotality HVI data for {MONTH_ABBREV[month]} {year}: {yoy_pct}% YoY")
+        logger.info(
+            f"Cotality HVI data for "
+            f"{MONTH_ABBREV[month]} {year}: {yoy_pct}% YoY"
+        )
         return row
 
     logger.warning("Cotality PDF scraper: no data extracted for any candidate month")
     return pd.DataFrame(columns=['date', 'value', 'source', 'series_id'])
 
 
-def fetch_and_save() -> Dict[str, Union[str, int]]:
+def fetch_and_save() -> dict[str, str | int]:
     """
     Fetch Cotality data and save to CSV.
     NEVER raises - returns status dict with success/failure.
@@ -211,7 +228,10 @@ def fetch_and_save() -> Dict[str, Union[str, int]]:
         df = scrape_cotality()
 
         if df.empty:
-            logger.warning("Cotality scraper returned no new data (may already be current)")
+            logger.warning(
+                "Cotality scraper returned no new data "
+                "(may already be current)"
+            )
             return {
                 'status': 'failed',
                 'error': 'No new Cotality data extracted'

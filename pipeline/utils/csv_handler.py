@@ -4,12 +4,12 @@ Appends new data to existing CSVs without duplicating rows.
 """
 
 from pathlib import Path
-from typing import Union
+
 import pandas as pd
 
 
 def append_to_csv(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     new_data: pd.DataFrame,
     date_column: str = 'date'
 ) -> int:

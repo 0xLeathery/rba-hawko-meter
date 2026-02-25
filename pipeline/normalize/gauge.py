@@ -8,7 +8,7 @@ into 5 zones, and computes weighted hawk score.
 import json
 import math
 
-from pipeline.config import ZSCORE_CLAMP_MIN, ZSCORE_CLAMP_MAX
+from pipeline.config import ZSCORE_CLAMP_MAX, ZSCORE_CLAMP_MIN
 
 
 def zscore_to_gauge(z, clamp_min=None, clamp_max=None):

@@ -69,7 +69,9 @@ def block_network(monkeypatch, request):
 
     def blocked_socket(*args, **kwargs):
         raise RuntimeError(
-            "Network access blocked in tests. Use @pytest.mark.live for tests requiring network."
+            "Network access blocked in tests. "
+            "Use @pytest.mark.live for tests "
+            "requiring network."
         )
 
     monkeypatch.setattr(socket, "socket", blocked_socket)
@@ -95,19 +97,19 @@ def fixture_employment_df():
 
 @pytest.fixture
 def fixture_wages_df():
-    """Return ABS Wage Price Index fixture data as a DataFrame (abs_wage_price_index.csv)."""
+    """Return ABS WPI fixture data as a DataFrame."""
     return pd.read_csv(FIXTURES_DIR / "abs_wage_price_index.csv")
 
 
 @pytest.fixture
 def fixture_spending_df():
-    """Return ABS Household Spending fixture data as a DataFrame (abs_household_spending.csv)."""
+    """Return ABS Household Spending fixture DataFrame."""
     return pd.read_csv(FIXTURES_DIR / "abs_household_spending.csv")
 
 
 @pytest.fixture
 def fixture_building_approvals_df():
-    """Return ABS Building Approvals fixture data as a DataFrame (abs_building_approvals.csv)."""
+    """Return ABS Building Approvals fixture DataFrame."""
     return pd.read_csv(FIXTURES_DIR / "abs_building_approvals.csv")
 
 
@@ -119,5 +121,5 @@ def fixture_housing_df():
 
 @pytest.fixture
 def fixture_nab_capacity_df():
-    """Return NAB capacity utilisation fixture data as a DataFrame (nab_capacity.csv)."""
+    """Return NAB capacity utilisation fixture DataFrame."""
     return pd.read_csv(FIXTURES_DIR / "nab_capacity.csv")

@@ -19,7 +19,8 @@ import pipeline.config
 
 
 def test_pytest_discovers_and_exits_zero():
-    """Baseline: pytest discovered this file and ran this test. Infrastructure is alive."""
+    """Baseline: pytest discovered this file and ran this
+    test. Infrastructure is alive."""
     assert True
 
 
@@ -36,14 +37,16 @@ def test_data_dir_isolated_from_production():
 
     # Must not point to the production data/ directory
     assert test_data_dir != str(Path("data")), (
-        "DATA_DIR is still the relative Path('data') — isolate_data_dir fixture is not working"
+        "DATA_DIR is still the relative Path('data') — "
+        "isolate_data_dir fixture is not working"
     )
     assert test_data_dir != live_data_dir, (
-        "DATA_DIR resolves to the live data/ folder — isolate_data_dir fixture is not working"
+        "DATA_DIR resolves to the live data/ folder — "
+        "isolate_data_dir fixture is not working"
     )
 
-    # Must look like a temp path (starts with / and contains 'tmp' or is an absolute path
-    # not under the project root)
+    # Must look like a temp path (starts with / and contains
+    # 'tmp' or is an absolute path not under the project root)
     assert str(pipeline.config.DATA_DIR).startswith("/"), (
         "DATA_DIR is not an absolute path — expected a tmp_path from pytest"
     )
@@ -83,6 +86,10 @@ def test_fixture_csvs_loadable(fixture_cpi_df):
     with >0 rows and has the expected column headers.
     """
     assert fixture_cpi_df is not None, "fixture_cpi_df returned None"
-    assert len(fixture_cpi_df) > 0, "fixture_cpi_df is empty — check abs_cpi.csv"
+    assert len(fixture_cpi_df) > 0, (
+        "fixture_cpi_df is empty — check abs_cpi.csv"
+    )
     assert "date" in fixture_cpi_df.columns, "Missing 'date' column in fixture CPI data"
-    assert "value" in fixture_cpi_df.columns, "Missing 'value' column in fixture CPI data"
+    assert "value" in fixture_cpi_df.columns, (
+        "Missing 'value' column in fixture CPI data"
+    )

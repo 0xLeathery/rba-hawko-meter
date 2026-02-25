@@ -29,7 +29,10 @@ from jsonschema._types import draft7_type_checker
 
 _strict_type_checker = draft7_type_checker.redefine(
     "integer",
-    lambda checker, instance: isinstance(instance, int) and not isinstance(instance, (bool, float)),
+    lambda checker, instance: (
+        isinstance(instance, int)
+        and not isinstance(instance, (bool, float))
+    ),
 )
 StrictValidator = jsonschema.validators.extend(
     Draft7Validator, type_checker=_strict_type_checker
@@ -46,18 +49,30 @@ def _validate(document, schema):
 
 STATUS_SCHEMA = {
     "type": "object",
-    "required": ["generated_at", "pipeline_version", "overall", "gauges", "weights", "metadata"],
+    "required": [
+        "generated_at", "pipeline_version",
+        "overall", "gauges", "weights", "metadata",
+    ],
     "additionalProperties": True,  # top-level allows asx_futures optional key
     "properties": {
         "generated_at": {"type": "string"},
         "pipeline_version": {"type": "string"},
         "overall": {
             "type": "object",
-            "required": ["hawk_score", "zone", "zone_label", "verdict", "confidence"],
+            "required": [
+                "hawk_score", "zone", "zone_label",
+                "verdict", "confidence",
+            ],
             "additionalProperties": False,
             "properties": {
                 "hawk_score": {"type": "integer", "minimum": 0, "maximum": 100},
-                "zone": {"type": "string", "enum": ["cold", "cool", "neutral", "warm", "hot", "unknown"]},
+                "zone": {
+                    "type": "string",
+                    "enum": [
+                        "cold", "cool", "neutral",
+                        "warm", "hot", "unknown",
+                    ],
+                },
                 "zone_label": {"type": "string"},
                 "verdict": {"type": "string"},
                 "confidence": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
@@ -128,7 +143,8 @@ GAUGE_SCHEMA = {
         "interpretation": {"type": "string"},
         "history": {"type": "array", "items": {"type": "number"}},
     },
-    "additionalProperties": True,  # allows data_source, stale_display, long_run_avg, direction
+    # allows data_source, stale_display, long_run_avg, direction
+    "additionalProperties": True,
 }
 
 
@@ -397,7 +413,8 @@ def test_gauge_invalid_zone_enum():
 
 
 def test_asx_futures_optional_key_allowed():
-    """Valid document WITH asx_futures key at top level passes (additionalProperties: true at top)."""
+    """Valid document WITH asx_futures key at top level
+    passes (additionalProperties: true at top)."""
     doc = _make_valid_status()
     doc["asx_futures"] = {
         "current_rate": 3.85,

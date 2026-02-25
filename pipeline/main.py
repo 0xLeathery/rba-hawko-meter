@@ -11,13 +11,13 @@ Exit codes:
 - 1: Critical source failed (pipeline failed)
 """
 
-import sys
 import json
+import sys
 from datetime import datetime
-from typing import Dict, Any, Tuple, Callable
+from typing import Any
 
 # Import all ingestors
-from pipeline.ingest import rba_data, abs_data, corelogic_scraper, nab_scraper
+from pipeline.ingest import abs_data, corelogic_scraper, nab_scraper, rba_data
 
 # Import normalization engine (guarded -- pipeline works even if module unavailable)
 try:
@@ -46,7 +46,7 @@ OPTIONAL_SOURCES = [
 ]
 
 
-def run_pipeline() -> Dict[str, Any]:
+def run_pipeline() -> dict[str, Any]:
     """
     Execute data pipeline with tiered failure handling.
 
@@ -74,7 +74,12 @@ def run_pipeline() -> Dict[str, Any]:
         print(f"\n[CRITICAL] {name}")
         try:
             # Call lambda functions directly, modules via fetch_and_save method
-            if callable(module) and hasattr(module, '__name__') and '<lambda>' in str(module):
+            is_lambda = (
+                callable(module)
+                and hasattr(module, '__name__')
+                and '<lambda>' in str(module)
+            )
+            if is_lambda:
                 result = module()
             else:
                 result = module.fetch_and_save()
@@ -121,7 +126,11 @@ def run_pipeline() -> Dict[str, Any]:
             important_failures.append(name)
 
     if important_failures:
-        print(f"\n⚠ {len(important_failures)} important source(s) failed: {', '.join(important_failures)}")
+        print(
+            f"\n⚠ {len(important_failures)} important "
+            f"source(s) failed: "
+            f"{', '.join(important_failures)}"
+        )
 
     # Phase 3: Optional sources (graceful degradation)
     print("\n\nPHASE 3: OPTIONAL SOURCES")
@@ -136,7 +145,10 @@ def run_pipeline() -> Dict[str, Any]:
 
             # Check if result indicates failure (scrapers return status dicts)
             if isinstance(result, dict) and result.get('status') == 'failed':
-                print(f"⚠ WARNING: {name} failed: {result.get('error', 'Unknown error')}")
+                print(
+                    f"⚠ WARNING: {name} failed: "
+                    f"{result.get('error', 'Unknown error')}"
+                )
                 results['optional'][name] = result
                 optional_failures.append(name)
             else:
@@ -160,7 +172,10 @@ def run_pipeline() -> Dict[str, Any]:
         results['status'] = 'partial'
         results['important_failures'] = important_failures
         results['optional_failures'] = optional_failures
-        print(f"\n⚠ {len(all_failures)} non-critical source(s) failed: {', '.join(all_failures)}")
+        print(
+            f"\n⚠ {len(all_failures)} non-critical "
+            f"source(s) failed: {', '.join(all_failures)}"
+        )
     else:
         results['status'] = 'success'
         print("\n✓ All non-critical sources succeeded")
@@ -170,8 +185,14 @@ def run_pipeline() -> Dict[str, Any]:
     print("-" * 60)
 
     if not NORMALIZATION_AVAILABLE:
-        print("\n  Normalization engine not installed -- skipping status.json generation")
-        results['normalization'] = {'status': 'skipped', 'reason': 'module not available'}
+        print(
+            "\n  Normalization engine not installed "
+            "-- skipping status.json generation"
+        )
+        results['normalization'] = {
+            'status': 'skipped',
+            'reason': 'module not available',
+        }
     else:
         try:
             status = generate_status()
@@ -181,9 +202,20 @@ def run_pipeline() -> Dict[str, Any]:
                 'indicators_available': status['metadata']['indicators_available'],
                 'indicators_missing': status['metadata']['indicators_missing'],
             }
-            print(f"\n  Normalization completed: Hawk Score = {status['overall']['hawk_score']:.1f}")
-            print(f"  Zone: {status['overall']['zone_label']}")
-            print(f"  Indicators: {status['metadata']['indicators_available']} available, {len(status['metadata']['indicators_missing'])} missing")
+            print(
+                f"\n  Normalization completed: "
+                f"Hawk Score = "
+                f"{status['overall']['hawk_score']:.1f}"
+            )
+            print(
+                f"  Zone: {status['overall']['zone_label']}"
+            )
+            avail = status['metadata']['indicators_available']
+            missing = status['metadata']['indicators_missing']
+            print(
+                f"  Indicators: {avail} available, "
+                f"{len(missing)} missing"
+            )
 
         except Exception as e:
             print(f"\n  WARNING: Normalization failed: {e}")
@@ -199,17 +231,30 @@ def run_pipeline() -> Dict[str, Any]:
     print("PIPELINE SUMMARY")
     print("=" * 60)
 
-    total_sources = len(CRITICAL_SOURCES) + len(IMPORTANT_SOURCES) + len(OPTIONAL_SOURCES)
-    critical_success = sum(1 for r in results['critical'].values() if r.get('status') == 'success')
-    important_success = sum(1 for r in results['important'].values() if r.get('status') == 'success')
-    optional_success = sum(1 for r in results['optional'].values() if r.get('status') == 'success')
+    total_sources = (
+        len(CRITICAL_SOURCES)
+        + len(IMPORTANT_SOURCES)
+        + len(OPTIONAL_SOURCES)
+    )
+    critical_success = sum(
+        1 for r in results['critical'].values()
+        if r.get('status') == 'success'
+    )
+    important_success = sum(
+        1 for r in results['important'].values()
+        if r.get('status') == 'success'
+    )
+    optional_success = sum(
+        1 for r in results['optional'].values()
+        if r.get('status') == 'success'
+    )
     total_success = critical_success + important_success + optional_success
     total_failures = total_sources - total_success
 
     print(f"Total sources: {total_sources}")
     print(f"Succeeded: {total_success}")
     print(f"Failed: {total_failures}")
-    print(f"\nTier Breakdown:")
+    print("\nTier Breakdown:")
     print(f"  Critical: {critical_success}/{len(CRITICAL_SOURCES)} succeeded")
     print(f"  Important: {important_success}/{len(IMPORTANT_SOURCES)} succeeded")
     print(f"  Optional: {optional_success}/{len(OPTIONAL_SOURCES)} succeeded")

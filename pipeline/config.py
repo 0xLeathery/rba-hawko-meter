@@ -11,7 +11,11 @@ DATA_DIR = Path("data")
 # HTTP client configuration
 DEFAULT_TIMEOUT = 30  # seconds
 USER_AGENT = "RBA-Hawko-Meter/1.0 (Data Pipeline)"
-BROWSER_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+BROWSER_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36"
+)
 
 # Per-indicator timeout overrides for slow/unreliable sources
 TIMEOUT_OVERRIDES = {
@@ -60,7 +64,10 @@ ABS_CONFIG = {
         "params": {"startPeriod": "2014", "detail": "dataonly"},
         "filters": {},
         "output_file": "abs_employment.csv",
-        "description": "Total employed persons, Australia, Seasonally Adjusted (monthly, thousands)",
+        "description": (
+            "Total employed persons, Australia, "
+            "Seasonally Adjusted (monthly, thousands)"
+        ),
         "critical": True,
     },
     "household_spending": {
@@ -69,7 +76,11 @@ ABS_CONFIG = {
         "params": {"startPeriod": "2014", "detail": "dataonly"},
         "filters": {},
         "output_file": "abs_household_spending.csv",
-        "description": "Monthly Household Spending Indicator, Total Australia, Seasonally Adjusted, Current Prices (monthly, $millions)",
+        "description": (
+            "Monthly Household Spending Indicator, "
+            "Total Australia, Seasonally Adjusted, "
+            "Current Prices (monthly, $millions)"
+        ),
         "critical": True,
     },
     "wage_price_index": {
@@ -87,10 +98,14 @@ ABS_CONFIG = {
     },
     "building_approvals": {
         "dataflow": "BA_GCCSA",
-        "key": "1.1.9.1.100.10.AUS.M",  # MEASURE.VALUE.SECTOR.WORK_TYPE.BUILDING_TYPE.TSEST.REGION.FREQ
+        # MEASURE.VALUE.SECTOR.WORK_TYPE.BUILDING_TYPE.TSEST.REGION.FREQ
+        "key": "1.1.9.1.100.10.AUS.M",
         "params": {"startPeriod": "2014", "detail": "dataonly"},
         "output_file": "abs_building_approvals.csv",
-        "description": "Building Approvals, total new residential dwellings, Australia (monthly, original)",
+        "description": (
+            "Building Approvals, total new residential "
+            "dwellings, Australia (monthly, original)"
+        ),
         "critical": False,
     },
     "rppi": {
@@ -99,7 +114,10 @@ ABS_CONFIG = {
         "params": {"startPeriod": "2002", "detail": "dataonly"},
         "filters": {},
         "output_file": "corelogic_housing.csv",
-        "description": "Residential Property Price Index, national weighted average (quarterly)",
+        "description": (
+            "Residential Property Price Index, "
+            "national weighted average (quarterly)"
+        ),
         "critical": False,
     },
 }

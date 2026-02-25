@@ -10,32 +10,28 @@ Usage:
 """
 
 import json
-import math
 from datetime import datetime
-from pathlib import Path
-
-import numpy as np
 
 from pipeline.config import (
     DATA_DIR,
     INDICATOR_CONFIG,
     OPTIONAL_INDICATOR_CONFIG,
-    ZSCORE_WINDOW_YEARS,
-    ZSCORE_CLAMP_MIN,
-    ZSCORE_CLAMP_MAX,
-    WEIGHTS_FILE,
     STATUS_OUTPUT,
+    WEIGHTS_FILE,
+    ZSCORE_CLAMP_MAX,
+    ZSCORE_CLAMP_MIN,
+    ZSCORE_WINDOW_YEARS,
 )
-from pipeline.normalize.ratios import normalize_indicator, load_asx_futures_csv
-from pipeline.normalize.zscore import compute_rolling_zscores, determine_confidence
 from pipeline.normalize.gauge import (
-    zscore_to_gauge,
-    classify_zone,
     apply_polarity,
-    load_weights,
+    classify_zone,
     compute_hawk_score,
     generate_verdict,
+    load_weights,
+    zscore_to_gauge,
 )
+from pipeline.normalize.ratios import load_asx_futures_csv, normalize_indicator
+from pipeline.normalize.zscore import compute_rolling_zscores, determine_confidence
 
 
 def generate_interpretation(indicator_name, zone, raw_value):
@@ -188,6 +184,7 @@ def build_gauge_entry(name, latest_row, z_df, weight_config, config=None):
     # Business conditions: enrich with direction, long-run average, and source
     if name == 'business_confidence':
         import pandas as _pd
+
         from pipeline.config import DATA_DIR as _DATA_DIR
         _config = config or {}
         csv_path = _DATA_DIR / _config.get('csv_file', '')
@@ -269,7 +266,8 @@ def build_asx_futures_entry():
         meetings_out = []
         for m in data['meetings']:
             dt = datetime.strptime(m['meeting_date'], '%Y-%m-%d')
-            # Cross-platform day without zero-padding: str(int(day)) avoids %-d on Windows
+            # Cross-platform day without zero-padding:
+            # str(int(day)) avoids %-d on Windows
             day = str(dt.day)
             meeting_date_label = f"{day} {dt.strftime('%b %Y')}"
             meetings_out.append({
@@ -342,7 +340,10 @@ def generate_status():
     missing_indicators = []
 
     # Process core indicators
-    all_configs = list(INDICATOR_CONFIG.items()) + list(OPTIONAL_INDICATOR_CONFIG.items())
+    all_configs = (
+        list(INDICATOR_CONFIG.items())
+        + list(OPTIONAL_INDICATOR_CONFIG.items())
+    )
     total = len(all_configs)
 
     for i, (name, config) in enumerate(all_configs, 1):
