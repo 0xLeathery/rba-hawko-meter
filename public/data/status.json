@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-02-25T06:43:24.452897Z",
+  "generated_at": "2026-02-26T06:41:08.994526Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 48.9,
@@ -19,7 +19,7 @@
       "weight": 0.25,
       "polarity": 1,
       "data_date": "2025-12-31",
-      "staleness_days": 56,
+      "staleness_days": 57,
       "confidence": "HIGH",
       "interpretation": "Inflation below long-run average",
       "history": [
@@ -47,7 +47,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2025-10-01",
-      "staleness_days": 147,
+      "staleness_days": 148,
       "confidence": "HIGH",
       "interpretation": "Wage growth significantly above long-run average",
       "history": [
@@ -75,7 +75,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -34,
+      "staleness_days": -33,
       "confidence": "HIGH",
       "interpretation": "Labour market looser than historical average",
       "history": [
@@ -103,7 +103,7 @@
       "weight": 0.1,
       "polarity": 1,
       "data_date": "2025-12-31",
-      "staleness_days": 56,
+      "staleness_days": 57,
       "confidence": "HIGH",
       "interpretation": "Consumer spending above trend",
       "history": [
@@ -131,7 +131,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2025-12-31",
-      "staleness_days": 56,
+      "staleness_days": 57,
       "confidence": "HIGH",
       "interpretation": "Building approvals near trend",
       "history": [
@@ -177,14 +177,14 @@
   "asx_futures": {
     "current_rate": 3.85,
     "next_meeting": "2026-03-03",
-    "implied_rate": 3.87,
+    "implied_rate": 3.86,
     "probabilities": {
       "cut": 0.0,
       "hold": 100.0,
       "hike": 0.0
     },
     "direction": "hold",
-    "data_date": "2026-02-25",
+    "data_date": "2026-02-26",
     "staleness_days": 0
   }
 }
