@@ -1,0 +1,149 @@
+{
+  "generated_at": "2026-02-25T12:00:00Z",
+  "pipeline_version": "1.0.0",
+  "overall": {
+    "hawk_score": 50.0,
+    "zone": "neutral",
+    "zone_label": "Balanced",
+    "verdict": "Economic indicators are broadly balanced",
+    "confidence": "HIGH"
+  },
+  "gauges": {
+    "inflation": {
+      "value": 55.0,
+      "zone": "neutral",
+      "zone_label": "Balanced",
+      "z_score": 0.3,
+      "raw_value": 3.2,
+      "raw_unit": "% YoY",
+      "weight": 0.25,
+      "polarity": 1,
+      "data_date": "2025-10-01",
+      "staleness_days": 100,
+      "confidence": "HIGH",
+      "interpretation": "test interpretation",
+      "history": [
+        50.0,
+        52.0,
+        55.0
+      ]
+    },
+    "wages": {
+      "value": 55.0,
+      "zone": "neutral",
+      "zone_label": "Balanced",
+      "z_score": 0.3,
+      "raw_value": 3.2,
+      "raw_unit": "% YoY",
+      "weight": 0.25,
+      "polarity": 1,
+      "data_date": "2025-10-01",
+      "staleness_days": 100,
+      "confidence": "HIGH",
+      "interpretation": "test interpretation",
+      "history": [
+        50.0,
+        52.0,
+        55.0
+      ]
+    },
+    "employment": {
+      "value": 55.0,
+      "zone": "neutral",
+      "zone_label": "Balanced",
+      "z_score": 0.3,
+      "raw_value": 3.2,
+      "raw_unit": "% YoY",
+      "weight": 0.25,
+      "polarity": 1,
+      "data_date": "2025-10-01",
+      "staleness_days": 100,
+      "confidence": "HIGH",
+      "interpretation": "test interpretation",
+      "history": [
+        50.0,
+        52.0,
+        55.0
+      ]
+    },
+    "spending": {
+      "value": 55.0,
+      "zone": "neutral",
+      "zone_label": "Balanced",
+      "z_score": 0.3,
+      "raw_value": 3.2,
+      "raw_unit": "% YoY",
+      "weight": 0.25,
+      "polarity": 1,
+      "data_date": "2025-10-01",
+      "staleness_days": 100,
+      "confidence": "HIGH",
+      "interpretation": "test interpretation",
+      "history": [
+        50.0,
+        52.0,
+        55.0
+      ]
+    },
+    "building_approvals": {
+      "value": 55.0,
+      "zone": "neutral",
+      "zone_label": "Balanced",
+      "z_score": 0.3,
+      "raw_value": 3.2,
+      "raw_unit": "% YoY",
+      "weight": 0.25,
+      "polarity": 1,
+      "data_date": "2025-10-01",
+      "staleness_days": 100,
+      "confidence": "HIGH",
+      "interpretation": "test interpretation",
+      "history": [
+        50.0,
+        52.0,
+        55.0
+      ]
+    },
+    "housing": {
+      "value": 55.0,
+      "zone": "neutral",
+      "zone_label": "Balanced",
+      "z_score": 0.3,
+      "raw_value": 3.2,
+      "raw_unit": "% YoY",
+      "weight": 0.25,
+      "polarity": 1,
+      "data_date": "2025-10-01",
+      "staleness_days": 100,
+      "confidence": "HIGH",
+      "interpretation": "test interpretation",
+      "history": [
+        50.0,
+        52.0,
+        55.0
+      ]
+    }
+  },
+  "weights": {
+    "inflation": 0.25,
+    "wages": 0.2,
+    "employment": 0.2,
+    "spending": 0.15,
+    "building_approvals": 0.1,
+    "housing": 0.1
+  },
+  "metadata": {
+    "window_years": 10,
+    "clamp_range": [
+      -3.0,
+      3.0
+    ],
+    "mapping": "linear",
+    "statistics": "robust (median/MAD)",
+    "indicators_available": 6,
+    "indicators_missing": [
+      "business_confidence",
+      "asx_futures"
+    ]
+  }
+}
