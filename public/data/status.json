@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-02T06:39:29.539909Z",
+  "generated_at": "2026-03-03T06:37:27.545711Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 51.7,
@@ -21,7 +21,7 @@
       "weight": 0.25,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -29,
+      "staleness_days": -28,
       "confidence": "HIGH",
       "interpretation": "Inflation below long-run average",
       "history": [
@@ -52,7 +52,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2025-10-01",
-      "staleness_days": 152,
+      "staleness_days": 153,
       "confidence": "HIGH",
       "interpretation": "Wage growth significantly above long-run average",
       "history": [
@@ -83,7 +83,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -29,
+      "staleness_days": -28,
       "confidence": "HIGH",
       "interpretation": "Labour market looser than historical average",
       "history": [
@@ -114,7 +114,7 @@
       "weight": 0.1,
       "polarity": 1,
       "data_date": "2025-12-31",
-      "staleness_days": 61,
+      "staleness_days": 62,
       "confidence": "HIGH",
       "interpretation": "Consumer spending above trend",
       "history": [
@@ -145,7 +145,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2025-12-31",
-      "staleness_days": 61,
+      "staleness_days": 62,
       "confidence": "HIGH",
       "interpretation": "Building approvals near trend",
       "history": [
@@ -176,7 +176,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-02-28",
-      "staleness_days": 2,
+      "staleness_days": 3,
       "confidence": "HIGH",
       "interpretation": "Housing prices near trend",
       "history": [
@@ -209,7 +209,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -29,
+      "staleness_days": -28,
       "confidence": "LOW",
       "interpretation": "Capacity utilisation above long-run average",
       "history": [
@@ -244,21 +244,21 @@
   "asx_futures": {
     "current_rate": 3.85,
     "next_meeting": "2026-03-03",
-    "implied_rate": 3.85,
+    "implied_rate": 3.88,
     "probabilities": {
       "cut": 0.0,
       "hold": 100.0,
       "hike": 0.0
     },
     "direction": "hold",
-    "data_date": "2026-03-02",
+    "data_date": "2026-03-03",
     "staleness_days": 0,
     "meetings": [
       {
         "meeting_date": "2026-03-03",
         "meeting_date_label": "3 Mar 2026",
-        "implied_rate": 3.85,
-        "change_bp": 0.0,
+        "implied_rate": 3.88,
+        "change_bp": 3.0,
         "probability_cut": 0.0,
         "probability_hold": 100.0,
         "probability_hike": 0.0
@@ -266,29 +266,29 @@
       {
         "meeting_date": "2026-04-07",
         "meeting_date_label": "7 Apr 2026",
-        "implied_rate": 3.85,
-        "change_bp": 0.5,
+        "implied_rate": 3.93,
+        "change_bp": 8.0,
         "probability_cut": 0.0,
-        "probability_hold": 100.0,
-        "probability_hike": 0.0
+        "probability_hold": 68.0,
+        "probability_hike": 32.0
       },
       {
         "meeting_date": "2026-05-05",
         "meeting_date_label": "5 May 2026",
-        "implied_rate": 4.01,
-        "change_bp": 16.5,
+        "implied_rate": 4.08,
+        "change_bp": 23.5,
         "probability_cut": 0.0,
-        "probability_hold": 34.0,
-        "probability_hike": 66.0
+        "probability_hold": 6.0,
+        "probability_hike": 94.0
       },
       {
         "meeting_date": "2026-06-02",
         "meeting_date_label": "2 Jun 2026",
-        "implied_rate": 4.05,
-        "change_bp": 20.0,
+        "implied_rate": 4.13,
+        "change_bp": 28.0,
         "probability_cut": 0.0,
-        "probability_hold": 20.0,
-        "probability_hike": 80.0
+        "probability_hold": 0.0,
+        "probability_hike": 100.0
       }
     ]
   }
