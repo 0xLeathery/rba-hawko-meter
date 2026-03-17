@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-16T06:51:10.529270Z",
+  "generated_at": "2026-03-17T06:43:26.377188Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 49.9,
@@ -21,7 +21,7 @@
       "weight": 0.25,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -15,
+      "staleness_days": -14,
       "confidence": "HIGH",
       "interpretation": "Inflation below long-run average",
       "history": [
@@ -52,7 +52,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2025-10-01",
-      "staleness_days": 166,
+      "staleness_days": 167,
       "confidence": "HIGH",
       "interpretation": "Wage growth significantly above long-run average",
       "history": [
@@ -83,7 +83,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -15,
+      "staleness_days": -14,
       "confidence": "HIGH",
       "interpretation": "Labour market looser than historical average",
       "history": [
@@ -114,7 +114,7 @@
       "weight": 0.1,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -15,
+      "staleness_days": -14,
       "confidence": "HIGH",
       "interpretation": "Consumer spending near trend",
       "history": [
@@ -145,7 +145,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -15,
+      "staleness_days": -14,
       "confidence": "HIGH",
       "interpretation": "Building approvals below trend",
       "history": [
@@ -176,7 +176,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-02-28",
-      "staleness_days": 16,
+      "staleness_days": 17,
       "confidence": "HIGH",
       "interpretation": "Housing prices near trend",
       "history": [
@@ -209,7 +209,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -15,
+      "staleness_days": -14,
       "confidence": "LOW",
       "interpretation": "Capacity utilisation above long-run average",
       "history": [
@@ -247,30 +247,30 @@
   "asx_futures": {
     "current_rate": 3.85,
     "next_meeting": "2026-04-07",
-    "implied_rate": 4.0,
+    "implied_rate": 4.09,
     "probabilities": {
       "cut": 0.0,
-      "hold": 38.0,
-      "hike": 62.0
+      "hold": 2.0,
+      "hike": 98.0
     },
     "direction": "hike",
-    "data_date": "2026-03-16",
+    "data_date": "2026-03-17",
     "staleness_days": 0,
     "meetings": [
       {
         "meeting_date": "2026-04-07",
         "meeting_date_label": "7 Apr 2026",
-        "implied_rate": 4.0,
-        "change_bp": 15.5,
+        "implied_rate": 4.09,
+        "change_bp": 24.5,
         "probability_cut": 0.0,
-        "probability_hold": 38.0,
-        "probability_hike": 62.0
+        "probability_hold": 2.0,
+        "probability_hike": 98.0
       },
       {
         "meeting_date": "2026-05-05",
         "meeting_date_label": "5 May 2026",
-        "implied_rate": 4.15,
-        "change_bp": 30.0,
+        "implied_rate": 4.22,
+        "change_bp": 37.0,
         "probability_cut": 0.0,
         "probability_hold": 0.0,
         "probability_hike": 100.0
@@ -278,8 +278,8 @@
       {
         "meeting_date": "2026-06-02",
         "meeting_date_label": "2 Jun 2026",
-        "implied_rate": 4.21,
-        "change_bp": 35.5,
+        "implied_rate": 4.27,
+        "change_bp": 42.0,
         "probability_cut": 0.0,
         "probability_hold": 0.0,
         "probability_hike": 100.0
@@ -287,8 +287,8 @@
       {
         "meeting_date": "2026-07-07",
         "meeting_date_label": "7 Jul 2026",
-        "implied_rate": 4.24,
-        "change_bp": 39.0,
+        "implied_rate": 4.3,
+        "change_bp": 45.5,
         "probability_cut": 0.0,
         "probability_hold": 0.0,
         "probability_hike": 100.0
