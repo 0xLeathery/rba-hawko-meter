@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-17T06:43:26.377188Z",
+  "generated_at": "2026-03-18T06:43:28.021399Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 49.9,
@@ -21,7 +21,7 @@
       "weight": 0.25,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -14,
+      "staleness_days": -13,
       "confidence": "HIGH",
       "interpretation": "Inflation below long-run average",
       "history": [
@@ -52,7 +52,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2025-10-01",
-      "staleness_days": 167,
+      "staleness_days": 168,
       "confidence": "HIGH",
       "interpretation": "Wage growth significantly above long-run average",
       "history": [
@@ -83,7 +83,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -14,
+      "staleness_days": -13,
       "confidence": "HIGH",
       "interpretation": "Labour market looser than historical average",
       "history": [
@@ -114,7 +114,7 @@
       "weight": 0.1,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -14,
+      "staleness_days": -13,
       "confidence": "HIGH",
       "interpretation": "Consumer spending near trend",
       "history": [
@@ -145,7 +145,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -14,
+      "staleness_days": -13,
       "confidence": "HIGH",
       "interpretation": "Building approvals below trend",
       "history": [
@@ -176,7 +176,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-02-28",
-      "staleness_days": 17,
+      "staleness_days": 18,
       "confidence": "HIGH",
       "interpretation": "Housing prices near trend",
       "history": [
@@ -209,7 +209,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": -14,
+      "staleness_days": -13,
       "confidence": "LOW",
       "interpretation": "Capacity utilisation above long-run average",
       "history": [
@@ -254,7 +254,7 @@
       "hike": 98.0
     },
     "direction": "hike",
-    "data_date": "2026-03-17",
+    "data_date": "2026-03-18",
     "staleness_days": 0,
     "meetings": [
       {
