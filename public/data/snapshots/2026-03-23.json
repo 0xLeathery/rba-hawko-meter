@@ -6,9 +6,7 @@
     "zone": "neutral",
     "zone_label": "Balanced",
     "verdict": "Economic indicators are broadly balanced",
-    "confidence": "LOW",
-    "previous_hawk_score": 49.9,
-    "hawk_score_delta": 1.7
+    "confidence": "LOW"
   },
   "gauges": {
     "inflation": {
@@ -37,10 +35,7 @@
         25.8,
         29.5,
         29.3
-      ],
-      "previous_value": 29.3,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      ]
     },
     "wages": {
       "value": 84.8,
@@ -68,10 +63,7 @@
         52.6,
         100.0,
         84.8
-      ],
-      "previous_value": 84.8,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      ]
     },
     "employment": {
       "value": 44.2,
@@ -99,10 +91,7 @@
         28.9,
         30.3,
         44.2
-      ],
-      "previous_value": 33.7,
-      "delta": 10.5,
-      "delta_direction": "up"
+      ]
     },
     "spending": {
       "value": 55.7,
@@ -130,10 +119,7 @@
         60.9,
         60.0,
         55.7
-      ],
-      "previous_value": 55.7,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      ]
     },
     "building_approvals": {
       "value": 34.0,
@@ -161,10 +147,7 @@
         77.0,
         59.3,
         34.0
-      ],
-      "previous_value": 34.0,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      ]
     },
     "housing": {
       "value": 59.4,
@@ -194,10 +177,7 @@
         59.4
       ],
       "data_source": "Cotality HVI",
-      "stale_display": "quarter_only",
-      "previous_value": 59.4,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      "stale_display": "quarter_only"
     },
     "business_confidence": {
       "value": 72.5,
@@ -217,10 +197,7 @@
       ],
       "long_run_avg": 83.0,
       "direction": "STEADY",
-      "data_source": "NAB Monthly Business Survey",
-      "previous_value": 72.5,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      "data_source": "NAB Monthly Business Survey"
     }
   },
   "weights": {
