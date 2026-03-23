@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-23T03:15:56.494800Z",
+  "generated_at": "2026-03-23T06:48:53.676961Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 51.6,
@@ -245,50 +245,50 @@
     "indicators_missing": []
   },
   "asx_futures": {
-    "current_rate": 3.85,
+    "current_rate": 4.1,
     "next_meeting": "2026-04-07",
     "implied_rate": 4.09,
     "probabilities": {
       "cut": 0.0,
-      "hold": 2.0,
-      "hike": 98.0
+      "hold": 100.0,
+      "hike": 0.0
     },
-    "direction": "hike",
-    "data_date": "2026-03-20",
-    "staleness_days": 3,
+    "direction": "hold",
+    "data_date": "2026-03-23",
+    "staleness_days": 0,
     "meetings": [
       {
         "meeting_date": "2026-04-07",
         "meeting_date_label": "7 Apr 2026",
         "implied_rate": 4.09,
-        "change_bp": 24.5,
+        "change_bp": -0.5,
         "probability_cut": 0.0,
-        "probability_hold": 2.0,
-        "probability_hike": 98.0
+        "probability_hold": 100.0,
+        "probability_hike": 0.0
       },
       {
         "meeting_date": "2026-05-05",
         "meeting_date_label": "5 May 2026",
         "implied_rate": 4.25,
-        "change_bp": 40.0,
+        "change_bp": 15.0,
         "probability_cut": 0.0,
-        "probability_hold": 0.0,
-        "probability_hike": 100.0
+        "probability_hold": 40.0,
+        "probability_hike": 60.0
       },
       {
         "meeting_date": "2026-06-02",
         "meeting_date_label": "2 Jun 2026",
-        "implied_rate": 4.33,
-        "change_bp": 48.5,
+        "implied_rate": 4.32,
+        "change_bp": 22.0,
         "probability_cut": 0.0,
-        "probability_hold": 0.0,
-        "probability_hike": 100.0
+        "probability_hold": 12.0,
+        "probability_hike": 88.0
       },
       {
         "meeting_date": "2026-07-07",
         "meeting_date_label": "7 Jul 2026",
-        "implied_rate": 4.41,
-        "change_bp": 55.5,
+        "implied_rate": 4.4,
+        "change_bp": 30.0,
         "probability_cut": 0.0,
         "probability_hold": 0.0,
         "probability_hike": 100.0
