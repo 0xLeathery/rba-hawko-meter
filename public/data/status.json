@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-03-30T03:17:08.278724Z",
+  "generated_at": "2026-03-30T06:59:33.878834Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 51.7,
@@ -254,8 +254,8 @@
       "hike": 0.0
     },
     "direction": "hold",
-    "data_date": "2026-03-27",
-    "staleness_days": 3,
+    "data_date": "2026-03-30",
+    "staleness_days": 0,
     "meetings": [
       {
         "meeting_date": "2026-04-07",
@@ -269,29 +269,29 @@
       {
         "meeting_date": "2026-05-05",
         "meeting_date_label": "5 May 2026",
-        "implied_rate": 4.25,
-        "change_bp": 14.5,
+        "implied_rate": 4.24,
+        "change_bp": 14.0,
         "probability_cut": 0.0,
-        "probability_hold": 42.0,
-        "probability_hike": 58.0
+        "probability_hold": 44.0,
+        "probability_hike": 56.0
       },
       {
         "meeting_date": "2026-06-02",
         "meeting_date_label": "2 Jun 2026",
-        "implied_rate": 4.33,
-        "change_bp": 22.5,
+        "implied_rate": 4.3,
+        "change_bp": 20.5,
         "probability_cut": 0.0,
-        "probability_hold": 10.0,
-        "probability_hike": 90.0
+        "probability_hold": 18.0,
+        "probability_hike": 82.0
       },
       {
         "meeting_date": "2026-07-07",
         "meeting_date_label": "7 Jul 2026",
-        "implied_rate": 4.38,
-        "change_bp": 28.0,
+        "implied_rate": 4.34,
+        "change_bp": 24.5,
         "probability_cut": 0.0,
-        "probability_hold": 0.0,
-        "probability_hike": 100.0
+        "probability_hold": 2.0,
+        "probability_hike": 98.0
       }
     ]
   }
