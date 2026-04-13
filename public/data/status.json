@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-04-13T03:18:36.154593Z",
+  "generated_at": "2026-04-13T07:07:24.517402Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 53.5,
@@ -247,48 +247,48 @@
   "asx_futures": {
     "current_rate": 4.1,
     "next_meeting": "2026-05-05",
-    "implied_rate": 4.24,
+    "implied_rate": 4.23,
     "probabilities": {
       "cut": 0.0,
-      "hold": 46.0,
-      "hike": 54.0
+      "hold": 48.0,
+      "hike": 52.0
     },
     "direction": "hike",
-    "data_date": "2026-04-10",
-    "staleness_days": 3,
+    "data_date": "2026-04-13",
+    "staleness_days": 0,
     "meetings": [
       {
         "meeting_date": "2026-05-05",
         "meeting_date_label": "5 May 2026",
-        "implied_rate": 4.24,
-        "change_bp": 13.5,
+        "implied_rate": 4.23,
+        "change_bp": 13.0,
         "probability_cut": 0.0,
-        "probability_hold": 46.0,
-        "probability_hike": 54.0
+        "probability_hold": 48.0,
+        "probability_hike": 52.0
       },
       {
         "meeting_date": "2026-06-02",
         "meeting_date_label": "2 Jun 2026",
         "implied_rate": 4.29,
-        "change_bp": 19.0,
+        "change_bp": 19.5,
         "probability_cut": 0.0,
-        "probability_hold": 24.0,
-        "probability_hike": 76.0
+        "probability_hold": 22.0,
+        "probability_hike": 78.0
       },
       {
         "meeting_date": "2026-07-07",
         "meeting_date_label": "7 Jul 2026",
-        "implied_rate": 4.33,
-        "change_bp": 23.0,
+        "implied_rate": 4.34,
+        "change_bp": 24.0,
         "probability_cut": 0.0,
-        "probability_hold": 8.0,
-        "probability_hike": 92.0
+        "probability_hold": 4.0,
+        "probability_hike": 96.0
       },
       {
         "meeting_date": "2026-08-04",
         "meeting_date_label": "4 Aug 2026",
-        "implied_rate": 4.43,
-        "change_bp": 33.0,
+        "implied_rate": 4.45,
+        "change_bp": 35.0,
         "probability_cut": 0.0,
         "probability_hold": 0.0,
         "probability_hike": 100.0
