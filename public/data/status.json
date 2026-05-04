@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-04T03:21:34.979241Z",
+  "generated_at": "2026-05-04T07:26:19.642281Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 55.5,
@@ -247,39 +247,39 @@
   "asx_futures": {
     "current_rate": 4.1,
     "next_meeting": "2026-05-05",
-    "implied_rate": 4.25,
+    "implied_rate": 4.26,
     "probabilities": {
       "cut": 0.0,
-      "hold": 38.0,
-      "hike": 62.0
+      "hold": 36.0,
+      "hike": 64.0
     },
     "direction": "hike",
-    "data_date": "2026-05-01",
-    "staleness_days": 3,
+    "data_date": "2026-05-04",
+    "staleness_days": 0,
     "meetings": [
       {
         "meeting_date": "2026-05-05",
         "meeting_date_label": "5 May 2026",
-        "implied_rate": 4.25,
-        "change_bp": 15.5,
+        "implied_rate": 4.26,
+        "change_bp": 16.0,
         "probability_cut": 0.0,
-        "probability_hold": 38.0,
-        "probability_hike": 62.0
+        "probability_hold": 36.0,
+        "probability_hike": 64.0
       },
       {
         "meeting_date": "2026-06-02",
         "meeting_date_label": "2 Jun 2026",
-        "implied_rate": 4.32,
-        "change_bp": 22.0,
+        "implied_rate": 4.33,
+        "change_bp": 22.5,
         "probability_cut": 0.0,
-        "probability_hold": 12.0,
-        "probability_hike": 88.0
+        "probability_hold": 10.0,
+        "probability_hike": 90.0
       },
       {
         "meeting_date": "2026-07-07",
         "meeting_date_label": "7 Jul 2026",
         "implied_rate": 4.37,
-        "change_bp": 27.0,
+        "change_bp": 26.5,
         "probability_cut": 0.0,
         "probability_hold": 0.0,
         "probability_hike": 100.0
@@ -287,8 +287,8 @@
       {
         "meeting_date": "2026-08-04",
         "meeting_date_label": "4 Aug 2026",
-        "implied_rate": 4.49,
-        "change_bp": 38.5,
+        "implied_rate": 4.47,
+        "change_bp": 37.0,
         "probability_cut": 0.0,
         "probability_hold": 0.0,
         "probability_hike": 100.0
