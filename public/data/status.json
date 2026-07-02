@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-01T07:52:20.138467Z",
+  "generated_at": "2026-07-02T07:34:38.503410Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 57.2,
@@ -21,7 +21,7 @@
       "weight": 0.25,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": 92,
+      "staleness_days": 93,
       "confidence": "HIGH",
       "interpretation": "Inflation below long-run average",
       "history": [
@@ -52,7 +52,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2025-10-01",
-      "staleness_days": 273,
+      "staleness_days": 274,
       "confidence": "HIGH",
       "interpretation": "Wage growth significantly above long-run average",
       "history": [
@@ -83,7 +83,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": 92,
+      "staleness_days": 93,
       "confidence": "HIGH",
       "interpretation": "Labour market near historical average",
       "history": [
@@ -114,7 +114,7 @@
       "weight": 0.1,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": 92,
+      "staleness_days": 93,
       "confidence": "HIGH",
       "interpretation": "Consumer spending above trend",
       "history": [
@@ -145,7 +145,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": 92,
+      "staleness_days": 93,
       "confidence": "HIGH",
       "interpretation": "Building approvals above trend",
       "history": [
@@ -176,7 +176,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-02-28",
-      "staleness_days": 123,
+      "staleness_days": 124,
       "confidence": "HIGH",
       "interpretation": "Housing prices near trend",
       "history": [
@@ -209,7 +209,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-06-30",
-      "staleness_days": 1,
+      "staleness_days": 2,
       "confidence": "LOW",
       "interpretation": "Capacity utilisation above long-run average",
       "history": [
@@ -254,7 +254,7 @@
       "hike": 0.0
     },
     "direction": "hold",
-    "data_date": "2026-07-01",
+    "data_date": "2026-07-02",
     "staleness_days": 0,
     "meetings": [
       {
