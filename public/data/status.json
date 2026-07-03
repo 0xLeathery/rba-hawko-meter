@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-02T07:34:38.503410Z",
+  "generated_at": "2026-07-03T07:31:46.861888Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 57.2,
@@ -21,7 +21,7 @@
       "weight": 0.25,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": 93,
+      "staleness_days": 94,
       "confidence": "HIGH",
       "interpretation": "Inflation below long-run average",
       "history": [
@@ -52,7 +52,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2025-10-01",
-      "staleness_days": 274,
+      "staleness_days": 275,
       "confidence": "HIGH",
       "interpretation": "Wage growth significantly above long-run average",
       "history": [
@@ -83,7 +83,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": 93,
+      "staleness_days": 94,
       "confidence": "HIGH",
       "interpretation": "Labour market near historical average",
       "history": [
@@ -114,7 +114,7 @@
       "weight": 0.1,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": 93,
+      "staleness_days": 94,
       "confidence": "HIGH",
       "interpretation": "Consumer spending above trend",
       "history": [
@@ -145,7 +145,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-03-31",
-      "staleness_days": 93,
+      "staleness_days": 94,
       "confidence": "HIGH",
       "interpretation": "Building approvals above trend",
       "history": [
@@ -176,7 +176,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-02-28",
-      "staleness_days": 124,
+      "staleness_days": 125,
       "confidence": "HIGH",
       "interpretation": "Housing prices near trend",
       "history": [
@@ -209,7 +209,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-06-30",
-      "staleness_days": 2,
+      "staleness_days": 3,
       "confidence": "LOW",
       "interpretation": "Capacity utilisation above long-run average",
       "history": [
@@ -254,7 +254,7 @@
       "hike": 0.0
     },
     "direction": "hold",
-    "data_date": "2026-07-02",
+    "data_date": "2026-07-03",
     "staleness_days": 0,
     "meetings": [
       {
@@ -270,7 +270,7 @@
         "meeting_date": "2026-08-04",
         "meeting_date_label": "4 Aug 2026",
         "implied_rate": 4.38,
-        "change_bp": 3.5,
+        "change_bp": 3.0,
         "probability_cut": 0.0,
         "probability_hold": 100.0,
         "probability_hike": 0.0
@@ -278,8 +278,8 @@
       {
         "meeting_date": "2026-09-01",
         "meeting_date_label": "1 Sep 2026",
-        "implied_rate": 4.4,
-        "change_bp": 5.0,
+        "implied_rate": 4.39,
+        "change_bp": 4.0,
         "probability_cut": 0.0,
         "probability_hold": 100.0,
         "probability_hike": 0.0
@@ -287,11 +287,11 @@
       {
         "meeting_date": "2026-10-06",
         "meeting_date_label": "6 Oct 2026",
-        "implied_rate": 4.42,
-        "change_bp": 7.0,
+        "implied_rate": 4.41,
+        "change_bp": 6.0,
         "probability_cut": 0.0,
-        "probability_hold": 72.0,
-        "probability_hike": 28.0
+        "probability_hold": 76.0,
+        "probability_hike": 24.0
       }
     ]
   }
