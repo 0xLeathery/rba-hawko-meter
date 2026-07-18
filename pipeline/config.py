@@ -50,7 +50,6 @@ ABS_CONFIG = {
         # MEASURE.INDEX.TSEST.REGION.FREQ — All groups CPI, Original, Australia, Monthly
         "key": "1.10001.10.50.M",
         "params": {"startPeriod": "2014", "detail": "dataonly"},
-        "filters": {},  # no client-side filter needed; key is already specific
         "output_file": "abs_cpi.csv",
         "description": "Consumer Price Index (monthly)",
         "critical": True,
@@ -59,7 +58,6 @@ ABS_CONFIG = {
         "dataflow": "LF",
         "key": "M3.3.1599.20.AUS.M",
         "params": {"startPeriod": "2014", "detail": "dataonly"},
-        "filters": {},
         "output_file": "abs_employment.csv",
         "description": (
             "Total employed persons, Australia, "
@@ -71,7 +69,6 @@ ABS_CONFIG = {
         "dataflow": "HSI_M",
         "key": "7.TOT.CUR.20.AUS.M",
         "params": {"startPeriod": "2014", "detail": "dataonly"},
-        "filters": {},
         "output_file": "abs_household_spending.csv",
         "description": (
             "Monthly Household Spending Indicator, "
@@ -85,7 +82,6 @@ ABS_CONFIG = {
         # Index, THRPEB, Private+Public, All Industries, Original, AUS, Quarterly
         "key": "1.THRPEB.7.TOT.10.AUS.Q",
         "params": {"startPeriod": "2014", "detail": "dataonly"},
-        "filters": {},
         "output_file": "abs_wage_price_index.csv",
         "description": "Wage Price Index (quarterly)",
         "critical": True,
@@ -106,7 +102,6 @@ ABS_CONFIG = {
         "dataflow": "RPPI",
         "key": "1.3.100.Q",
         "params": {"startPeriod": "2002", "detail": "dataonly"},
-        "filters": {},
         "output_file": "corelogic_housing.csv",
         "description": (
             "Residential Property Price Index, "
@@ -115,6 +110,7 @@ ABS_CONFIG = {
         "critical": False,
     },
 }
+
 
 # Source metadata for all data sources
 SOURCE_METADATA = {

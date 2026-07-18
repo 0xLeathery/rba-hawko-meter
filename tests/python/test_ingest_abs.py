@@ -64,25 +64,31 @@ def _make_mock_session(responses):
 
 
 class TestAbsApiBase:
-    """Guard against regressing to the retired ABS /data path."""
+    """Guard against regressing to the retired ABS /data path and bulk keys."""
 
     def test_abs_api_base_uses_rest_data_path(self):
         assert ABS_API_BASE == "https://data.api.abs.gov.au/rest/data"
 
-    def test_fetch_abs_series_request_url_uses_rest_data_path(
+    def test_fetch_abs_series_request_url_uses_production_cpi_config(
         self, fixture_abs_response
     ):
+        """What ABS_CONFIG says for CPI is what HTTP receives."""
+        cfg = ABS_CONFIG["cpi"]
+        dataflow = cfg["dataflow"]
+        key = cfg["key"]
+        assert key != "all"
+
         mock_session = _make_mock_session([
             {"status_code": 200, "text": fixture_abs_response}
         ])
         with patch(PATCH_TARGET, return_value=mock_session):
-            fetch_abs_series("CPI", "all", params={"startPeriod": "2014"})
+            fetch_abs_series(dataflow, key, params=cfg.get("params"))
 
-        args, _kwargs = mock_session.get.call_args
-        request_url = args[0]
-        assert request_url == f"{ABS_API_BASE}/ABS,CPI/all"
-        assert "/rest/data/" in request_url
-        assert not request_url.startswith("https://data.api.abs.gov.au/data/")
+        request_url = mock_session.get.call_args[0][0]
+        assert request_url == f"{ABS_API_BASE}/ABS,{dataflow}/{key}"
+        assert not request_url.startswith(
+            "https://data.api.abs.gov.au/data/"
+        )
 
     def test_cpi_and_wpi_use_targeted_series_keys(self):
         """Regression: bulk key 'all' downloads ~40MB and GHA truncates the stream."""
@@ -90,7 +96,17 @@ class TestAbsApiBase:
             key = ABS_CONFIG[series]["key"]
             assert key != "all", f"{series} must not use bulk key 'all'"
             assert key  # non-empty targeted SDMX key
-            assert ABS_CONFIG[series]["filters"] == {}
+            # SDMX key is the only series selector; no empty filters: {}
+            assert "filters" not in ABS_CONFIG[series]
+
+    def test_abs_config_has_no_empty_filters(self):
+        """Empty filters: {} is vestigial; omit the key when unused."""
+        for name, cfg in ABS_CONFIG.items():
+            filters = cfg.get("filters")
+            if filters is not None:
+                assert filters, (
+                    f"{name}: use a non-empty filters dict or omit the key"
+                )
 
 
 # ---------------------------------------------------------------------------
