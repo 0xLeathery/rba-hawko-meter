@@ -38,6 +38,7 @@ IMPORTANT_SOURCES = [
 
 OPTIONAL_SOURCES = [
     ('ABS Building Approvals', lambda: abs_data.fetch_and_save('building_approvals')),
+    ('ABS RPPI', lambda: abs_data.fetch_and_save('rppi')),
     ('CoreLogic Housing', corelogic_scraper),
     ('NAB Capacity', nab_scraper),
 ]

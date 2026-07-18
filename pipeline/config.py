@@ -105,7 +105,8 @@ ABS_CONFIG = {
         "dataflow": "RPPI",
         "key": "1.3.100.Q",
         "params": {"startPeriod": "2002", "detail": "dataonly"},
-        "output_file": "corelogic_housing.csv",
+        # Separate file from Cotality YoY (corelogic_housing.csv) — never mix.
+        "output_file": "abs_rppi.csv",
         "description": (
             "Residential Property Price Index, "
             "national weighted average (quarterly)"
@@ -113,6 +114,7 @@ ABS_CONFIG = {
         "critical": False,
     },
 }
+
 
 # Source metadata for all data sources
 SOURCE_METADATA = {
@@ -197,11 +199,14 @@ INDICATOR_CONFIG = {
 # Optional indicators (stubs -- csv_file=None until scrapers implemented)
 OPTIONAL_INDICATOR_CONFIG = {
     "housing": {
-        "csv_file": "corelogic_housing.csv",
+        # ABS RPPI index history (YoY in normalize). Cotality HVI is pre-computed
+        # annual YoY in a separate file and overlaid as the latest point when present.
+        "csv_file": "abs_rppi.csv",
+        "cotality_csv": "corelogic_housing.csv",
         "normalize": "yoy_pct_change",
         "frequency": "quarterly",
         "yoy_periods": 4,
-        "description": "Housing prices YoY % change",
+        "description": "Housing prices YoY % change (ABS RPPI + Cotality overlay)",
     },
     "business_confidence": {
         "csv_file": "nab_capacity.csv",

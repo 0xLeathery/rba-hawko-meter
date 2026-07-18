@@ -98,6 +98,16 @@ class TestAbsApiBase:
             assert key and key != "all", f"{name} must use a targeted SDMX key"
             assert "filters" not in cfg, f"{name}: filters path is removed"
 
+    def test_wpi_and_rppi_files_are_single_series_contracts(self):
+        """WPI and RPPI write dedicated files (not mixed metric dumps)."""
+        wpi = ABS_CONFIG["wage_price_index"]
+        assert wpi["key"] == "1.THRPEB.7.TOT.10.AUS.Q"
+        assert wpi["output_file"] == "abs_wage_price_index.csv"
+        rppi = ABS_CONFIG["rppi"]
+        assert rppi["key"] == "1.3.100.Q"
+        assert rppi["output_file"] == "abs_rppi.csv"
+        assert rppi["output_file"] != "corelogic_housing.csv"
+
 
 # ---------------------------------------------------------------------------
 # Tests for _parse_abs_date

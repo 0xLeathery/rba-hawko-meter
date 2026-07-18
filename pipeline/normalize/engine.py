@@ -155,15 +155,20 @@ def build_gauge_entry(name, latest_row, z_df, weight_config, config=None):
     stale_display = None
     if name == 'housing':
         import pandas as _pd
-        csv_path = pipeline.config.DATA_DIR / "corelogic_housing.csv"
-        if csv_path.exists():
-            raw_df = _pd.read_csv(csv_path)
-            if 'source' in raw_df.columns and len(raw_df) > 0:
-                raw_df['date'] = _pd.to_datetime(raw_df['date'])
-                latest_raw = raw_df.sort_values('date').iloc[-1]
-                data_source = latest_raw.get('source', 'ABS')
-        # Map source to display name
-        if data_source == 'ABS':
+        cotality_path = pipeline.config.DATA_DIR / "corelogic_housing.csv"
+        rppi_path = pipeline.config.DATA_DIR / "abs_rppi.csv"
+        # Prefer Cotality HVI rows when present; else ABS RPPI file.
+        if cotality_path.exists() and cotality_path.stat().st_size > 0:
+            raw_df = _pd.read_csv(cotality_path)
+            if len(raw_df) > 0:
+                if 'source' in raw_df.columns:
+                    if (raw_df['source'] == 'Cotality HVI').any():
+                        data_source = 'Cotality HVI'
+                    elif (raw_df['source'] == 'ABS').any():
+                        data_source = 'ABS RPPI'
+                else:
+                    data_source = 'Cotality HVI'
+        if data_source is None and rppi_path.exists():
             data_source = 'ABS RPPI'
         stale_display = 'quarter_only'
 

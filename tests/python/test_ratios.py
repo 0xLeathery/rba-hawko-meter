@@ -290,36 +290,38 @@ def test_normalize_indicator_missing_csv(tmp_path, monkeypatch):
 
 def test_normalize_indicator_hybrid_cotality_abs_path(tmp_path, monkeypatch):
     """
-    Hybrid Cotality/ABS path: ABS index rows get YoY-normalized, Cotality HVI row
-    (pre-computed YoY) is appended unchanged, avoiding double-normalization.
+    Split-file housing: ABS RPPI index gets YoY; Cotality HVI (separate CSV)
+    is overlaid as pre-computed YoY without double-normalization.
     """
     import pipeline.config
     monkeypatch.setattr(pipeline.config, "DATA_DIR", tmp_path)
 
-    # Build a mixed-source CSV: 8 ABS quarterly index rows + 1 Cotality HVI row.
-    # Need >= 5 quarterly rows for yoy_periods=4 to produce at least 1 valid row
-    # (shift(4) on 4 rows yields all NaN; 5th row is the first with a valid ratio).
-    # Row 4 YoY = 105/100 - 1 = 5.0%, Row 5 YoY = 110/105 - 1 = 4.76%,
-    # Row 6 YoY = 115/110 - 1 = 4.55%, Row 7 YoY = 120/115 - 1 = 4.35%
-    csv_path = tmp_path / "corelogic_housing.csv"
-    csv_content = (
-        "date,value,source\n"
-        "2019-03-31,100.0,ABS\n"
-        "2019-06-30,105.0,ABS\n"
-        "2019-09-30,110.0,ABS\n"
-        "2019-12-31,115.0,ABS\n"
-        "2020-03-31,105.0,ABS\n"
-        "2020-06-30,110.25,ABS\n"
-        "2020-09-30,115.5,ABS\n"
-        "2020-12-31,120.75,ABS\n"
-        "2024-01-31,9.4,Cotality HVI\n"
+    # ABS RPPI index history (need >= 5 rows for yoy_periods=4)
+    rppi = tmp_path / "abs_rppi.csv"
+    rppi.write_text(
+        "date,value,source,series_id\n"
+        "2019-03-31,100.0,ABS,RPPI/1.3.100.Q\n"
+        "2019-06-30,105.0,ABS,RPPI/1.3.100.Q\n"
+        "2019-09-30,110.0,ABS,RPPI/1.3.100.Q\n"
+        "2019-12-31,115.0,ABS,RPPI/1.3.100.Q\n"
+        "2020-03-31,105.0,ABS,RPPI/1.3.100.Q\n"
+        "2020-06-30,110.25,ABS,RPPI/1.3.100.Q\n"
+        "2020-09-30,115.5,ABS,RPPI/1.3.100.Q\n"
+        "2020-12-31,120.75,ABS,RPPI/1.3.100.Q\n",
+        encoding="utf-8",
     )
-    csv_path.write_text(csv_content)
+    cotality = tmp_path / "corelogic_housing.csv"
+    cotality.write_text(
+        "date,value,source,series_id\n"
+        "2024-01-31,9.4,Cotality HVI,Cotality/HVI/National/Annual\n",
+        encoding="utf-8",
+    )
 
     result = normalize_indicator(
         "housing",
         {
-            "csv_file": "corelogic_housing.csv",
+            "csv_file": "abs_rppi.csv",
+            "cotality_csv": "corelogic_housing.csv",
             "normalize": "yoy_pct_change",
             "frequency": "quarterly",
             "yoy_periods": 4,
@@ -343,6 +345,39 @@ def test_normalize_indicator_hybrid_cotality_abs_path(tmp_path, monkeypatch):
 
     # (c) Last row's value should be 9.4 (Cotality is the most recent date)
     assert abs(result["value"].iloc[-1] - 9.4) < 0.01
+
+
+def test_normalize_indicator_legacy_mixed_housing_csv(tmp_path, monkeypatch):
+    """Legacy single-file ABS+Cotality hybrid still works."""
+    import pipeline.config
+    monkeypatch.setattr(pipeline.config, "DATA_DIR", tmp_path)
+
+    csv_path = tmp_path / "corelogic_housing.csv"
+    csv_path.write_text(
+        "date,value,source\n"
+        "2019-03-31,100.0,ABS\n"
+        "2019-06-30,105.0,ABS\n"
+        "2019-09-30,110.0,ABS\n"
+        "2019-12-31,115.0,ABS\n"
+        "2020-03-31,105.0,ABS\n"
+        "2020-06-30,110.25,ABS\n"
+        "2020-09-30,115.5,ABS\n"
+        "2020-12-31,120.75,ABS\n"
+        "2024-01-31,9.4,Cotality HVI\n",
+        encoding="utf-8",
+    )
+
+    result = normalize_indicator(
+        "housing",
+        {
+            "csv_file": "corelogic_housing.csv",
+            "normalize": "yoy_pct_change",
+            "frequency": "quarterly",
+            "yoy_periods": 4,
+        },
+    )
+    assert result is not None
+    assert 9.4 in result["value"].values
 
 
 def test_normalize_indicator_direct_normalization(tmp_path, monkeypatch):

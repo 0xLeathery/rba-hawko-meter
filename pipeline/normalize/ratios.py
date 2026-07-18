@@ -13,6 +13,66 @@ import pandas as pd
 import pipeline.config
 
 
+def _load_cotality_yoy_overlay(config: dict) -> pd.DataFrame | None:
+    """Load latest Cotality HVI YoY row from a dedicated CSV, if configured."""
+    cotality_name = config.get('cotality_csv')
+    if not cotality_name:
+        return None
+    path = pipeline.config.DATA_DIR / cotality_name
+    if not path.exists() or path.stat().st_size == 0:
+        return None
+    try:
+        raw = pd.read_csv(path)
+    except Exception:
+        return None
+    if 'value' not in raw.columns or len(raw) == 0:
+        return None
+    if 'source' in raw.columns:
+        raw = raw[raw['source'] == 'Cotality HVI']
+    if len(raw) == 0:
+        return None
+    out = raw[['date', 'value']].copy()
+    out['date'] = pd.to_datetime(out['date'])
+    out['value'] = pd.to_numeric(out['value'], errors='coerce')
+    out = out.dropna(subset=['date', 'value']).sort_values('date').tail(1)
+    return out if len(out) > 0 else None
+
+
+def _split_legacy_hybrid_csv(csv_path: Path):
+    """Split a mixed ABS-index + Cotality-YoY CSV (legacy single-file shape).
+
+    Returns:
+        (precomputed_cotality_rows | None, abs_index_df | None)
+    """
+    precomputed_yoy_sources = {'Cotality HVI'}
+    raw_path = Path(csv_path)
+    if not raw_path.exists() or raw_path.stat().st_size == 0:
+        return None, None
+    try:
+        _full = pd.read_csv(raw_path)
+    except Exception:
+        return None, None
+    if 'source' not in _full.columns:
+        return None, None
+    mask = _full['source'].isin(precomputed_yoy_sources)
+    if not mask.any():
+        return None, None
+
+    _precomp = _full[mask][['date', 'value']].copy()
+    _precomp['date'] = pd.to_datetime(_precomp['date'])
+    _precomp['value'] = pd.to_numeric(_precomp['value'], errors='coerce')
+    _precomp = (
+        _precomp.dropna(subset=['value']).sort_values('date').tail(1)
+    )
+    precomputed = _precomp if len(_precomp) > 0 else None
+
+    _index_rows = _full[~mask][['date', 'value']].copy()
+    _index_rows['date'] = pd.to_datetime(_index_rows['date'])
+    _index_rows['value'] = pd.to_numeric(_index_rows['value'], errors='coerce')
+    _index_rows = _index_rows.sort_values('date').reset_index(drop=True)
+    return precomputed, _index_rows
+
+
 def load_indicator_csv(csv_path):
     """
     Read a CSV file with date/value columns, parse dates, sort by date.
@@ -124,95 +184,72 @@ def normalize_indicator(name, config):
 
     csv_path = pipeline.config.DATA_DIR / csv_file
 
-    # Hybrid source detection: if the CSV has a 'source' column with mixed sources,
-    # separate rows that store pre-computed YoY % (e.g. Cotality HVI) from rows
-    # that store absolute index values (e.g. ABS RPPI). The pre-computed rows are
-    # appended after YoY normalization of the index rows, avoiding double-normalization.
-    precomputed_yoy_sources = {'Cotality HVI'}
-    precomputed_rows = None
+    # Optional separate Cotality HVI file (pre-computed annual YoY %).
+    # Kept out of the ABS index CSV so metric units never mix.
+    precomputed_rows = _load_cotality_yoy_overlay(config)
+
+    # Legacy hybrid: single CSV with mixed sources (tests / old data).
+    # Prefer cotality_csv when configured; fall back to in-file Cotality rows.
     df_override = None
-
-    raw_path = Path(csv_path)
-    if raw_path.exists() and raw_path.stat().st_size > 0:
-        try:
-            _full = pd.read_csv(raw_path)
-            if 'source' in _full.columns:
-                mask = _full['source'].isin(precomputed_yoy_sources)
-                if mask.any():
-                    # Extract pre-computed YoY rows (latest one only)
-                    _precomp = _full[mask][['date', 'value']].copy()
-                    _precomp['date'] = pd.to_datetime(_precomp['date'])
-                    _precomp['value'] = pd.to_numeric(
-                        _precomp['value'], errors='coerce'
-                    )
-                    _precomp = (
-                        _precomp.dropna(subset=['value'])
-                        .sort_values('date')
-                        .tail(1)
-                    )
-                    if len(_precomp) > 0:
-                        precomputed_rows = _precomp
-
-                    # Build a filtered DataFrame (only
-                    # non-precomputed rows) for standard pipeline
-                    _index_rows = _full[~mask][['date', 'value']].copy()
-                    _index_rows['date'] = pd.to_datetime(_index_rows['date'])
-                    _index_rows['value'] = pd.to_numeric(
-                        _index_rows['value'], errors='coerce'
-                    )
-                    _index_rows = (
-                        _index_rows.sort_values('date')
-                        .reset_index(drop=True)
-                    )
-                    df_override = _index_rows
-        except Exception:
-            pass  # Fall through to standard load path
+    if precomputed_rows is None:
+        precomputed_rows, df_override = _split_legacy_hybrid_csv(csv_path)
 
     # Load CSV: use filtered df_override if available, otherwise load normally
     if df_override is not None:
         df = df_override
     else:
         df = load_indicator_csv(csv_path)
-        if df is None:
-            return None
 
-    # Filter out zeros and invalid values before normalization
-    df = filter_valid_data(df)
-
-    if len(df) == 0:
-        print(f"  {name}: no valid data after filtering")
+    has_index = df is not None and len(df) > 0
+    has_cotality = precomputed_rows is not None and len(precomputed_rows) > 0
+    if not has_index and not has_cotality:
         return None
 
-    normalize_type = config.get('normalize', 'yoy_pct_change')
+    if has_index:
+        # Filter out zeros and invalid values before normalization
+        df = filter_valid_data(df)
 
-    if normalize_type == 'yoy_pct_change':
-        periods = config.get('yoy_periods', 4)
-        df = compute_yoy_pct_change(df, periods)
-    elif normalize_type == 'direct':
-        pass  # Use values as-is (already a ratio/index)
+        if len(df) == 0:
+            print(f"  {name}: no valid data after filtering")
+            df = None
+        else:
+            normalize_type = config.get('normalize', 'yoy_pct_change')
 
-    if len(df) == 0:
-        print(f"  {name}: no data after normalization")
-        return None
+            if normalize_type == 'yoy_pct_change':
+                periods = config.get('yoy_periods', 4)
+                df = compute_yoy_pct_change(df, periods)
+            elif normalize_type == 'direct':
+                pass  # Use values as-is (already a ratio/index)
 
-    # Resample monthly data to quarterly
-    frequency = config.get('frequency', 'quarterly')
-    if frequency == 'monthly':
-        df = resample_to_quarterly(df)
+            if len(df) == 0:
+                print(f"  {name}: no data after normalization")
+                df = None
+            else:
+                # Resample monthly data to quarterly
+                frequency = config.get('frequency', 'quarterly')
+                if frequency == 'monthly':
+                    df = resample_to_quarterly(df)
 
-    if len(df) == 0:
-        print(f"  {name}: no data after resampling")
-        return None
-
-    # Filter any remaining invalid values after normalization
-    df = df.replace([np.inf, -np.inf], np.nan)
-    df = df.dropna(subset=['value'])
+                if len(df) == 0:
+                    print(f"  {name}: no data after resampling")
+                    df = None
+                else:
+                    # Filter any remaining invalid values after normalization
+                    df = df.replace([np.inf, -np.inf], np.nan)
+                    df = df.dropna(subset=['value'])
 
     # Append pre-computed YoY rows (e.g. Cotality HVI) as the latest data point(s).
     # These values are already in YoY % format -- no further transformation needed.
-    if precomputed_rows is not None and len(precomputed_rows) > 0:
-        df = pd.concat([df, precomputed_rows[['date', 'value']]], ignore_index=True)
-        df = df.sort_values('date').reset_index(drop=True)
+    if has_cotality:
+        cot = precomputed_rows[['date', 'value']]
+        if df is not None and len(df) > 0:
+            df = pd.concat([df, cot], ignore_index=True)
+            df = df.sort_values('date').reset_index(drop=True)
+        else:
+            df = cot.reset_index(drop=True)
+
+    if df is None or len(df) == 0:
+        return None
 
     # Return only date and value columns
     return df[['date', 'value']].reset_index(drop=True)
