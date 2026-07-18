@@ -84,6 +84,14 @@ class TestAbsApiBase:
         assert "/rest/data/" in request_url
         assert not request_url.startswith("https://data.api.abs.gov.au/data/")
 
+    def test_cpi_and_wpi_use_targeted_series_keys(self):
+        """Regression: bulk key 'all' downloads ~40MB and GHA truncates the stream."""
+        for series in ("cpi", "wage_price_index"):
+            key = ABS_CONFIG[series]["key"]
+            assert key != "all", f"{series} must not use bulk key 'all'"
+            assert key  # non-empty targeted SDMX key
+            assert ABS_CONFIG[series]["filters"] == {}
+
 
 # ---------------------------------------------------------------------------
 # Tests for _parse_abs_date
@@ -324,9 +332,8 @@ class TestFetchAndSave:
 
     def test_all_series(self, fixture_abs_response):
         # Each of the 6 fetchers calls create_session once -> 6 calls total.
-        # The CPI fixture data has specific column values (INDEX=10001, etc.)
-        # so series with incompatible filters (e.g., WPI with INDEX=THRPEB)
-        # will match 0 rows after filtering and raise Exception -> caught as 0.
+        # Config series keys are targeted (no client-side filters); the shared
+        # CPI fixture still parses successfully for all series under mocks.
         mock_session = _make_mock_session(
             [{"status_code": 200, "text": fixture_abs_response}] * 6
         )

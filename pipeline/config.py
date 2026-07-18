@@ -47,14 +47,10 @@ ABS_API_BASE = "https://data.api.abs.gov.au/rest/data"
 ABS_CONFIG = {
     "cpi": {
         "dataflow": "CPI",
-        "key": "all",
+        # MEASURE.INDEX.TSEST.REGION.FREQ — All groups CPI, Original, Australia, Monthly
+        "key": "1.10001.10.50.M",
         "params": {"startPeriod": "2014", "detail": "dataonly"},
-        "filters": {
-            "MEASURE": "1",  # Index numbers
-            "INDEX": "10001",  # All groups CPI
-            "TSEST": "10",  # Original (not seasonally adjusted)
-            "REGION": "50",  # Australia
-        },
+        "filters": {},  # no client-side filter needed; key is already specific
         "output_file": "abs_cpi.csv",
         "description": "Consumer Price Index (monthly)",
         "critical": True,
@@ -86,13 +82,10 @@ ABS_CONFIG = {
     },
     "wage_price_index": {
         "dataflow": "WPI",
-        "key": "all",
+        # Index, THRPEB, Private+Public, All Industries, Original, AUS, Quarterly
+        "key": "1.THRPEB.7.TOT.10.AUS.Q",
         "params": {"startPeriod": "2014", "detail": "dataonly"},
-        "filters": {
-            "MEASURE": "1",  # Index numbers
-            "INDEX": "THRPEB",  # Total hourly rates of pay excluding bonuses
-            "TSEST": "10",  # Original
-        },
+        "filters": {},
         "output_file": "abs_wage_price_index.csv",
         "description": "Wage Price Index (quarterly)",
         "critical": True,
