@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 import requests.exceptions
 
-from pipeline.config import ABS_CONFIG, DEFAULT_TIMEOUT, TIMEOUT_OVERRIDES
+from pipeline.config import ABS_API_BASE, ABS_CONFIG, DEFAULT_TIMEOUT, TIMEOUT_OVERRIDES
 from pipeline.ingest.abs_data import (
     FETCHERS,
     _parse_abs_date,
@@ -24,6 +24,8 @@ from pipeline.ingest.abs_data import (
 # ---------------------------------------------------------------------------
 # Helper: mock session builder (pattern used across all ingest test modules)
 # ---------------------------------------------------------------------------
+
+PATCH_TARGET = "pipeline.ingest.abs_data.create_session"
 
 
 def _make_mock_session(responses):
@@ -54,6 +56,33 @@ def _make_mock_session(responses):
         mock_responses.append(resp)
     mock_session.get.side_effect = mock_responses
     return mock_session
+
+
+# ---------------------------------------------------------------------------
+# Regression: ABS SDMX base path (old /data/ returns 403)
+# ---------------------------------------------------------------------------
+
+
+class TestAbsApiBase:
+    """Guard against regressing to the retired ABS /data path."""
+
+    def test_abs_api_base_uses_rest_data_path(self):
+        assert ABS_API_BASE == "https://data.api.abs.gov.au/rest/data"
+
+    def test_fetch_abs_series_request_url_uses_rest_data_path(
+        self, fixture_abs_response
+    ):
+        mock_session = _make_mock_session([
+            {"status_code": 200, "text": fixture_abs_response}
+        ])
+        with patch(PATCH_TARGET, return_value=mock_session):
+            fetch_abs_series("CPI", "all", params={"startPeriod": "2014"})
+
+        args, _kwargs = mock_session.get.call_args
+        request_url = args[0]
+        assert request_url == f"{ABS_API_BASE}/ABS,CPI/all"
+        assert "/rest/data/" in request_url
+        assert not request_url.startswith("https://data.api.abs.gov.au/data/")
 
 
 # ---------------------------------------------------------------------------
@@ -89,8 +118,6 @@ class TestParseAbsDate:
 # ---------------------------------------------------------------------------
 # Tests for fetch_abs_series
 # ---------------------------------------------------------------------------
-
-PATCH_TARGET = "pipeline.ingest.abs_data.create_session"
 
 
 class TestFetchAbsSeries:

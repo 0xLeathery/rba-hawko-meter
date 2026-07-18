@@ -43,7 +43,7 @@ RBA_CONFIG = {
 }
 
 # ABS (Australian Bureau of Statistics) Data API configuration
-ABS_API_BASE = "https://data.api.abs.gov.au/data"
+ABS_API_BASE = "https://data.api.abs.gov.au/rest/data"
 ABS_CONFIG = {
     "cpi": {
         "dataflow": "CPI",
