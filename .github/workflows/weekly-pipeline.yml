@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write              # Required for git-auto-commit-action
+  issues: write                # Open/update pipeline-failure issues
 
 concurrency:
   group: weekly-pipeline
@@ -20,10 +21,10 @@ jobs:
       PYTHONUNBUFFERED: '1'
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -32,12 +33,14 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run data pipeline
+        id: pipeline
         run: python -m pipeline.main
 
       - name: Generate pipeline status summary
         if: always()
         run: |
-          echo "## Weekly Pipeline Status" >> $GITHUB_STEP_SUMMARY
+          echo "## Weekly Pipeline Status" >> "$GITHUB_STEP_SUMMARY"
+          echo "Job result: **${{ job.status }}**" >> "$GITHUB_STEP_SUMMARY"
           python3 -c "
           import json, os
           summary_file = os.environ.get('GITHUB_STEP_SUMMARY', '/dev/null')
@@ -58,8 +61,85 @@ jobs:
                   out.write(f'Error reading status.json: {e}\n')
           "
 
+      - name: Report pipeline failure
+        if: failure()
+        run: |
+          {
+            echo "## Pipeline FAILED"
+            echo ""
+            echo "The weekly data pipeline exited non-zero."
+            echo ""
+            echo "- Workflow: \`${{ github.workflow }}\`"
+            echo "- Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "- Trigger: \`${{ github.event_name }}\`"
+            echo ""
+            echo "Critical ingest failures still attempt meetings/status refresh before exit."
+            echo "Check the **Run data pipeline** step log for the critical source error."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open/update issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'pipeline-failure: weekly data pipeline failed';
+            const label = 'pipeline-failure';
+            const body = [
+              '## Weekly pipeline failed',
+              '',
+              `Run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              `Event: \`${context.eventName}\``,
+              '',
+              'Inspect the **Run data pipeline** step. Critical sources (RBA / ABS CPI / Employment) fail the job;',
+              'meetings.json and last-known status.json may still have been refreshed.',
+            ].join('\n');
+            try {
+              await github.rest.issues.getLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: label,
+              });
+            } catch (e) {
+              if (e.status === 404) {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label,
+                  color: 'B60205',
+                  description: 'Automated data pipeline / source failure',
+                });
+              } else {
+                throw e;
+              }
+            }
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: label,
+              per_page: 20,
+            });
+            const existing = issues.find((i) => i.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: [label],
+              });
+            }
+
       - name: Commit updated data
-        uses: stefanzweifel/git-auto-commit-action@v5
+        if: success()
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: 'data: weekly pipeline update [skip ci]'
           file_pattern: 'data/*.csv public/data/status.json public/data/snapshots/ public/data/meetings.json public/data/rates.json'

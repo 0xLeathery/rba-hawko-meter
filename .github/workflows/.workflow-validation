@@ -1,26 +1,19 @@
-GitHub Actions Workflow Validation - 2026-02-04
+GitHub Actions Workflow Validation - 2026-07-18 (Phase 4 recovery)
 
-Audit performed as part of plan 01-05 (Gap Closure: Workflow Execution Verification)
+VALIDATED ACTION MAJORS:
+- actions/checkout@v6
+- actions/setup-python@v6
+- actions/setup-node@v4 (CI only)
+- actions/github-script@v7 (failure reporting)
+- stefanzweifel/git-auto-commit-action@v7
 
-VALIDATED:
-- actions/checkout@v6 (latest: v6.0.2) ✓
-- actions/setup-python@v6 (latest: v6.2.0) ✓
-- stefanzweifel/git-auto-commit-action@v7 (latest: v7.1.0) ✓
+WORKFLOWS:
+- ci.yml — PR/push: npm run verify:fast (lint + pytest not-live + coverage ≥85%)
+- weekly-pipeline.yml — schedule + dispatch; issues:write for pipeline-failure
+- daily-asx-futures.yml — weekday ASX + meetings refresh
+- live-canary.yml — Mon/Thu live pytest; opens pipeline-failure issue on fail
 
-STRUCTURE:
-- permissions: contents: write ✓
-- workflow_dispatch: enabled ✓
-- cron expressions: valid ✓
-- Python 3.11 specified ✓
-- pip cache configured ✓
-- requirements.txt install step ✓
-
-MODULE PATHS:
-- pipeline.main (weekly-pipeline.yml) ✓
-- pipeline.ingest.asx_futures_scraper (daily-asx-futures.yml) ✓
-
-DATA OUTPUTS:
-- file_pattern 'data/*.csv' matches existing files ✓
-- [skip ci] flag prevents infinite loops ✓
-
-RESULT: Both workflows ready for execution. No fixes required.
+NOTES:
+- npm ci --ignore-scripts in CI (skip local lefthook postinstall)
+- data commits use [skip ci] to avoid loops
+- critical pipeline failure still refreshes meetings/status (see pipeline/main.py)
