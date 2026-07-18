@@ -64,7 +64,7 @@ def _make_mock_session(responses):
 
 
 class TestAbsApiBase:
-    """Guard against regressing to the retired ABS /data path and bulk keys."""
+    """Guard ABS base path, targeted keys, and single-frequency CPI contract."""
 
     def test_abs_api_base_uses_rest_data_path(self):
         assert ABS_API_BASE == "https://data.api.abs.gov.au/rest/data"
@@ -77,6 +77,7 @@ class TestAbsApiBase:
         dataflow = cfg["dataflow"]
         key = cfg["key"]
         assert key != "all"
+        assert key.endswith(".Q"), "CPI pipeline series must be quarterly"
 
         mock_session = _make_mock_session([
             {"status_code": 200, "text": fixture_abs_response}
@@ -90,23 +91,12 @@ class TestAbsApiBase:
             "https://data.api.abs.gov.au/data/"
         )
 
-    def test_cpi_and_wpi_use_targeted_series_keys(self):
-        """Regression: bulk key 'all' downloads ~40MB and GHA truncates the stream."""
-        for series in ("cpi", "wage_price_index"):
-            key = ABS_CONFIG[series]["key"]
-            assert key != "all", f"{series} must not use bulk key 'all'"
-            assert key  # non-empty targeted SDMX key
-            # SDMX key is the only series selector; no empty filters: {}
-            assert "filters" not in ABS_CONFIG[series]
-
-    def test_abs_config_has_no_empty_filters(self):
-        """Empty filters: {} is vestigial; omit the key when unused."""
+    def test_abs_config_uses_targeted_keys_without_filters(self):
+        """No bulk key=all; SDMX key is the only series selector."""
         for name, cfg in ABS_CONFIG.items():
-            filters = cfg.get("filters")
-            if filters is not None:
-                assert filters, (
-                    f"{name}: use a non-empty filters dict or omit the key"
-                )
+            key = cfg["key"]
+            assert key and key != "all", f"{name} must use a targeted SDMX key"
+            assert "filters" not in cfg, f"{name}: filters path is removed"
 
 
 # ---------------------------------------------------------------------------
@@ -148,31 +138,18 @@ class TestFetchAbsSeries:
     """Tests for the core fetch_abs_series function."""
 
     def test_happy_path(self, fixture_abs_response):
+        key = ABS_CONFIG["cpi"]["key"]
         mock_session = _make_mock_session([
             {"status_code": 200, "text": fixture_abs_response}
         ])
         with patch(PATCH_TARGET, return_value=mock_session):
-            df = fetch_abs_series("CPI", "all", params={"startPeriod": "2014"})
+            df = fetch_abs_series("CPI", key, params={"startPeriod": "2014"})
 
         assert isinstance(df, pd.DataFrame)
         assert list(df.columns) == ["date", "value", "source", "series_id"]
         assert len(df) == 3
         assert (df["source"] == "ABS").all()
-        assert df["series_id"].iloc[0] == "CPI/all"
-
-    def test_with_filters(self, fixture_abs_response):
-        mock_session = _make_mock_session([
-            {"status_code": 200, "text": fixture_abs_response}
-        ])
-        with patch(PATCH_TARGET, return_value=mock_session):
-            df = fetch_abs_series(
-                "CPI", "all",
-                filters={"MEASURE": "1"},
-            )
-
-        # The fixture has MEASURE column starting with "1: Index Numbers"
-        # so all 3 rows should match the filter
-        assert len(df) == 3
+        assert df["series_id"].iloc[0] == f"CPI/{key}"
 
     @pytest.mark.parametrize("status_code", [400, 404, 500])
     def test_http_error(self, status_code):
@@ -181,7 +158,7 @@ class TestFetchAbsSeries:
         ])
         with patch(PATCH_TARGET, return_value=mock_session):
             with pytest.raises(Exception, match="ABS API error"):
-                fetch_abs_series("CPI", "all")
+                fetch_abs_series("CPI", ABS_CONFIG["cpi"]["key"])
 
     def test_empty_response_body(self):
         mock_session = _make_mock_session([

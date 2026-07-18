@@ -26,17 +26,19 @@ def fetch_abs_series(
     dataflow_id: str,
     key: str,
     params: dict = None,
-    filters: dict = None,
     timeout: int = None,
 ) -> pd.DataFrame:
     """
     Fetch a data series from ABS Data API.
 
+    Series selection is entirely via the SDMX ``key`` (targeted dimension
+    path). Bulk ``key="all"`` plus client-side filters is not supported —
+    it pulls multi‑MB responses that fail in CI.
+
     Args:
         dataflow_id: ABS dataflow identifier (e.g., "CPI", "LF")
-        key: Series key/filter (use "all" for wildcard)
+        key: Targeted SDMX series key (not ``all``)
         params: Optional query parameters (e.g., {"startPeriod": "2014"})
-        filters: Optional dimension filters to apply after fetching
         timeout: Optional timeout override in seconds (default: DEFAULT_TIMEOUT)
 
     Returns:
@@ -90,25 +92,6 @@ def fetch_abs_series(
     # Find TIME_PERIOD and OBS_VALUE columns (they may have labels appended)
     time_col = [c for c in df.columns if c.startswith('TIME_PERIOD')][0]
     value_col = 'OBS_VALUE'
-
-    # Apply filters if specified
-    if filters:
-        for col_name, filter_value in filters.items():
-            # Find matching column (ABS uses format "COLUMN: Label")
-            matching_cols = [c for c in df.columns if c.startswith(f"{col_name}:")]
-            if matching_cols:
-                col = matching_cols[0]
-                # Filter by checking if value starts with
-                # the filter (handles "code: label" format)
-                df = df[
-                    df[col].astype(str).str.contains(
-                        f"^{filter_value}:",
-                        regex=True,
-                        na=False,
-                    )
-                ]
-
-        print(f"After filtering: {len(df)} rows")
 
     # Rename columns
     df = df.rename(columns={
@@ -180,13 +163,12 @@ def _parse_abs_date(date_str: str) -> str:
 # Individual fetchers for each indicator
 
 def fetch_cpi() -> pd.DataFrame:
-    """Fetch Consumer Price Index (All Groups, Monthly)."""
+    """Fetch Consumer Price Index (All Groups, Quarterly)."""
     config = ABS_CONFIG["cpi"]
     return fetch_abs_series(
         config["dataflow"],
         config["key"],
         config.get("params"),
-        config.get("filters")
     )
 
 
@@ -197,7 +179,6 @@ def fetch_employment() -> pd.DataFrame:
         config["dataflow"],
         config["key"],
         config.get("params"),
-        config.get("filters")
     )
 
 
@@ -208,7 +189,6 @@ def fetch_household_spending() -> pd.DataFrame:
         config["dataflow"],
         config["key"],
         config.get("params"),
-        config.get("filters")
     )
 
 
@@ -219,7 +199,6 @@ def fetch_wage_price_index() -> pd.DataFrame:
         config["dataflow"],
         config["key"],
         config.get("params"),
-        config.get("filters")
     )
 
 
@@ -231,8 +210,7 @@ def fetch_building_approvals() -> pd.DataFrame:
         config["dataflow"],
         config["key"],
         config.get("params"),
-        config.get("filters"),
-        timeout=timeout
+        timeout=timeout,
     )
 
 
@@ -243,7 +221,6 @@ def fetch_rppi() -> pd.DataFrame:
         config["dataflow"],
         config["key"],
         config.get("params"),
-        config.get("filters")
     )
 
 

@@ -47,13 +47,16 @@ ABS_API_BASE = "https://data.api.abs.gov.au/rest/data"
 ABS_CONFIG = {
     "cpi": {
         "dataflow": "CPI",
-        # MEASURE.INDEX.TSEST.REGION.FREQ — All groups CPI, Original, Australia, Monthly
-        "key": "1.10001.10.50.M",
+        # MEASURE.INDEX.TSEST.REGION.FREQ — All groups, Original, AUS, Quarterly
+        # Pipeline owns quarterly (10y+ history). Monthly CPI is too short alone.
+        "key": "1.10001.10.50.Q",
         "params": {"startPeriod": "2014", "detail": "dataonly"},
         "output_file": "abs_cpi.csv",
-        "description": "Consumer Price Index (monthly)",
+        "description": "Consumer Price Index (quarterly)",
         "critical": True,
     },
+
+
     "employment": {
         "dataflow": "LF",
         "key": "M3.3.1599.20.AUS.M",
@@ -111,7 +114,6 @@ ABS_CONFIG = {
     },
 }
 
-
 # Source metadata for all data sources
 SOURCE_METADATA = {
     "RBA": {
@@ -157,10 +159,11 @@ INDICATOR_CONFIG = {
     "inflation": {
         "csv_file": "abs_cpi.csv",
         "normalize": "yoy_pct_change",
-        "frequency": "monthly",
-        "yoy_periods": 12,
+        "frequency": "quarterly",
+        "yoy_periods": 4,
         "description": "Consumer Price Index YoY % change",
     },
+
     "wages": {
         "csv_file": "abs_wage_price_index.csv",
         "normalize": "yoy_pct_change",
