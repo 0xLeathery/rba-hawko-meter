@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -18,22 +21,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - name: Set up Python pipeline
+        uses: ./.github/actions/setup-python-pipeline
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          install-dev: 'true'
 
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-
-      - name: Install Python dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
 
       - name: Install npm dependencies
         # Skip postinstall lefthook (not needed in CI; hooks are local-only)

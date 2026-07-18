@@ -1,0 +1,125 @@
+name: 'Report pipeline failure'
+description: >-
+  Open, comment on, or close a pipeline-failure GitHub issue by exact title.
+  Lookup prefers the Search API (exact title + open + label); on empty results
+  falls back to listForRepo because Search is eventually consistent.
+
+inputs:
+  title:
+    description: 'Issue title (exact match used to find an open issue)'
+    required: true
+  body:
+    description: 'Markdown body for new issue/comment, or success comment when mode=close'
+    required: true
+  mode:
+    description: 'report (default) opens/comments on failure; close closes matching open issue on success'
+    required: false
+    default: 'report'
+
+runs:
+  using: composite
+  steps:
+    - name: Open, update, or close pipeline-failure issue
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const title = ${{ toJSON(inputs.title) }};
+          const body = ${{ toJSON(inputs.body) }};
+          const mode = ${{ toJSON(inputs.mode) }};
+          const label = 'pipeline-failure';
+
+          async function findOpenIssueByTitle() {
+            // Strip " so phrase quotes in q stay balanced; exact match is client-side.
+            const titleForQuery = title.replace(/"/g, '');
+            const q = `repo:${context.repo.owner}/${context.repo.repo} is:issue is:open label:${label} in:title "${titleForQuery}"`;
+            const { data } = await github.rest.search.issuesAndPullRequests({ q });
+            const fromSearch = data.items.find((i) => i.title === title && !i.pull_request);
+            if (fromSearch) {
+              return fromSearch;
+            }
+
+            // Search index lag: fall back to Issues list API (authoritative for open+label).
+            core.info('Search returned no exact match; falling back to listForRepo');
+            const perPage = 100;
+            let page = 1;
+            while (true) {
+              const { data: issues } = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                labels: label,
+                per_page: perPage,
+                page,
+              });
+              const match = issues.find((i) => i.title === title && !i.pull_request);
+              if (match) {
+                return match;
+              }
+              if (issues.length < perPage) {
+                break;
+              }
+              page += 1;
+            }
+            return undefined;
+          }
+
+          if (mode === 'close') {
+            const existing = await findOpenIssueByTitle();
+            if (!existing) {
+              core.info(`No open issue with title: ${title}`);
+              return;
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: existing.number,
+              body,
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: existing.number,
+              state: 'closed',
+            });
+            core.info(`Closed issue #${existing.number}`);
+            return;
+          }
+
+          // mode === 'report' (default)
+          try {
+            await github.rest.issues.getLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: label,
+            });
+          } catch (e) {
+            if (e.status === 404) {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: label,
+                color: 'B60205',
+                description: 'Automated data pipeline / source failure',
+              });
+            } else {
+              throw e;
+            }
+          }
+
+          const existing = await findOpenIssueByTitle();
+          if (existing) {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: existing.number,
+              body,
+            });
+          } else {
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: [label],
+            });
+          }

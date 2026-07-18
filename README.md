@@ -181,7 +181,7 @@ Lefthook runs three checks in parallel on every `git push`:
 | `daily-asx-futures.yml` | Weekdays 6:23 AM UTC | ASX futures + status/meetings refresh |
 | `live-canary.yml` | Mon + Thu 04:17 UTC | `pytest -m live` against real sources |
 
-Scheduled jobs auto-commit data via `git-auto-commit-action` with `[skip ci]` in the message to avoid CI loops. Weekly and canary failures open/update a GitHub issue labelled `pipeline-failure`.
+Scheduled jobs auto-commit data via `git-auto-commit-action` with `[skip ci]` in the message to avoid CI loops. Weekly and canary failures open/update a GitHub issue labelled `pipeline-failure` (and auto-close it on the next green run). Daily ASX intentionally does not open issues — ASX is optional/lower-severity.
 
 ### Manual dispatch (ops)
 

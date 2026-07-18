@@ -1,19 +1,26 @@
-GitHub Actions Workflow Validation - 2026-07-18 (Phase 4 recovery)
+GitHub Actions Workflow Validation - 2026-07-18 (Phase 4/5)
 
 VALIDATED ACTION MAJORS:
 - actions/checkout@v6
-- actions/setup-python@v6
+- actions/setup-python@v6 (via setup-python-pipeline composite)
 - actions/setup-node@v4 (CI only)
-- actions/github-script@v7 (failure reporting)
+- actions/github-script@v7 (via report-pipeline-failure composite)
 - stefanzweifel/git-auto-commit-action@v7
 
+COMPOSITE ACTIONS:
+- .github/actions/setup-python-pipeline — setup-python@v6 + pip install requirements.txt; install-dev case-insensitive true (checkout stays in each workflow)
+- .github/actions/report-pipeline-failure — ensure pipeline-failure label; Search API by exact title, listForRepo fallback on empty (Search lag); mode=report (default) open/comment, mode=close comment+close (used by weekly-pipeline + live-canary)
+
 WORKFLOWS:
-- ci.yml — PR/push: npm run verify:fast (lint + pytest not-live + coverage ≥85%)
-- weekly-pipeline.yml — schedule + dispatch; issues:write for pipeline-failure
-- daily-asx-futures.yml — weekday ASX + meetings refresh
-- live-canary.yml — Mon/Thu live pytest; opens pipeline-failure issue on fail
+- ci.yml — PR/push; contents:read; npm run verify:fast (lint + pytest not-live + coverage ≥85%)
+- weekly-pipeline.yml — schedule + dispatch; contents:write + issues:write; failure → report action; success → commit then close (continue-on-error)
+- daily-asx-futures.yml — weekday ASX + meetings refresh; intentionally NO pipeline-failure issues (ASX is optional/lower-severity)
+- live-canary.yml — Mon/Thu live pytest; contents:read + issues:write; failure → report action; success → close (continue-on-error)
 
 NOTES:
 - npm ci --ignore-scripts in CI (skip local lefthook postinstall)
 - data commits use [skip ci] to avoid loops
 - critical pipeline failure still refreshes meetings/status (see pipeline/main.py)
+- daily ASX silence on issues is intentional — do not add report-pipeline-failure there
+- weekly success order is commit then close so Issues API flakiness cannot block data publish
+
