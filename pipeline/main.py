@@ -18,18 +18,11 @@ from typing import Any
 
 # Import all ingestors
 from pipeline.ingest import abs_data, corelogic_scraper, nab_scraper, rba_data
+from pipeline.normalize.engine import generate_status
 from pipeline.normalize.frontend_data import (
     generate_frontend_data,
     generate_meetings_json,
 )
-
-# Normalization guarded for partial checkouts (historical pattern).
-try:
-    from pipeline.normalize.engine import generate_status
-    NORMALIZATION_AVAILABLE = True
-except ImportError:
-    NORMALIZATION_AVAILABLE = False
-
 
 # Define source tiers
 CRITICAL_SOURCES = [
@@ -50,57 +43,91 @@ OPTIONAL_SOURCES = [
 ]
 
 
+def _normalization_success(status: dict[str, Any], **extra: Any) -> dict[str, Any]:
+    """Build the results['normalization'] success payload."""
+    return {
+        'status': 'success',
+        'hawk_score': status['overall']['hawk_score'],
+        'indicators_available': status['metadata']['indicators_available'],
+        'indicators_missing': status['metadata']['indicators_missing'],
+        **extra,
+    }
+
+
+def _frontend_success(
+    *,
+    next_meeting: str | None,
+    rates: bool | None = None,
+    meetings_only: bool = False,
+    **extra: Any,
+) -> dict[str, Any]:
+    """Build the results['frontend_data'] success payload."""
+    payload: dict[str, Any] = {
+        'status': 'success',
+        'next_meeting': next_meeting,
+        **extra,
+    }
+    if meetings_only:
+        payload['meetings_only'] = True
+    else:
+        payload['rates'] = bool(rates)
+    return payload
+
+
+def _run_normalization() -> dict[str, Any]:
+    """Generate status.json; return a results fragment (never raises)."""
+    try:
+        status = generate_status()
+        print(
+            f"\n  Normalization completed: "
+            f"Hawk Score = {status['overall']['hawk_score']:.1f}"
+        )
+        print(f"  Zone: {status['overall']['zone_label']}")
+        avail = status['metadata']['indicators_available']
+        missing = status['metadata']['indicators_missing']
+        print(f"  Indicators: {avail} available, {len(missing)} missing")
+        return _normalization_success(status)
+    except Exception as e:
+        print(f"\n  WARNING: Normalization failed: {e}")
+        return {'status': 'failed', 'error': str(e)}
+
+
+def _run_frontend_data(*, meetings_only: bool = False) -> dict[str, Any]:
+    """Generate meetings/rates JSON; return a results fragment (never raises)."""
+    try:
+        if meetings_only:
+            meetings = generate_meetings_json()
+            next_m = (meetings.get('next_meeting') or {}).get('display_date')
+            print(f"\n  meetings.json refreshed (next: {next_m or 'n/a'})")
+            return _frontend_success(next_meeting=next_m, meetings_only=True)
+        frontend = generate_frontend_data()
+        next_m = (frontend.get('meetings') or {}).get('next_meeting') or {}
+        display = next_m.get('display_date')
+        print(f"\n  Frontend data OK (next meeting: {display or 'n/a'})")
+        return _frontend_success(
+            next_meeting=display,
+            rates=frontend.get('rates') is not None,
+        )
+    except Exception as e:
+        print(f"\n  WARNING: Frontend data generation failed: {e}")
+        return {'status': 'failed', 'error': str(e)}
+
+
 def _refresh_artifacts_after_critical_failure(results: dict[str, Any]) -> None:
     """Best-effort refresh that does not depend on critical ingest succeeding.
 
-    Meetings are pure calendar (no ABS). Status uses last-known CSVs when
-    the normalization engine is available. Failures here are recorded but
-    never suppress the pipeline's non-zero exit.
+    Meetings are pure calendar (no ABS). Status uses last-known CSVs.
+    Failures here never suppress the pipeline's non-zero exit.
     """
     print("\n  Best-effort refresh after critical failure...")
-
-    if NORMALIZATION_AVAILABLE:
-        try:
-            status = generate_status()
-            results['normalization'] = {
-                'status': 'success',
-                'hawk_score': status['overall']['hawk_score'],
-                'indicators_available': status['metadata']['indicators_available'],
-                'indicators_missing': status['metadata']['indicators_missing'],
-                'after_critical_failure': True,
-            }
-            print(
-                f"  status.json refreshed from last-known CSVs "
-                f"(hawk={status['overall']['hawk_score']:.1f})"
-            )
-        except Exception as e:
-            results['normalization'] = {
-                'status': 'failed',
-                'error': str(e),
-                'after_critical_failure': True,
-            }
-            print(f"  WARNING: status.json refresh failed: {e}")
-
-    try:
-        meetings = generate_meetings_json()
-        next_m = meetings.get('next_meeting') or {}
-        results['frontend_data'] = {
-            'status': 'success',
-            'next_meeting': next_m.get('display_date'),
-            'meetings_only': True,
-            'after_critical_failure': True,
-        }
-        print(
-            f"  meetings.json refreshed "
-            f"(next: {next_m.get('display_date', 'n/a')})"
-        )
-    except Exception as e:
-        results['frontend_data'] = {
-            'status': 'failed',
-            'error': str(e),
-            'after_critical_failure': True,
-        }
-        print(f"  WARNING: meetings.json refresh failed: {e}")
+    results['normalization'] = {
+        **_run_normalization(),
+        'after_critical_failure': True,
+    }
+    results['frontend_data'] = {
+        **_run_frontend_data(meetings_only=True),
+        'after_critical_failure': True,
+    }
 
 
 def run_pipeline() -> dict[str, Any]:
@@ -242,71 +269,13 @@ def run_pipeline() -> dict[str, Any]:
     # Phase 4: Data normalization and status.json generation
     print("\n\nPHASE 4: DATA NORMALIZATION")
     print("-" * 60)
-
-    if not NORMALIZATION_AVAILABLE:
-        print(
-            "\n  Normalization engine not installed "
-            "-- skipping status.json generation"
-        )
-        results['normalization'] = {
-            'status': 'skipped',
-            'reason': 'module not available',
-        }
-    else:
-        try:
-            status = generate_status()
-            results['normalization'] = {
-                'status': 'success',
-                'hawk_score': status['overall']['hawk_score'],
-                'indicators_available': status['metadata']['indicators_available'],
-                'indicators_missing': status['metadata']['indicators_missing'],
-            }
-            print(
-                f"\n  Normalization completed: "
-                f"Hawk Score = "
-                f"{status['overall']['hawk_score']:.1f}"
-            )
-            print(
-                f"  Zone: {status['overall']['zone_label']}"
-            )
-            avail = status['metadata']['indicators_available']
-            missing = status['metadata']['indicators_missing']
-            print(
-                f"  Indicators: {avail} available, "
-                f"{len(missing)} missing"
-            )
-
-        except Exception as e:
-            print(f"\n  WARNING: Normalization failed: {e}")
-            results['normalization'] = {
-                'status': 'failed',
-                'error': str(e)
-            }
-            # Normalization failure is non-fatal -- the pipeline still succeeds
-            # if critical data was ingested. status.json just won't be updated.
+    # Non-fatal: pipeline still succeeds if critical ingest worked.
+    results['normalization'] = _run_normalization()
 
     # Phase 5: Frontend JSON (meetings + rates) so countdown never freezes
     print("\n\nPHASE 5: FRONTEND DATA")
     print("-" * 60)
-
-    try:
-        frontend = generate_frontend_data()
-        next_m = (frontend.get('meetings') or {}).get('next_meeting') or {}
-        results['frontend_data'] = {
-            'status': 'success',
-            'next_meeting': next_m.get('display_date'),
-            'rates': frontend.get('rates') is not None,
-        }
-        print(
-            f"\n  Frontend data OK"
-            f" (next meeting: {next_m.get('display_date', 'n/a')})"
-        )
-    except Exception as e:
-        print(f"\n  WARNING: Frontend data generation failed: {e}")
-        results['frontend_data'] = {
-            'status': 'failed',
-            'error': str(e),
-        }
+    results['frontend_data'] = _run_frontend_data()
 
     # Print summary
     print("\n" + "=" * 60)

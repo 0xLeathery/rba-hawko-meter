@@ -3,7 +3,7 @@ Unit tests for pipeline.main.run_pipeline().
 
 Covers: all-success path, critical failure (sys.exit(1)), important source
 failure (partial), optional source failure (exception path), optional source
-returning failed dict, normalization unavailable, normalization exception.
+returning failed dict, normalization exception, critical-fail refresh.
 
 All tier lists are patched with single controlled mock entries using lambdas
 (matching the lambda detection logic in main.py).
@@ -22,6 +22,27 @@ def _make_lambda_mock(return_value=None, side_effect=None):
     """Return a lambda wrapping a MagicMock for use in tier source lists."""
     m = MagicMock(return_value=return_value, side_effect=side_effect)
     return lambda: m()
+
+
+def _default_status():
+    return {
+        "overall": {"hawk_score": 55.0, "zone_label": "Balanced"},
+        "metadata": {"indicators_available": 6, "indicators_missing": []},
+    }
+
+
+def _stub_status(monkeypatch, *, result=None, side_effect=None):
+    """Avoid running the real normalization engine in unit tests."""
+    if side_effect is not None:
+        monkeypatch.setattr(
+            "pipeline.main.generate_status",
+            MagicMock(side_effect=side_effect),
+        )
+        return
+    monkeypatch.setattr(
+        "pipeline.main.generate_status",
+        MagicMock(return_value=result or _default_status()),
+    )
 
 
 def _stub_frontend(monkeypatch, *, result=None, side_effect=None):
@@ -62,13 +83,11 @@ def _stub_critical_refresh(monkeypatch, *, meetings=None, status=None):
         MagicMock(return_value=meetings),
     )
     if status is not None:
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", True)
-        monkeypatch.setattr(
-            "pipeline.main.generate_status",
-            MagicMock(return_value=status),
-        )
+        _stub_status(monkeypatch, result=status)
     else:
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        _stub_status(
+            monkeypatch, side_effect=RuntimeError("status skipped in test")
+        )
 
 
 # =============================================================================
@@ -99,7 +118,6 @@ class TestRunPipeline:
         monkeypatch.setattr(
             "pipeline.main.OPTIONAL_SOURCES", [("Test Optional", optional_mock)]
         )
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", True)
         monkeypatch.setattr("pipeline.main.generate_status", lambda: mock_status)
         _stub_frontend(monkeypatch)
 
@@ -155,8 +173,8 @@ class TestRunPipeline:
         )
         monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
         monkeypatch.setattr("pipeline.main.generate_meetings_json", meetings_mock)
+        _stub_status(monkeypatch, side_effect=RuntimeError("no status in test"))
 
         from pipeline.main import run_pipeline
 
@@ -183,7 +201,6 @@ class TestRunPipeline:
         )
         monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", True)
         monkeypatch.setattr("pipeline.main.generate_status", status_mock)
         monkeypatch.setattr("pipeline.main.generate_meetings_json", meetings_mock)
 
@@ -213,7 +230,6 @@ class TestRunPipeline:
             "pipeline.main.IMPORTANT_SOURCES", [("Test Important", important_mock)]
         )
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", True)
         monkeypatch.setattr("pipeline.main.generate_status", lambda: mock_status)
         _stub_frontend(monkeypatch)
 
@@ -240,7 +256,7 @@ class TestRunPipeline:
         monkeypatch.setattr(
             "pipeline.main.OPTIONAL_SOURCES", [("Test Optional", optional_mock)]
         )
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        _stub_status(monkeypatch)
         _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
@@ -266,7 +282,7 @@ class TestRunPipeline:
         monkeypatch.setattr(
             "pipeline.main.OPTIONAL_SOURCES", [("Test Optional", optional_mock)]
         )
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        _stub_status(monkeypatch)
         _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
@@ -275,25 +291,6 @@ class TestRunPipeline:
 
         assert results["status"] == "partial"
         assert "Test Optional" in results["optional_failures"]
-
-    def test_normalization_not_available_is_skipped(self, monkeypatch):
-        """When NORMALIZATION_AVAILABLE is False, normalization phase is skipped."""
-        critical_mock = _make_lambda_mock(return_value={"rows": 5})
-
-        monkeypatch.setattr(
-            "pipeline.main.CRITICAL_SOURCES", [("Test Critical", critical_mock)]
-        )
-        monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
-        monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
-        _stub_frontend(monkeypatch)
-
-        from pipeline.main import run_pipeline
-
-        results = run_pipeline()
-
-        assert results["normalization"]["status"] == "skipped"
-        assert results["normalization"]["reason"] == "module not available"
 
     def test_normalization_exception_is_non_fatal(self, monkeypatch):
         """Normalization exception does not prevent pipeline returning 'success'."""
@@ -304,7 +301,6 @@ class TestRunPipeline:
         )
         monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", True)
         monkeypatch.setattr(
             "pipeline.main.generate_status",
             MagicMock(side_effect=RuntimeError("Engine error")),
@@ -349,7 +345,7 @@ class TestRunPipeline:
         )
         monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        _stub_status(monkeypatch)
         _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
@@ -368,7 +364,7 @@ class TestRunPipeline:
         )
         monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        _stub_status(monkeypatch)
         _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
@@ -393,7 +389,7 @@ class TestRunPipeline:
             [("Source A", important_mock1), ("Source B", important_mock2)],
         )
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        _stub_status(monkeypatch)
         _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
@@ -421,7 +417,6 @@ class TestRunPipeline:
         )
         monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", True)
         monkeypatch.setattr("pipeline.main.generate_status", lambda: mock_status)
         _stub_frontend(monkeypatch)
 
@@ -443,7 +438,7 @@ class TestRunPipeline:
         )
         monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
-        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        _stub_status(monkeypatch)
         _stub_frontend(
             monkeypatch, side_effect=RuntimeError("meetings boom")
         )
@@ -460,11 +455,11 @@ class TestRunPipeline:
 # =============================================================================
 
 
-def test_normalization_available_is_bool():
-    """NORMALIZATION_AVAILABLE is set at module import time and is a bool."""
+def test_generate_status_is_imported():
+    """generate_status is a first-class import (no optional flag)."""
     import pipeline.main
 
-    assert isinstance(pipeline.main.NORMALIZATION_AVAILABLE, bool)
+    assert callable(pipeline.main.generate_status)
 
 
 def test_critical_sources_is_list():
