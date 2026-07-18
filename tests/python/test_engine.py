@@ -316,34 +316,38 @@ class TestBuildGaugeEntry:
         entry = build_gauge_entry("inflation", latest_row, z_df, weight_config)
         assert entry["staleness_days"] == 10
 
-    def test_housing_branch_reads_csv_from_data_dir(self, monkeypatch, tmp_path):
-        """Housing branch reads corelogic_housing.csv; maps 'ABS' -> 'ABS RPPI'."""
+    def test_housing_meta_from_normalize_attrs(self, monkeypatch):
+        """Housing meta comes from indicator_meta, not CSV sniffing."""
         monkeypatch.setattr("pipeline.normalize.engine.datetime", MockDatetime)
-        # Write housing CSV to tmp_path (isolate_data_dir patches DATA_DIR to tmp_path)
-        housing_data = pd.DataFrame(
-            {
-                "date": ["2025-10-01"],
-                "value": [3.5],
-                "source": ["ABS"],
-            }
+        from pipeline.normalize.engine import build_gauge_entry
+
+        z_df = _make_z_df()
+        latest_row = z_df.iloc[-1]
+        weight_config = {"polarity": 1, "weight": 0.1}
+        meta = {
+            "data_source": "Cotality HVI",
+            "stale_display": "quarter_only",
+            "display_raw_value": 9.4,
+            "display_data_date": "2026-02-28",
+            "confidence_cap": "LOW",
+        }
+
+        entry = build_gauge_entry(
+            "housing",
+            latest_row,
+            z_df,
+            weight_config,
+            indicator_meta=meta,
         )
-        housing_data.to_csv(tmp_path / "corelogic_housing.csv", index=False)
 
-        from pipeline.normalize.engine import build_gauge_entry
-
-        z_df = _make_z_df()
-        latest_row = z_df.iloc[-1]
-        weight_config = {"polarity": 1, "weight": 0.1}
-
-        entry = build_gauge_entry("housing", latest_row, z_df, weight_config)
-
-        assert "data_source" in entry
-        assert entry["data_source"] == "ABS RPPI"
-        assert "stale_display" in entry
+        assert entry["data_source"] == "Cotality HVI"
         assert entry["stale_display"] == "quarter_only"
+        assert entry["raw_value"] == 9.4
+        assert entry["data_date"] == "2026-02-28"
+        assert entry["confidence"] == "LOW"
 
-    def test_housing_branch_no_csv_still_sets_stale_display(self, monkeypatch):
-        """Housing without CSV still sets stale_display=quarter_only."""
+    def test_housing_meta_abs_only(self, monkeypatch):
+        """Housing ABS-only meta sets stale_display without CSV I/O."""
         monkeypatch.setattr("pipeline.normalize.engine.datetime", MockDatetime)
         from pipeline.normalize.engine import build_gauge_entry
 
@@ -351,7 +355,17 @@ class TestBuildGaugeEntry:
         latest_row = z_df.iloc[-1]
         weight_config = {"polarity": 1, "weight": 0.1}
 
-        entry = build_gauge_entry("housing", latest_row, z_df, weight_config)
+        entry = build_gauge_entry(
+            "housing",
+            latest_row,
+            z_df,
+            weight_config,
+            indicator_meta={
+                "data_source": "ABS RPPI",
+                "stale_display": "quarter_only",
+            },
+        )
+        assert entry["data_source"] == "ABS RPPI"
         assert entry["stale_display"] == "quarter_only"
 
     def test_business_confidence_enrichment(self, monkeypatch, tmp_path):

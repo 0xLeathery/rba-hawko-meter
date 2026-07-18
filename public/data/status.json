@@ -1,14 +1,14 @@
 {
-  "generated_at": "2026-07-18T04:42:05.573221Z",
+  "generated_at": "2026-07-18T04:48:44.891914Z",
   "pipeline_version": "1.0.0",
   "overall": {
-    "hawk_score": 62.8,
+    "hawk_score": 69.6,
     "zone": "warm",
     "zone_label": "Mild hawkish pressure",
     "verdict": "Economic indicators suggest moderate tightening pressure",
     "confidence": "LOW",
     "previous_hawk_score": 57.2,
-    "hawk_score_delta": 5.6
+    "hawk_score_delta": 12.4
   },
   "gauges": {
     "inflation": {
@@ -167,19 +167,20 @@
       "delta_direction": "down"
     },
     "housing": {
-      "value": 59.4,
-      "zone": "neutral",
-      "zone_label": "Balanced",
-      "z_score": 0.565,
+      "value": 100.0,
+      "zone": "hot",
+      "zone_label": "Strong hawkish pressure",
+      "z_score": 3.457,
       "raw_value": 9.4,
       "raw_unit": "% YoY",
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-02-28",
       "staleness_days": 140,
-      "confidence": "HIGH",
-      "interpretation": "Housing prices near trend",
+      "confidence": "LOW",
+      "interpretation": "Housing prices well above trend",
       "history": [
+        12.9,
         12.7,
         23.1,
         44.0,
@@ -190,14 +191,13 @@
         58.3,
         84.0,
         100.0,
-        100.0,
-        59.4
+        100.0
       ],
       "data_source": "Cotality HVI",
       "stale_display": "quarter_only",
       "previous_value": 59.4,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      "delta": 40.6,
+      "delta_direction": "up"
     },
     "business_confidence": {
       "value": 61.2,

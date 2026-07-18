@@ -333,22 +333,23 @@ def test_normalize_indicator_hybrid_cotality_abs_path(tmp_path, monkeypatch):
     assert "date" in result.columns
     assert "value" in result.columns
 
-    # (a) Cotality HVI value (9.4) must appear in output —
-    # pre-computed, not double-normalized
-    assert 9.4 in result["value"].values
+    # Large temporal gap: Cotality stays out of z-score series (display meta only)
+    assert 9.4 not in result["value"].values
+    meta = result.attrs.get("indicator_meta") or {}
+    assert meta.get("data_source") == "Cotality HVI"
+    assert abs(meta.get("display_raw_value", 0) - 9.4) < 0.01
+    assert meta.get("sparse_overlay") is True
+    assert meta.get("confidence_cap") == "LOW"
 
-    # (b) ABS YoY rows must be present (first ABS row after YoY: 105/100 - 1 = 5%)
+    # ABS YoY rows must be present (first ABS row after YoY: 105/100 - 1 = 5%)
     yoy_values = result["value"].values
     assert any(abs(v - 5.0) < 0.1 for v in yoy_values), (
         f"Expected ABS YoY value ~5.0% not found in {yoy_values}"
     )
 
-    # (c) Last row's value should be 9.4 (Cotality is the most recent date)
-    assert abs(result["value"].iloc[-1] - 9.4) < 0.01
-
 
 def test_normalize_indicator_legacy_mixed_housing_csv(tmp_path, monkeypatch):
-    """Legacy single-file ABS+Cotality hybrid still works."""
+    """Legacy single-file ABS+Cotality still resolves via unified loader."""
     import pipeline.config
     monkeypatch.setattr(pipeline.config, "DATA_DIR", tmp_path)
 
@@ -377,7 +378,9 @@ def test_normalize_indicator_legacy_mixed_housing_csv(tmp_path, monkeypatch):
         },
     )
     assert result is not None
-    assert 9.4 in result["value"].values
+    meta = result.attrs.get("indicator_meta") or {}
+    assert meta.get("data_source") == "Cotality HVI"
+    assert abs(meta.get("display_raw_value", 0) - 9.4) < 0.01
 
 
 def test_normalize_indicator_direct_normalization(tmp_path, monkeypatch):

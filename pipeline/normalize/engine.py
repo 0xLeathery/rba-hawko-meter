@@ -12,6 +12,8 @@ Usage:
 import json
 from datetime import datetime
 
+import pandas as pd
+
 import pipeline.config
 from pipeline.config import (
     INDICATOR_CONFIG,
@@ -117,7 +119,9 @@ def generate_interpretation(indicator_name, zone, raw_value):
     return indicator_templates.get(zone, f'{indicator_name} data available')
 
 
-def build_gauge_entry(name, latest_row, z_df, weight_config, config=None):
+def build_gauge_entry(
+    name, latest_row, z_df, weight_config, config=None, indicator_meta=None
+):
     """
     Build a single gauge dict for status.json.
 
@@ -127,6 +131,7 @@ def build_gauge_entry(name, latest_row, z_df, weight_config, config=None):
         z_df: Full Z-score DataFrame (for history extraction).
         weight_config: Weight config dict from weights.json.
         config: Optional indicator config dict (used for indicator-specific enrichment).
+        indicator_meta: Optional metadata from normalize_indicator (attrs).
 
     Returns:
         Dict with gauge metadata matching the status.json per-gauge schema.
@@ -138,9 +143,20 @@ def build_gauge_entry(name, latest_row, z_df, weight_config, config=None):
     confidence = determine_confidence(int(latest_row['window_size']))
 
     data_date = latest_row['date']
+    raw_value = float(latest_row['value'])
+    meta = indicator_meta or {}
+
+    # Sparse Cotality overlay: z-score stays on ABS history; display uses overlay.
+    if meta.get('display_raw_value') is not None:
+        raw_value = float(meta['display_raw_value'])
+    if meta.get('display_data_date'):
+        data_date = pd.Timestamp(meta['display_data_date'])
+    if meta.get('confidence_cap') == 'LOW':
+        confidence = 'LOW'
+
     staleness_days = (datetime.now() - data_date).days
 
-    interpretation = generate_interpretation(name, zone_id, latest_row['value'])
+    interpretation = generate_interpretation(name, zone_id, raw_value)
 
     # Extract history: last 12 valid gauge values from the Z-score series
     valid_rows = z_df.dropna(subset=['z_score']).tail(12)
@@ -150,34 +166,15 @@ def build_gauge_entry(name, latest_row, z_df, weight_config, config=None):
         hg = zscore_to_gauge(hz)
         history.append(round(hg, 1))
 
-    # Source attribution for housing indicator
-    data_source = None
-    stale_display = None
-    if name == 'housing':
-        import pandas as _pd
-        cotality_path = pipeline.config.DATA_DIR / "corelogic_housing.csv"
-        rppi_path = pipeline.config.DATA_DIR / "abs_rppi.csv"
-        # Prefer Cotality HVI rows when present; else ABS RPPI file.
-        if cotality_path.exists() and cotality_path.stat().st_size > 0:
-            raw_df = _pd.read_csv(cotality_path)
-            if len(raw_df) > 0:
-                if 'source' in raw_df.columns:
-                    if (raw_df['source'] == 'Cotality HVI').any():
-                        data_source = 'Cotality HVI'
-                    elif (raw_df['source'] == 'ABS').any():
-                        data_source = 'ABS RPPI'
-                else:
-                    data_source = 'Cotality HVI'
-        if data_source is None and rppi_path.exists():
-            data_source = 'ABS RPPI'
-        stale_display = 'quarter_only'
+    data_source = meta.get('data_source')
+    stale_display = meta.get('stale_display')
 
     entry = {
         'value': round(gauge_value, 1),
         'zone': zone_id,
         'zone_label': zone_label,
         'z_score': round(oriented_z, 3),
-        'raw_value': round(latest_row['value'], 2),
+        'raw_value': round(raw_value, 2),
         'raw_unit': '% YoY',
         'weight': weight_config['weight'],
         'polarity': polarity,
@@ -314,6 +311,8 @@ def process_indicator(name, config, weight_config):
     if len(df) == 0:
         return None, None
 
+    indicator_meta = dict(getattr(df, 'attrs', {}).get('indicator_meta') or {})
+
     # For indicators with limited history (fewer than ZSCORE_MIN_YEARS * 4 quarters),
     # lower the min_quarters requirement so a z-score can still be computed.
     # This applies to newly-wired optional indicators like business_confidence.
@@ -330,7 +329,14 @@ def process_indicator(name, config, weight_config):
         return None, None
 
     latest = valid.iloc[-1]
-    entry = build_gauge_entry(name, latest, df, weight_config, config=config)
+    entry = build_gauge_entry(
+        name,
+        latest,
+        df,
+        weight_config,
+        config=config,
+        indicator_meta=indicator_meta,
+    )
 
     return entry, entry['value']
 
