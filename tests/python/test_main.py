@@ -24,6 +24,32 @@ def _make_lambda_mock(return_value=None, side_effect=None):
     return lambda: m()
 
 
+def _stub_frontend(monkeypatch, *, available=True, result=None, side_effect=None):
+    """Avoid writing real meetings/rates during main pipeline unit tests."""
+    monkeypatch.setattr("pipeline.main.FRONTEND_DATA_AVAILABLE", available)
+    if available:
+        if side_effect is not None:
+            monkeypatch.setattr(
+                "pipeline.main.generate_frontend_data",
+                MagicMock(side_effect=side_effect),
+            )
+        else:
+            if result is None:
+                result = {
+                    "meetings": {
+                        "next_meeting": {
+                            "display_date": "4 August 2026",
+                            "date": "2026-08-04T14:30:00+10:00",
+                        }
+                    },
+                    "rates": {"current_rate": 4.35},
+                }
+            monkeypatch.setattr(
+                "pipeline.main.generate_frontend_data",
+                MagicMock(return_value=result),
+            )
+
+
 # =============================================================================
 # TestRunPipeline
 # =============================================================================
@@ -54,6 +80,7 @@ class TestRunPipeline:
         )
         monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", True)
         monkeypatch.setattr("pipeline.main.generate_status", lambda: mock_status)
+        _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
 
@@ -65,6 +92,8 @@ class TestRunPipeline:
         assert results["optional"]["Test Optional"]["status"] == "success"
         assert results["normalization"]["status"] == "success"
         assert results["normalization"]["hawk_score"] == 55.0
+        assert results["frontend_data"]["status"] == "success"
+        assert results["frontend_data"]["next_meeting"] == "4 August 2026"
 
     def test_critical_failure_calls_sys_exit_1(self, monkeypatch):
         """Critical source failure triggers sys.exit(1) — test runner does not die."""
@@ -104,6 +133,7 @@ class TestRunPipeline:
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
         monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", True)
         monkeypatch.setattr("pipeline.main.generate_status", lambda: mock_status)
+        _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
 
@@ -129,6 +159,7 @@ class TestRunPipeline:
             "pipeline.main.OPTIONAL_SOURCES", [("Test Optional", optional_mock)]
         )
         monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
 
@@ -154,6 +185,7 @@ class TestRunPipeline:
             "pipeline.main.OPTIONAL_SOURCES", [("Test Optional", optional_mock)]
         )
         monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
 
@@ -172,6 +204,7 @@ class TestRunPipeline:
         monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
         monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
 
@@ -194,6 +227,7 @@ class TestRunPipeline:
             "pipeline.main.generate_status",
             MagicMock(side_effect=RuntimeError("Engine error")),
         )
+        _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
 
@@ -233,6 +267,7 @@ class TestRunPipeline:
         monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
         monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
 
@@ -251,6 +286,7 @@ class TestRunPipeline:
         monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
         monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
 
@@ -275,6 +311,7 @@ class TestRunPipeline:
         )
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
         monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
 
@@ -303,6 +340,7 @@ class TestRunPipeline:
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
         monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", True)
         monkeypatch.setattr("pipeline.main.generate_status", lambda: mock_status)
+        _stub_frontend(monkeypatch)
 
         from pipeline.main import run_pipeline
 
@@ -313,6 +351,25 @@ class TestRunPipeline:
         assert norm["hawk_score"] == 72.5
         assert norm["indicators_available"] == 7
         assert "business_confidence" in norm["indicators_missing"]
+
+    def test_frontend_data_failure_is_non_fatal(self, monkeypatch):
+        """Frontend JSON generation failure does not fail the pipeline."""
+        critical_mock = _make_lambda_mock(return_value={"rows": 5})
+        monkeypatch.setattr(
+            "pipeline.main.CRITICAL_SOURCES", [("Test Critical", critical_mock)]
+        )
+        monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
+        monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
+        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        _stub_frontend(
+            monkeypatch, side_effect=RuntimeError("meetings boom")
+        )
+
+        from pipeline.main import run_pipeline
+
+        results = run_pipeline()
+        assert results["status"] == "success"
+        assert results["frontend_data"]["status"] == "failed"
 
 
 # =============================================================================

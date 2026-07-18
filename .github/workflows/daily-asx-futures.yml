@@ -34,6 +34,9 @@ jobs:
       - name: Regenerate status.json
         run: python -m pipeline.normalize.engine
 
+      - name: Refresh meetings.json
+        run: python -c "from pipeline.normalize.frontend_data import generate_meetings_json; generate_meetings_json()"
+
       - name: Verify ASX data freshness
         continue-on-error: true
         run: |
@@ -54,6 +57,6 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: 'data: daily ASX futures update [skip ci]'
-          file_pattern: 'data/*.csv public/data/status.json'
+          file_pattern: 'data/*.csv public/data/status.json public/data/meetings.json'
           commit_user_name: 'github-actions[bot]'
           commit_user_email: 'github-actions[bot]@users.noreply.github.com'

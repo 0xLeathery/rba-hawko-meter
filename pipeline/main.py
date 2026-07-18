@@ -26,6 +26,12 @@ try:
 except ImportError:
     NORMALIZATION_AVAILABLE = False
 
+try:
+    from pipeline.normalize.frontend_data import generate_frontend_data
+    FRONTEND_DATA_AVAILABLE = True
+except ImportError:
+    FRONTEND_DATA_AVAILABLE = False
+
 
 # Define source tiers
 CRITICAL_SOURCES = [
@@ -225,6 +231,36 @@ def run_pipeline() -> dict[str, Any]:
             }
             # Normalization failure is non-fatal -- the pipeline still succeeds
             # if critical data was ingested. status.json just won't be updated.
+
+    # Phase 5: Frontend JSON (meetings + rates) so countdown never freezes
+    print("\n\nPHASE 5: FRONTEND DATA")
+    print("-" * 60)
+
+    if not FRONTEND_DATA_AVAILABLE:
+        print("\n  Frontend data module not available -- skipping")
+        results['frontend_data'] = {
+            'status': 'skipped',
+            'reason': 'module not available',
+        }
+    else:
+        try:
+            frontend = generate_frontend_data()
+            next_m = (frontend.get('meetings') or {}).get('next_meeting') or {}
+            results['frontend_data'] = {
+                'status': 'success',
+                'next_meeting': next_m.get('display_date'),
+                'rates': frontend.get('rates') is not None,
+            }
+            print(
+                f"\n  Frontend data OK"
+                f" (next meeting: {next_m.get('display_date', 'n/a')})"
+            )
+        except Exception as e:
+            print(f"\n  WARNING: Frontend data generation failed: {e}")
+            results['frontend_data'] = {
+                'status': 'failed',
+                'error': str(e),
+            }
 
     # Print summary
     print("\n" + "=" * 60)
