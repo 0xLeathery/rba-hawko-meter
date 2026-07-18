@@ -14,6 +14,113 @@
 
   var resizeTimer = null;
   var renderedMetricIds = [];
+  /** @type {Array<{id: string, history: Array, color: string}>} */
+  var sparklineRegistry = [];
+
+  /**
+   * Render hero hawk-score delta (DELT-02).
+   * Inserts #hero-delta between #hawk-score-display and #scale-explainer.
+   * Absent when hawk_score_delta is missing (cold start / DELT-04).
+   * @param {Object} overall - data.overall from status.json
+   * @param {boolean} reducedMotion
+   */
+  function renderHeroDelta(overall, reducedMotion) {
+    var existing = document.getElementById('hero-delta');
+    if (existing) existing.parentNode.removeChild(existing);
+
+    if (!overall || overall.hawk_score_delta == null) return;
+
+    var delta = Number(overall.hawk_score_delta);
+    if (!isFinite(delta)) return;
+
+    var scoreDisplay = document.getElementById('hawk-score-display');
+    var scaleExplainer = document.getElementById('scale-explainer');
+    if (!scoreDisplay || !scaleExplainer || !scoreDisplay.parentNode) return;
+
+    var el = document.createElement('div');
+    el.id = 'hero-delta';
+    el.className = 'text-base text-center mt-2';
+    if (!reducedMotion) {
+      el.classList.add('hero-animate-in');
+    }
+
+    if (delta === 0) {
+      el.className += ' text-gray-500';
+      el.textContent = 'No change since last update';
+    } else {
+      var arrow = delta > 0 ? '\u25B2' : '\u25BC';
+      var absVal = Math.abs(delta).toFixed(1);
+      var sign = delta > 0 ? '+' : '\u2212';
+
+      var coloured = document.createElement('span');
+      coloured.style.color = GaugesModule.getZoneColor(overall.hawk_score);
+      coloured.textContent = arrow + ' ' + sign + absVal;
+
+      var suffix = document.createElement('span');
+      suffix.className = 'text-gray-400';
+      suffix.textContent = ' since last update';
+
+      el.appendChild(coloured);
+      el.appendChild(suffix);
+      el.setAttribute(
+        'aria-label',
+        'Hawk score '
+          + (delta > 0 ? 'increased' : 'decreased')
+          + ' by ' + absVal + ' points since last update'
+      );
+    }
+
+    scoreDisplay.parentNode.insertBefore(el, scaleExplainer);
+  }
+
+  /**
+   * Fill sparkline host: canvas draw or "Building history..." placeholder.
+   * @param {string} metricId
+   * @param {Object} metricData
+   */
+  function renderSparklineForMetric(metricId, metricData) {
+    var host = document.getElementById('sparkline-' + metricId);
+    if (!host) return;
+    host.textContent = '';
+
+    var history = metricData && metricData.history;
+    var values = (typeof SparklineModule !== 'undefined'
+      && SparklineModule.numericHistory)
+      ? SparklineModule.numericHistory(history)
+      : [];
+    var color = GaugesModule.getZoneColor(metricData.value);
+
+    if (values.length < 3) {
+      // SPRK-03
+      host.className =
+        'w-full mt-1 mb-1 flex items-center justify-center';
+      host.style.height = '40px';
+      var ph = document.createElement('p');
+      ph.className = 'text-xs text-gray-500 italic';
+      ph.textContent = 'Building history...';
+      host.appendChild(ph);
+      return;
+    }
+
+    host.className = 'w-full mt-1 mb-1';
+    host.style.height = '';
+    var canvas = document.createElement('canvas');
+    canvas.setAttribute('aria-hidden', 'true');
+    canvas.className = 'w-full block';
+    host.appendChild(canvas);
+
+    var drawn = false;
+    if (typeof SparklineModule !== 'undefined' && SparklineModule.draw) {
+      drawn = SparklineModule.draw(canvas, values, color);
+    }
+    if (drawn) {
+      sparklineRegistry.push({
+        id: metricId,
+        history: values,
+        color: color
+      });
+    }
+  }
 
   /**
    * Render greyed-out placeholder cards for missing indicators.
@@ -98,6 +205,7 @@
     }
 
     renderedMetricIds = [];
+    sparklineRegistry = [];
 
     // Render data coverage notice
     var coverageEl = document.getElementById('data-coverage-notice');
@@ -126,9 +234,10 @@
 
       renderedMetricIds.push(metricId);
 
-      // Staggered rendering for bullet gauges
+      // Staggered rendering for bullet gauges + sparklines (need layout width)
       requestAnimationFrame(function () {
         GaugesModule.createBulletGauge('gauge-' + metricId, metricData);
+        renderSparklineForMetric(metricId, metricData);
       });
     });
   }
@@ -233,6 +342,9 @@
           }
         }
 
+        // Hero hawk score delta (Phase 25 / DELT-02)
+        renderHeroDelta(data.overall, reducedMotion);
+
         // Set zone-coloured top border on hero card
         var heroCard = document.getElementById('hero-card');
         if (heroCard) {
@@ -314,7 +426,7 @@
   }
 
   /**
-   * Debounced resize handler for all Plotly gauges.
+   * Debounced resize handler for Plotly gauges and Canvas sparklines.
    */
   function setupResizeHandler() {
     window.addEventListener('resize', function () {
@@ -329,6 +441,14 @@
           if (el && el.data) {
             Plotly.relayout(el, { autosize: true });
           }
+        });
+        // Redraw sparklines at new card widths
+        sparklineRegistry.forEach(function (entry) {
+          var host = document.getElementById('sparkline-' + entry.id);
+          if (!host) return;
+          var canvas = host.querySelector('canvas');
+          if (!canvas || typeof SparklineModule === 'undefined') return;
+          SparklineModule.draw(canvas, entry.history, entry.color);
         });
       }, 250);
     });

@@ -44,6 +44,88 @@ var InterpretationsModule = (function () {
   }
 
   /**
+   * Metrics published as ABS quarterly series (period start dates).
+   * Staleness and labels use AU financial-year quarter language.
+   */
+  var QUARTERLY_METRIC_IDS = {
+    inflation: true,
+    wages: true,
+    housing: true
+  };
+
+  /**
+   * Australian quarter naming (FY quarters, not US calendar Q1–Q4 alone).
+   * Jul–Sep = Q1, Oct–Dec = Q2, Jan–Mar = Q3, Apr–Jun = Q4 (June quarter).
+   * @param {Date} d
+   * @returns {{ fyQ: number, monthName: string,
+   *   calendarYear: number, fyLabel: string }}
+   */
+  function ausQuarterParts(d) {
+    var month = d.getMonth(); // 0-11
+    var year = d.getFullYear();
+    var fyQ;
+    var monthName;
+    var fyStartYear;
+    if (month >= 6 && month <= 8) {
+      fyQ = 1;
+      monthName = 'September';
+      fyStartYear = year;
+    } else if (month >= 9) {
+      fyQ = 2;
+      monthName = 'December';
+      fyStartYear = year;
+    } else if (month <= 2) {
+      fyQ = 3;
+      monthName = 'March';
+      fyStartYear = year - 1;
+    } else {
+      fyQ = 4;
+      monthName = 'June';
+      fyStartYear = year - 1;
+    }
+    var fyEndShort = String(fyStartYear + 1).slice(2);
+    return {
+      fyQ: fyQ,
+      monthName: monthName,
+      calendarYear: year,
+      fyLabel: fyStartYear + '\u2013' + fyEndShort
+    };
+  }
+
+  /**
+   * Human label for a quarterly observation, e.g. "March quarter 2026 (FY Q3 2025–26)".
+   * @param {string} isoDateStr
+   * @returns {string}
+   */
+  function formatAusQuarterDate(isoDateStr) {
+    if (!isoDateStr) return 'unknown';
+    var d = new Date(isoDateStr);
+    if (isNaN(d.getTime())) return isoDateStr;
+    var p = ausQuarterParts(d);
+    return p.monthName + ' quarter ' + p.calendarYear
+      + ' (FY Q' + p.fyQ + ' ' + p.fyLabel + ')';
+  }
+
+  /**
+   * End of the ABS quarter for period-start dates (e.g. 2026-01-01 → 31 Mar 2026).
+   * @param {Date} periodStart
+   * @returns {Date}
+   */
+  function quarterPeriodEnd(periodStart) {
+    var p = ausQuarterParts(periodStart);
+    // End month: Sep=8, Dec=11, Mar=2, Jun=5
+    var endMonth = p.fyQ === 1 ? 8 : p.fyQ === 2 ? 11 : p.fyQ === 3 ? 2 : 5;
+    var endYear = periodStart.getFullYear();
+    if (p.fyQ === 3 && periodStart.getMonth() <= 2) {
+      endYear = periodStart.getFullYear();
+    } else if (p.fyQ === 4) {
+      endYear = periodStart.getFullYear();
+    }
+    // Last day of endMonth
+    return new Date(endYear, endMonth + 1, 0);
+  }
+
+  /**
    * Render overall verdict text with colored stance label.
    * @param {string} containerId - DOM element ID
    * @param {Object|string} overallData - data.overall from status.json or plain string
@@ -356,16 +438,17 @@ var InterpretationsModule = (function () {
   }
 
   /**
-   * Convert ISO date string to quarter format label.
-   * @param {string} isoDateStr - ISO 8601 date string (e.g. "2021-10-01")
-   * @returns {string} Quarter label e.g. "(Q4 2021)" or empty string if invalid
+   * Convert ISO period-start date to Australian quarter label.
+   * June quarter = FY Q4 (not calendar Q2 alone).
+   * @param {string} isoDateStr - ISO 8601 date string (e.g. "2026-01-01")
+   * @returns {string} e.g. "(March quarter 2026)" or empty if invalid
    */
   function toQuarterLabel(isoDateStr) {
     if (!isoDateStr) return '';
     var d = new Date(isoDateStr);
     if (isNaN(d.getTime())) return '';
-    var q = Math.ceil((d.getMonth() + 1) / 3);
-    return '(Q' + q + ' ' + d.getFullYear() + ')';
+    var p = ausQuarterParts(d);
+    return '(' + p.monthName + ' quarter ' + p.calendarYear + ')';
   }
 
   /**
@@ -801,6 +884,59 @@ var InterpretationsModule = (function () {
   }
 
   /**
+   * Display threshold for card delta badges (gauge points).
+   * Pipeline supplies raw delta; frontend filters per DELT-01.
+   */
+  var DELTA_DISPLAY_THRESHOLD = 5;
+
+  /**
+   * Build a directional delta badge for an indicator card.
+   * Zone colour is the CURRENT gauge value's zone (DELT-03), not
+   * "good/bad" direction colouring.
+   * @param {Object} metricData - Gauge data from status.json
+   * @param {string} [metricId] - For accessible label
+   * @returns {HTMLElement|null} Badge element or null if not shown
+   */
+  function createDeltaBadge(metricData, metricId) {
+    if (!metricData || typeof metricData !== 'object') return null;
+    // DELT-04: no badge without previous_value / delta
+    if (metricData.previous_value == null || metricData.delta == null) {
+      return null;
+    }
+    var delta = Number(metricData.delta);
+    if (!isFinite(delta)) return null;
+    // DELT-01: only show when |delta| >= threshold
+    if (Math.abs(delta) < DELTA_DISPLAY_THRESHOLD) return null;
+
+    var direction = metricData.delta_direction;
+    if (direction !== 'up' && direction !== 'down') {
+      // Infer from signed delta if direction missing
+      if (delta > 0) direction = 'up';
+      else if (delta < 0) direction = 'down';
+      else return null;
+    }
+
+    var arrow = direction === 'up' ? '\u25B2' : '\u25BC';
+    var absVal = Math.abs(delta).toFixed(1);
+    var displayLabel = metricId
+      ? GaugesModule.getDisplayLabel(metricId)
+      : 'Indicator';
+    var dirWord = direction === 'up' ? 'increased' : 'decreased';
+
+    var badge = document.createElement('span');
+    badge.className = 'text-xs font-semibold ml-2 shrink-0';
+    badge.setAttribute('data-delta-badge', 'true');
+    // DELT-03: zone colour of current value via element.style
+    badge.style.color = GaugesModule.getZoneColor(metricData.value);
+    badge.textContent = arrow + ' ' + absVal;
+    badge.setAttribute(
+      'aria-label',
+      displayLabel + ' gauge ' + dirWord + ' by ' + absVal + ' points'
+    );
+    return badge;
+  }
+
+  /**
    * Render a complete metric card with gauge container,
    * interpretation, weight, and source.
    * @param {string} containerId - Parent container DOM element ID
@@ -812,8 +948,23 @@ var InterpretationsModule = (function () {
     var container = document.getElementById(containerId);
     if (!container) return;
 
-    var stale = metricData.staleness_days > 90;
-    // Housing: quarter-only staleness — suppress amber border per CONTEXT.md
+    // Monthly series: 90 days. Quarterly ABS: age from period end + longer grace
+    // (CPI/WPI often ~4 weeks after quarter end; amber only when a print is late).
+    var staleDays = metricData.staleness_days || 0;
+    var isQuarterly = !!QUARTERLY_METRIC_IDS[metricId];
+    if (isQuarterly && metricData.data_date) {
+      var periodStart = new Date(metricData.data_date);
+      if (!isNaN(periodStart.getTime())) {
+        var periodEnd = quarterPeriodEnd(periodStart);
+        staleDays = Math.max(
+          0,
+          Math.round((Date.now() - periodEnd.getTime()) / 86400000)
+        );
+      }
+    }
+    var staleThreshold = isQuarterly ? 130 : 90;
+    var stale = staleDays > staleThreshold;
+    // Housing: quarter-only overlay mode — suppress amber border per CONTEXT.md
     if (metricId === 'housing' && metricData.stale_display === 'quarter_only') {
       stale = false;
     }
@@ -828,13 +979,21 @@ var InterpretationsModule = (function () {
       card.className += ' border-amber-500/50';
     }
 
-    // Header row: label + weight badge
+    // Header row: label + (delta badge + importance) grouped right
     var header = document.createElement('div');
-    header.className = 'flex items-center justify-between mb-2';
+    header.className = 'flex items-center justify-between mb-2 gap-2';
 
     var label = document.createElement('h4');
-    label.className = 'font-semibold text-gray-200';
+    label.className = 'font-semibold text-gray-200 min-w-0 truncate';
     label.textContent = GaugesModule.getDisplayLabel(metricId);
+
+    var rightGroup = document.createElement('div');
+    rightGroup.className = 'flex items-center shrink-0 gap-2';
+
+    var deltaBadge = createDeltaBadge(metricData, metricId);
+    if (deltaBadge) {
+      rightGroup.appendChild(deltaBadge);
+    }
 
     var weightBadge = document.createElement('span');
     weightBadge.className = 'text-xs text-gray-500';
@@ -845,9 +1004,10 @@ var InterpretationsModule = (function () {
     else importanceLabel = 'Lower importance';
     weightBadge.textContent = importanceLabel;
     weightBadge.title = pct + '% of overall score';
+    rightGroup.appendChild(weightBadge);
 
     header.appendChild(label);
-    header.appendChild(weightBadge);
+    header.appendChild(rightGroup);
     card.appendChild(header);
 
     // Low confidence badge
@@ -863,6 +1023,13 @@ var InterpretationsModule = (function () {
     gaugeDiv.id = 'gauge-' + metricId;
     gaugeDiv.className = 'w-full';
     card.appendChild(gaugeDiv);
+
+    // Sparkline container (filled by gauge-init after layout)
+    var sparkWrap = document.createElement('div');
+    sparkWrap.id = 'sparkline-' + metricId;
+    sparkWrap.className = 'w-full mt-1 mb-1';
+    sparkWrap.setAttribute('data-sparkline-host', metricId);
+    card.appendChild(sparkWrap);
 
     // Interpretation text
     var interpDiv = document.createElement('div');
@@ -896,17 +1063,28 @@ var InterpretationsModule = (function () {
       card.appendChild(bcSrcAttr);
     }
 
-    // Source citation with Australian date format
+    // Source citation — quarterly series use AU FY quarter language
     var sourceDiv = document.createElement('div');
     sourceDiv.className = 'text-xs text-gray-600 mt-2';
-    sourceDiv.textContent = 'Data as of ' + formatAusDate(metricData.data_date);
+    if (isQuarterly && metricData.data_date) {
+      sourceDiv.textContent = 'Latest print: '
+        + formatAusQuarterDate(metricData.data_date);
+    } else {
+      sourceDiv.textContent = 'Data as of '
+        + formatAusDate(metricData.data_date);
+    }
     if (stale) {
-      var months = Math.round(metricData.staleness_days / 30);
       var staleNote = document.createElement('span');
       staleNote.className = 'text-amber-400 ml-2';
-      staleNote.textContent = '(' + months + ' month'
-        + (months !== 1 ? 's' : '')
-        + ' old \u2014 newer data not yet available)';
+      if (isQuarterly) {
+        staleNote.textContent = '(next ABS quarter not yet released,'
+          + ' or print is overdue)';
+      } else {
+        var months = Math.round(staleDays / 30);
+        staleNote.textContent = '(' + months + ' month'
+          + (months !== 1 ? 's' : '')
+          + ' old \u2014 newer data not yet available)';
+      }
       sourceDiv.appendChild(staleNote);
     }
     card.appendChild(sourceDiv);
@@ -920,9 +1098,12 @@ var InterpretationsModule = (function () {
     renderStalenessWarning: renderStalenessWarning,
     generateMetricInterpretation: generateMetricInterpretation,
     renderMetricCard: renderMetricCard,
+    createDeltaBadge: createDeltaBadge,
+    DELTA_DISPLAY_THRESHOLD: DELTA_DISPLAY_THRESHOLD,
     getWhyItMatters: getWhyItMatters,
     getPlainVerdict: getPlainVerdict,
     formatAusDate: formatAusDate,
+    formatAusQuarterDate: formatAusQuarterDate,
     isDataSuspect: isDataSuspect,
     toQuarterLabel: toQuarterLabel,
     renderVerdictExplanation: renderVerdictExplanation,

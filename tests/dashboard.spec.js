@@ -169,6 +169,87 @@ test.describe('Phase 9 — Housing Prices Gauge', () => {
 
 });
 
+test.describe('Phase 25 — Indicator Card Deltas & Sparklines', () => {
+
+  test('hero delta appears when hawk_score_delta is present', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('#hawk-score-display', { timeout: 15000 });
+
+    if (statusJson.overall && statusJson.overall.hawk_score_delta != null) {
+      const heroDelta = page.locator('#hero-delta');
+      await expect(heroDelta).toBeVisible({ timeout: 10000 });
+      const d = Number(statusJson.overall.hawk_score_delta);
+      if (d === 0) {
+        await expect(heroDelta).toContainText('No change since last update');
+      } else {
+        await expect(heroDelta).toContainText('since last update');
+        await expect(heroDelta).toContainText(Math.abs(d).toFixed(1));
+      }
+    }
+  });
+
+  test('hero delta absent when hawk_score_delta missing from payload', async ({ page }) => {
+    await page.route('**/data/status.json', async (route) => {
+      const body = JSON.parse(JSON.stringify(statusJson));
+      delete body.overall.hawk_score_delta;
+      delete body.overall.previous_hawk_score;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(body),
+      });
+    });
+    await page.goto('/');
+    await page.waitForSelector('#hawk-score-display', { timeout: 15000 });
+    await expect(page.locator('#hero-delta')).toHaveCount(0);
+  });
+
+  test('delta badge appears when |delta| >= 5', async ({ page }) => {
+    await page.goto('/');
+    const grid = page.locator('#metric-gauges-grid');
+    await expect(grid.locator('[class*="bg-finance-gray"]')).toHaveCount(7, { timeout: 15000 });
+
+    // Inflation has |delta| = 35.2 in live status.json
+    const inflationCard = grid.locator('[class*="bg-finance-gray"]').filter({ hasText: 'Inflation' });
+    await expect(inflationCard.locator('[data-delta-badge="true"]')).toHaveCount(1);
+    await expect(inflationCard.locator('[data-delta-badge="true"]')).toContainText('35.2');
+  });
+
+  test('delta badge does not appear when |delta| < 5', async ({ page }) => {
+    await page.goto('/');
+    const grid = page.locator('#metric-gauges-grid');
+    await expect(grid.locator('[class*="bg-finance-gray"]')).toHaveCount(7, { timeout: 15000 });
+
+    // Wages has |delta| = 4.4 in live status.json — under threshold
+    const wagesCard = grid.locator('[class*="bg-finance-gray"]').filter({ hasText: 'Wages' });
+    await expect(wagesCard.locator('[data-delta-badge="true"]')).toHaveCount(0);
+  });
+
+  test('sparkline canvas for indicators with >= 3 history points', async ({ page }) => {
+    await page.goto('/');
+    const grid = page.locator('#metric-gauges-grid');
+    await expect(grid.locator('[class*="bg-finance-gray"]')).toHaveCount(7, { timeout: 15000 });
+
+    // Inflation has 12 history points
+    const sparkHost = page.locator('#sparkline-inflation');
+    await expect(sparkHost).toBeVisible();
+    await expect(sparkHost.locator('canvas')).toHaveCount(1, { timeout: 10000 });
+  });
+
+  test('Building history placeholder when history is short', async ({ page }) => {
+    await page.goto('/');
+    const grid = page.locator('#metric-gauges-grid');
+    await expect(grid.locator('[class*="bg-finance-gray"]')).toHaveCount(7, { timeout: 15000 });
+
+    // business_confidence currently has 1 history point
+    const bcSpark = page.locator('#sparkline-business_confidence');
+    await expect(bcSpark).toBeVisible({ timeout: 10000 });
+    await expect(bcSpark).toContainText('Building history...');
+    await expect(bcSpark.locator('canvas')).toHaveCount(0);
+  });
+
+});
+
 test.describe('Phase 10 — Business Conditions Gauge', () => {
 
   test('business conditions gauge shows capacity utilisation trend label', async ({ page }) => {

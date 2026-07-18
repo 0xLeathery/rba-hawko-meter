@@ -20,6 +20,7 @@ module.exports = defineConfig([
         CountdownModule: "writable",
         CalculatorModule: "writable",
         InterpretationsModule: "writable",
+        SparklineModule: "writable",
       },
     },
     rules: {
@@ -34,7 +35,7 @@ module.exports = defineConfig([
           varsIgnorePattern:
             "^(GaugesModule|ChartModule|DataModule"
             + "|CountdownModule|CalculatorModule"
-            + "|InterpretationsModule)$",
+            + "|InterpretationsModule|SparklineModule)$",
           caughtErrorsIgnorePattern: "^_",
           argsIgnorePattern: "^_",
         },

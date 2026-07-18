@@ -96,7 +96,78 @@ var GaugesModule = (function () {
   }
 
   /**
+   * Shared angular gauge: zone bands + fill-to-score bar + needle at score.
+   * Plotly has no separate needle — `threshold` draws the pointer and MUST
+   * equal `value` (a fixed 50 threshold looks like the score is mid-scale).
+   * Bar fill + white needle together make the reading obvious on dark UI.
+   * @param {number} value - Gauge value 0-100
+   * @param {Object} [opts]
+   * @param {number} [opts.numberSize]
+   * @param {string} [opts.barColor] - fill colour 0→value
+   * @param {number} [opts.barThickness]
+   * @param {string} [opts.needleColor]
+   * @param {number} [opts.needleWidth]
+   * @returns {Object} Plotly indicator trace
+   */
+  function angularScoreTrace(value, opts) {
+    opts = opts || {};
+    var numberSize = opts.numberSize != null ? opts.numberSize : 52;
+    var v = Math.max(0, Math.min(100, Number(value) || 0));
+    var barColor = opts.barColor != null
+      ? opts.barColor
+      : getZoneColor(v);
+    var barThickness = opts.barThickness != null
+      ? opts.barThickness
+      : 0.55;
+    var needleColor = opts.needleColor || '#ffffff';
+    var needleWidth = opts.needleWidth != null ? opts.needleWidth : 5;
+
+    return {
+      type: 'indicator',
+      mode: 'gauge+number',
+      value: v,
+      title: { text: '' },
+      number: {
+        font: { size: numberSize, color: '#f3f4f6' },
+        valueformat: '.0f',
+        suffix: '/100'
+      },
+      gauge: {
+        shape: 'angular',
+        axis: {
+          range: [0, 100],
+          tickwidth: 1,
+          tickcolor: '#4a4a4a',
+          tickfont: {
+            size: numberSize >= 40 ? 12 : 10,
+            color: '#9ca3af'
+          },
+          // 50 is a scale tick only — not the needle
+          tickvals: [0, 20, 40, 50, 60, 80, 100],
+          ticktext: ['0', '20', '40', '50', '60', '80', '100']
+        },
+        // Fill 0 → score (primary visual of "where we are")
+        bar: { color: barColor, thickness: barThickness },
+        bgcolor: '#1f2937',
+        borderwidth: 0,
+        steps: getGaugeSteps(),
+        // Needle at score — white for contrast on coloured bar
+        threshold: {
+          line: {
+            color: needleColor,
+            width: needleWidth
+          },
+          thickness: 0.9,
+          value: v
+        }
+      },
+      domain: { x: [0, 1], y: [0, 1] }
+    };
+  }
+
+  /**
    * Create the hero semicircle Hawk Score gauge.
+   * Fill + needle + number all show hawkScore.
    * @param {string} containerId - DOM element ID for the gauge
    * @param {number} hawkScore - Hawk score 0-100
    */
@@ -109,41 +180,21 @@ var GaugesModule = (function () {
       }
     }
 
-    var trace = {
-      type: 'indicator',
-      mode: 'gauge+number',
-      value: hawkScore,
-      title: { text: '' },
-      number: {
-        font: { size: 52, color: '#f3f4f6' },
-        valueformat: '.0f',
-        suffix: '/100'
-      },
-      gauge: {
-        shape: 'angular',
-        axis: {
-          range: [0, 100],
-          tickwidth: 1,
-          tickcolor: '#4a4a4a',
-          tickfont: { size: 12, color: '#9ca3af' }
-        },
-        bar: { color: getZoneColor(hawkScore), thickness: 0.6 },
-        bgcolor: '#1f2937',
-        borderwidth: 0,
-        steps: getGaugeSteps(),
-        threshold: {
-          line: { color: '#fbbf24', width: 3 },
-          thickness: 0.75,
-          value: 50
-        }
-      },
-      domain: { x: [0, 1], y: [0, 1] }
-    };
-
     var layout = getDarkLayout();
     var config = { responsive: true, displayModeBar: false };
 
-    Plotly.newPlot(containerId, [trace], layout, config);
+    Plotly.newPlot(
+      containerId,
+      [angularScoreTrace(hawkScore, {
+        numberSize: 52,
+        barColor: getZoneColor(hawkScore),
+        barThickness: 0.55,
+        needleColor: '#ffffff',
+        needleWidth: 6
+      })],
+      layout,
+      config
+    );
   }
 
   /**
@@ -164,46 +215,22 @@ var GaugesModule = (function () {
     var animDuration = 1500;
     var startTime = null;
     var finalColor = getZoneColor(hawkScore);
+    var layout = getDarkLayout();
+    var config = { responsive: true, displayModeBar: false };
 
     function easeOutExpo(t) {
       return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
     }
 
     function buildTrace(value) {
-      return {
-        type: 'indicator',
-        mode: 'gauge+number',
-        value: value,
-        title: { text: '' },
-        number: {
-          font: { size: 52, color: '#f3f4f6' },
-          valueformat: '.0f',
-          suffix: '/100'
-        },
-        gauge: {
-          shape: 'angular',
-          axis: {
-            range: [0, 100],
-            tickwidth: 1,
-            tickcolor: '#4a4a4a',
-            tickfont: { size: 12, color: '#9ca3af' }
-          },
-          bar: { color: finalColor, thickness: 0.6 },
-          bgcolor: '#1f2937',
-          borderwidth: 0,
-          steps: getGaugeSteps(),
-          threshold: {
-            line: { color: '#fbbf24', width: 3 },
-            thickness: 0.75,
-            value: 50
-          }
-        },
-        domain: { x: [0, 1], y: [0, 1] }
-      };
+      return angularScoreTrace(value, {
+        numberSize: 52,
+        barColor: finalColor,
+        barThickness: 0.55,
+        needleColor: '#ffffff',
+        needleWidth: 6
+      });
     }
-
-    var layout = getDarkLayout();
-    var config = { responsive: true, displayModeBar: false };
 
     Plotly.newPlot(containerId, [buildTrace(0)], layout, config);
 
@@ -230,79 +257,40 @@ var GaugesModule = (function () {
    * @param {number} hawkScore - New hawk score 0-100
    */
   function updateHeroGauge(containerId, hawkScore) {
-    var trace = {
-      type: 'indicator',
-      mode: 'gauge+number',
-      value: hawkScore,
-      title: { text: '' },
-      number: {
-        font: { size: 52, color: '#f3f4f6' },
-        valueformat: '.0f',
-        suffix: '/100'
-      },
-      gauge: {
-        shape: 'angular',
-        axis: {
-          range: [0, 100],
-          tickwidth: 1,
-          tickcolor: '#4a4a4a',
-          tickfont: { size: 12, color: '#9ca3af' }
-        },
-        bar: { color: getZoneColor(hawkScore), thickness: 0.6 },
-        bgcolor: '#1f2937',
-        borderwidth: 0,
-        steps: getGaugeSteps(),
-        threshold: {
-          line: { color: '#fbbf24', width: 3 },
-          thickness: 0.75,
-          value: 50
-        }
-      },
-      domain: { x: [0, 1], y: [0, 1] }
-    };
-
     var layout = getDarkLayout();
     var config = { responsive: true, displayModeBar: false };
 
-    Plotly.react(containerId, [trace], layout, config);
+    Plotly.react(
+      containerId,
+      [angularScoreTrace(hawkScore, {
+        numberSize: 52,
+        barColor: getZoneColor(hawkScore),
+        barThickness: 0.55,
+        needleColor: '#ffffff',
+        needleWidth: 6
+      })],
+      layout,
+      config
+    );
   }
 
   /**
    * Build a metric needle gauge trace (shared by create/update).
+   * Lighter fill + white needle at metric value.
    * @param {number} value - Gauge value 0-100
    * @returns {Object} Plotly trace
    */
   function metricGaugeTrace(value) {
-    return {
-      type: 'indicator',
-      mode: 'gauge+number',
-      value: value,
-      number: {
-        font: { size: 28, color: '#f3f4f6' },
-        valueformat: '.0f',
-        suffix: '/100'
-      },
-      gauge: {
-        shape: 'angular',
-        axis: {
-          range: [0, 100],
-          tickwidth: 1,
-          tickcolor: '#4a4a4a',
-          tickfont: { size: 10, color: '#6b7280' },
-          dtick: 20
-        },
-        bar: { color: 'rgba(0,0,0,0)', thickness: 0 },
-        bgcolor: '#1f2937',
-        borderwidth: 0,
-        steps: getGaugeSteps(),
-        threshold: {
-          line: { color: '#ffffff', width: 4 },
-          thickness: 0.85,
-          value: value
-        }
-      },
-      domain: { x: [0, 1], y: [0, 1] }
-    };
+    var v = Math.max(0, Math.min(100, Number(value) || 0));
+    // Soft zone-coloured fill so small cards stay readable
+    var soft = getZoneColor(v);
+    return angularScoreTrace(v, {
+      numberSize: 28,
+      barColor: soft,
+      barThickness: 0.4,
+      needleColor: '#ffffff',
+      needleWidth: 4
+    });
   }
 
   /**
