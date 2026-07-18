@@ -24,30 +24,51 @@ def _make_lambda_mock(return_value=None, side_effect=None):
     return lambda: m()
 
 
-def _stub_frontend(monkeypatch, *, available=True, result=None, side_effect=None):
+def _stub_frontend(monkeypatch, *, result=None, side_effect=None):
     """Avoid writing real meetings/rates during main pipeline unit tests."""
-    monkeypatch.setattr("pipeline.main.FRONTEND_DATA_AVAILABLE", available)
-    if available:
-        if side_effect is not None:
-            monkeypatch.setattr(
-                "pipeline.main.generate_frontend_data",
-                MagicMock(side_effect=side_effect),
-            )
-        else:
-            if result is None:
-                result = {
-                    "meetings": {
-                        "next_meeting": {
-                            "display_date": "4 August 2026",
-                            "date": "2026-08-04T14:30:00+10:00",
-                        }
-                    },
-                    "rates": {"current_rate": 4.35},
+    if side_effect is not None:
+        monkeypatch.setattr(
+            "pipeline.main.generate_frontend_data",
+            MagicMock(side_effect=side_effect),
+        )
+        return
+    if result is None:
+        result = {
+            "meetings": {
+                "next_meeting": {
+                    "display_date": "4 August 2026",
+                    "date": "2026-08-04T14:30:00+10:00",
                 }
-            monkeypatch.setattr(
-                "pipeline.main.generate_frontend_data",
-                MagicMock(return_value=result),
-            )
+            },
+            "rates": {"current_rate": 4.35},
+        }
+    monkeypatch.setattr(
+        "pipeline.main.generate_frontend_data",
+        MagicMock(return_value=result),
+    )
+
+
+def _stub_critical_refresh(monkeypatch, *, meetings=None, status=None):
+    """Stub best-effort refresh used after critical failure."""
+    if meetings is None:
+        meetings = {
+            "next_meeting": {
+                "display_date": "4 August 2026",
+                "date": "2026-08-04T14:30:00+10:00",
+            }
+        }
+    monkeypatch.setattr(
+        "pipeline.main.generate_meetings_json",
+        MagicMock(return_value=meetings),
+    )
+    if status is not None:
+        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", True)
+        monkeypatch.setattr(
+            "pipeline.main.generate_status",
+            MagicMock(return_value=status),
+        )
+    else:
+        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
 
 
 # =============================================================================
@@ -106,6 +127,7 @@ class TestRunPipeline:
         )
         monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
+        _stub_critical_refresh(monkeypatch)
 
         from pipeline.main import run_pipeline
 
@@ -113,6 +135,66 @@ class TestRunPipeline:
             run_pipeline()
 
         assert exc_info.value.code == 1
+
+    def test_critical_failure_still_refreshes_meetings(self, monkeypatch):
+        """ABS critical fail must still refresh meetings.json before exit."""
+        critical_mock = _make_lambda_mock(
+            side_effect=RuntimeError("ABS 403")
+        )
+        meetings_mock = MagicMock(
+            return_value={
+                "next_meeting": {
+                    "display_date": "4 August 2026",
+                    "date": "2026-08-04T14:30:00+10:00",
+                }
+            }
+        )
+
+        monkeypatch.setattr(
+            "pipeline.main.CRITICAL_SOURCES", [("ABS CPI", critical_mock)]
+        )
+        monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
+        monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
+        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", False)
+        monkeypatch.setattr("pipeline.main.generate_meetings_json", meetings_mock)
+
+        from pipeline.main import run_pipeline
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_pipeline()
+
+        assert exc_info.value.code == 1
+        meetings_mock.assert_called_once()
+
+    def test_critical_failure_refreshes_status_from_last_known(self, monkeypatch):
+        """Critical fail still regenerates status.json from existing CSVs."""
+        critical_mock = _make_lambda_mock(side_effect=RuntimeError("ABS down"))
+        mock_status = {
+            "overall": {"hawk_score": 50.0, "zone_label": "Balanced"},
+            "metadata": {"indicators_available": 5, "indicators_missing": []},
+        }
+        status_mock = MagicMock(return_value=mock_status)
+        meetings_mock = MagicMock(
+            return_value={"next_meeting": {"display_date": "4 August 2026"}}
+        )
+
+        monkeypatch.setattr(
+            "pipeline.main.CRITICAL_SOURCES", [("ABS CPI", critical_mock)]
+        )
+        monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
+        monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
+        monkeypatch.setattr("pipeline.main.NORMALIZATION_AVAILABLE", True)
+        monkeypatch.setattr("pipeline.main.generate_status", status_mock)
+        monkeypatch.setattr("pipeline.main.generate_meetings_json", meetings_mock)
+
+        from pipeline.main import run_pipeline
+
+        with pytest.raises(SystemExit) as exc_info:
+            run_pipeline()
+
+        assert exc_info.value.code == 1
+        status_mock.assert_called_once()
+        meetings_mock.assert_called_once()
 
     def test_important_failure_returns_partial_with_failures_list(self, monkeypatch):
         """Important source failure → status 'partial', important_failures populated."""
@@ -249,6 +331,7 @@ class TestRunPipeline:
         )
         monkeypatch.setattr("pipeline.main.IMPORTANT_SOURCES", [])
         monkeypatch.setattr("pipeline.main.OPTIONAL_SOURCES", [])
+        _stub_critical_refresh(monkeypatch)
 
         from pipeline.main import run_pipeline
 

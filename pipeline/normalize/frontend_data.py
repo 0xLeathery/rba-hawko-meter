@@ -133,9 +133,13 @@ def generate_meetings_json(
             else:
                 tz_label = "AEST"
 
+            # Portable day (no %-d — that is platform-specific)
+            display_date = (
+                f"{meeting_dt.day} {meeting_dt.strftime('%B %Y')}"
+            )
             all_meetings.append({
                 "date": meeting_dt.isoformat(),
-                "display_date": meeting_dt.strftime("%-d %B %Y"),
+                "display_date": display_date,
                 "display_time": f"2:30pm {tz_label}",
             })
 

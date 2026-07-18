@@ -36,7 +36,7 @@ class TestGenerateMeetingsJson:
 
         nm = result["next_meeting"]
         assert nm["date"].startswith("2026-08-04")
-        assert "August 2026" in nm["display_date"]
+        assert nm["display_date"] == "4 August 2026"
         assert datetime.fromisoformat(nm["date"]) > now
 
         out = tmp_path / "meetings.json"

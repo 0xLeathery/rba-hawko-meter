@@ -18,19 +18,17 @@ from typing import Any
 
 # Import all ingestors
 from pipeline.ingest import abs_data, corelogic_scraper, nab_scraper, rba_data
+from pipeline.normalize.frontend_data import (
+    generate_frontend_data,
+    generate_meetings_json,
+)
 
-# Import normalization engine (guarded -- pipeline works even if module unavailable)
+# Normalization guarded for partial checkouts (historical pattern).
 try:
     from pipeline.normalize.engine import generate_status
     NORMALIZATION_AVAILABLE = True
 except ImportError:
     NORMALIZATION_AVAILABLE = False
-
-try:
-    from pipeline.normalize.frontend_data import generate_frontend_data
-    FRONTEND_DATA_AVAILABLE = True
-except ImportError:
-    FRONTEND_DATA_AVAILABLE = False
 
 
 # Define source tiers
@@ -50,6 +48,59 @@ OPTIONAL_SOURCES = [
     ('CoreLogic Housing', corelogic_scraper),
     ('NAB Capacity', nab_scraper),
 ]
+
+
+def _refresh_artifacts_after_critical_failure(results: dict[str, Any]) -> None:
+    """Best-effort refresh that does not depend on critical ingest succeeding.
+
+    Meetings are pure calendar (no ABS). Status uses last-known CSVs when
+    the normalization engine is available. Failures here are recorded but
+    never suppress the pipeline's non-zero exit.
+    """
+    print("\n  Best-effort refresh after critical failure...")
+
+    if NORMALIZATION_AVAILABLE:
+        try:
+            status = generate_status()
+            results['normalization'] = {
+                'status': 'success',
+                'hawk_score': status['overall']['hawk_score'],
+                'indicators_available': status['metadata']['indicators_available'],
+                'indicators_missing': status['metadata']['indicators_missing'],
+                'after_critical_failure': True,
+            }
+            print(
+                f"  status.json refreshed from last-known CSVs "
+                f"(hawk={status['overall']['hawk_score']:.1f})"
+            )
+        except Exception as e:
+            results['normalization'] = {
+                'status': 'failed',
+                'error': str(e),
+                'after_critical_failure': True,
+            }
+            print(f"  WARNING: status.json refresh failed: {e}")
+
+    try:
+        meetings = generate_meetings_json()
+        next_m = meetings.get('next_meeting') or {}
+        results['frontend_data'] = {
+            'status': 'success',
+            'next_meeting': next_m.get('display_date'),
+            'meetings_only': True,
+            'after_critical_failure': True,
+        }
+        print(
+            f"  meetings.json refreshed "
+            f"(next: {next_m.get('display_date', 'n/a')})"
+        )
+    except Exception as e:
+        results['frontend_data'] = {
+            'status': 'failed',
+            'error': str(e),
+            'after_critical_failure': True,
+        }
+        print(f"  WARNING: meetings.json refresh failed: {e}")
 
 
 def run_pipeline() -> dict[str, Any]:
@@ -104,7 +155,9 @@ def run_pipeline() -> dict[str, Any]:
             }
             results['status'] = 'failed'
 
-            # Print summary and exit immediately
+            # Calendar/status must not freeze just because ABS died.
+            _refresh_artifacts_after_critical_failure(results)
+
             print("\n" + "=" * 60)
             print("PIPELINE FAILED - CRITICAL SOURCE ERROR")
             print("=" * 60)
@@ -236,31 +289,24 @@ def run_pipeline() -> dict[str, Any]:
     print("\n\nPHASE 5: FRONTEND DATA")
     print("-" * 60)
 
-    if not FRONTEND_DATA_AVAILABLE:
-        print("\n  Frontend data module not available -- skipping")
+    try:
+        frontend = generate_frontend_data()
+        next_m = (frontend.get('meetings') or {}).get('next_meeting') or {}
         results['frontend_data'] = {
-            'status': 'skipped',
-            'reason': 'module not available',
+            'status': 'success',
+            'next_meeting': next_m.get('display_date'),
+            'rates': frontend.get('rates') is not None,
         }
-    else:
-        try:
-            frontend = generate_frontend_data()
-            next_m = (frontend.get('meetings') or {}).get('next_meeting') or {}
-            results['frontend_data'] = {
-                'status': 'success',
-                'next_meeting': next_m.get('display_date'),
-                'rates': frontend.get('rates') is not None,
-            }
-            print(
-                f"\n  Frontend data OK"
-                f" (next meeting: {next_m.get('display_date', 'n/a')})"
-            )
-        except Exception as e:
-            print(f"\n  WARNING: Frontend data generation failed: {e}")
-            results['frontend_data'] = {
-                'status': 'failed',
-                'error': str(e),
-            }
+        print(
+            f"\n  Frontend data OK"
+            f" (next meeting: {next_m.get('display_date', 'n/a')})"
+        )
+    except Exception as e:
+        print(f"\n  WARNING: Frontend data generation failed: {e}")
+        results['frontend_data'] = {
+            'status': 'failed',
+            'error': str(e),
+        }
 
     # Print summary
     print("\n" + "=" * 60)

@@ -35,7 +35,7 @@ jobs:
         run: python -m pipeline.normalize.engine
 
       - name: Refresh meetings.json
-        run: python -c "from pipeline.normalize.frontend_data import generate_meetings_json; generate_meetings_json()"
+        run: python -c "from pipeline.normalize.frontend_data import generate_frontend_data; generate_frontend_data(meetings_only=True)"
 
       - name: Verify ASX data freshness
         continue-on-error: true
