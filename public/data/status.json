@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-08-18T07:08:57.946707Z",
+  "generated_at": "2026-08-19T07:09:17.901878Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 70.4,
@@ -21,7 +21,7 @@
       "weight": 0.25,
       "polarity": 1,
       "data_date": "2026-04-01",
-      "staleness_days": 139,
+      "staleness_days": 140,
       "confidence": "HIGH",
       "interpretation": "Inflation above long-run average",
       "history": [
@@ -52,7 +52,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-01-01",
-      "staleness_days": 229,
+      "staleness_days": 230,
       "confidence": "HIGH",
       "interpretation": "Wage growth significantly above long-run average",
       "history": [
@@ -83,7 +83,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-06-30",
-      "staleness_days": 49,
+      "staleness_days": 50,
       "confidence": "HIGH",
       "interpretation": "Labour market near historical average",
       "history": [
@@ -114,7 +114,7 @@
       "weight": 0.1,
       "polarity": 1,
       "data_date": "2026-06-30",
-      "staleness_days": 49,
+      "staleness_days": 50,
       "confidence": "HIGH",
       "interpretation": "Consumer spending above trend",
       "history": [
@@ -145,7 +145,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-06-30",
-      "staleness_days": 49,
+      "staleness_days": 50,
       "confidence": "HIGH",
       "interpretation": "Building approvals above trend",
       "history": [
@@ -176,7 +176,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-02-28",
-      "staleness_days": 171,
+      "staleness_days": 172,
       "confidence": "LOW",
       "interpretation": "Housing prices well above trend",
       "history": [
@@ -209,7 +209,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": -43,
+      "staleness_days": -42,
       "confidence": "LOW",
       "interpretation": "Capacity utilisation near long-run average",
       "history": [
@@ -254,7 +254,7 @@
       "hike": 0.0
     },
     "direction": "hold",
-    "data_date": "2026-08-18",
+    "data_date": "2026-08-19",
     "staleness_days": 0,
     "meetings": [
       {
@@ -270,7 +270,7 @@
         "meeting_date": "2026-10-06",
         "meeting_date_label": "6 Oct 2026",
         "implied_rate": 4.38,
-        "change_bp": 3.5,
+        "change_bp": 3.0,
         "probability_cut": 0.0,
         "probability_hold": 100.0,
         "probability_hike": 0.0
@@ -278,11 +278,11 @@
       {
         "meeting_date": "2026-11-03",
         "meeting_date_label": "3 Nov 2026",
-        "implied_rate": 4.46,
-        "change_bp": 11.0,
+        "implied_rate": 4.47,
+        "change_bp": 12.0,
         "probability_cut": 0.0,
-        "probability_hold": 56.0,
-        "probability_hike": 44.0
+        "probability_hold": 52.0,
+        "probability_hike": 48.0
       },
       {
         "meeting_date": "2026-12-01",
