@@ -6,9 +6,7 @@
     "zone": "warm",
     "zone_label": "Mild hawkish pressure",
     "verdict": "Economic indicators suggest moderate tightening pressure",
-    "confidence": "LOW",
-    "previous_hawk_score": 70.4,
-    "hawk_score_delta": -1.9
+    "confidence": "LOW"
   },
   "gauges": {
     "inflation": {
@@ -37,10 +35,7 @@
         71.6,
         74.6,
         70.3
-      ],
-      "previous_value": 70.3,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      ]
     },
     "wages": {
       "value": 74.3,
@@ -68,10 +63,7 @@
         93.6,
         80.4,
         74.3
-      ],
-      "previous_value": 80.4,
-      "delta": -6.1,
-      "delta_direction": "down"
+      ]
     },
     "employment": {
       "value": 37.4,
@@ -99,10 +91,7 @@
         42.0,
         43.1,
         37.4
-      ],
-      "previous_value": 42.9,
-      "delta": -5.5,
-      "delta_direction": "down"
+      ]
     },
     "spending": {
       "value": 65.3,
@@ -130,10 +119,7 @@
         60.2,
         71.3,
         65.3
-      ],
-      "previous_value": 65.3,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      ]
     },
     "building_approvals": {
       "value": 66.1,
@@ -161,10 +147,7 @@
         59.6,
         68.3,
         66.1
-      ],
-      "previous_value": 66.1,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      ]
     },
     "housing": {
       "value": 100.0,
@@ -194,10 +177,7 @@
         100.0
       ],
       "data_source": "Cotality HVI",
-      "stale_display": "quarter_only",
-      "previous_value": 100.0,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      "stale_display": "quarter_only"
     },
     "business_confidence": {
       "value": 50.0,
@@ -217,10 +197,7 @@
       ],
       "long_run_avg": 83.2,
       "direction": "STEADY",
-      "data_source": "NAB Monthly Business Survey",
-      "previous_value": 50.0,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      "data_source": "NAB Monthly Business Survey"
     }
   },
   "weights": {
