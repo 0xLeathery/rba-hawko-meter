@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-01T11:46:51.971023Z",
+  "generated_at": "2026-09-02T11:28:20.459016Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 69.0,
@@ -21,7 +21,7 @@
       "weight": 0.25,
       "polarity": 1,
       "data_date": "2026-04-01",
-      "staleness_days": 153,
+      "staleness_days": 154,
       "confidence": "HIGH",
       "interpretation": "Inflation above long-run average",
       "history": [
@@ -52,7 +52,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-04-01",
-      "staleness_days": 153,
+      "staleness_days": 154,
       "confidence": "HIGH",
       "interpretation": "Wage growth above long-run average",
       "history": [
@@ -83,7 +83,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": -29,
+      "staleness_days": -28,
       "confidence": "HIGH",
       "interpretation": "Labour market looser than historical average",
       "history": [
@@ -114,7 +114,7 @@
       "weight": 0.1,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": -29,
+      "staleness_days": -28,
       "confidence": "HIGH",
       "interpretation": "Consumer spending above trend",
       "history": [
@@ -145,7 +145,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-06-30",
-      "staleness_days": 63,
+      "staleness_days": 64,
       "confidence": "HIGH",
       "interpretation": "Building approvals above trend",
       "history": [
@@ -176,7 +176,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-02-28",
-      "staleness_days": 185,
+      "staleness_days": 186,
       "confidence": "LOW",
       "interpretation": "Housing prices well above trend",
       "history": [
@@ -209,7 +209,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": -29,
+      "staleness_days": -28,
       "confidence": "LOW",
       "interpretation": "Capacity utilisation near long-run average",
       "history": [
@@ -246,49 +246,49 @@
   },
   "asx_futures": {
     "current_rate": 4.35,
-    "next_meeting": "2026-09-01",
-    "implied_rate": 4.35,
+    "next_meeting": "2026-10-06",
+    "implied_rate": 4.54,
     "probabilities": {
       "cut": 0.0,
-      "hold": 100.0,
-      "hike": 0.0
+      "hold": 24.0,
+      "hike": 76.0
     },
-    "direction": "hold",
-    "data_date": "2026-09-01",
+    "direction": "hike",
+    "data_date": "2026-09-02",
     "staleness_days": 0,
     "meetings": [
       {
-        "meeting_date": "2026-09-01",
-        "meeting_date_label": "1 Sep 2026",
-        "implied_rate": 4.35,
-        "change_bp": 0.0,
-        "probability_cut": 0.0,
-        "probability_hold": 100.0,
-        "probability_hike": 0.0
-      },
-      {
         "meeting_date": "2026-10-06",
         "meeting_date_label": "6 Oct 2026",
-        "implied_rate": 4.49,
-        "change_bp": 13.5,
+        "implied_rate": 4.54,
+        "change_bp": 19.0,
         "probability_cut": 0.0,
-        "probability_hold": 46.0,
-        "probability_hike": 54.0
+        "probability_hold": 24.0,
+        "probability_hike": 76.0
       },
       {
         "meeting_date": "2026-11-03",
         "meeting_date_label": "3 Nov 2026",
-        "implied_rate": 4.59,
-        "change_bp": 24.5,
+        "implied_rate": 4.64,
+        "change_bp": 29.5,
         "probability_cut": 0.0,
-        "probability_hold": 2.0,
-        "probability_hike": 98.0
+        "probability_hold": 0.0,
+        "probability_hike": 100.0
       },
       {
         "meeting_date": "2026-12-01",
         "meeting_date_label": "1 Dec 2026",
-        "implied_rate": 4.62,
-        "change_bp": 27.5,
+        "implied_rate": 4.68,
+        "change_bp": 33.5,
+        "probability_cut": 0.0,
+        "probability_hold": 0.0,
+        "probability_hike": 100.0
+      },
+      {
+        "meeting_date": "2027-02-02",
+        "meeting_date_label": "2 Feb 2027",
+        "implied_rate": 4.75,
+        "change_bp": 39.5,
         "probability_cut": 0.0,
         "probability_hold": 0.0,
         "probability_hike": 100.0
