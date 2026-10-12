@@ -1,0 +1,275 @@
+{
+  "generated_at": "2026-10-12T02:47:28.387983Z",
+  "pipeline_version": "1.0.0",
+  "overall": {
+    "hawk_score": 69.3,
+    "zone": "warm",
+    "zone_label": "Mild hawkish pressure",
+    "verdict": "Economic indicators suggest moderate tightening pressure",
+    "confidence": "LOW"
+  },
+  "gauges": {
+    "inflation": {
+      "value": 70.3,
+      "zone": "warm",
+      "zone_label": "Mild hawkish pressure",
+      "z_score": 1.219,
+      "raw_value": 3.94,
+      "raw_unit": "% YoY",
+      "weight": 0.25,
+      "polarity": 1,
+      "data_date": "2026-04-01",
+      "staleness_days": 194,
+      "confidence": "HIGH",
+      "interpretation": "Inflation above long-run average",
+      "history": [
+        100.0,
+        96.7,
+        85.0,
+        86.4,
+        67.6,
+        59.1,
+        58.7,
+        52.7,
+        68.6,
+        71.6,
+        74.6,
+        70.3
+      ]
+    },
+    "wages": {
+      "value": 74.3,
+      "zone": "warm",
+      "zone_label": "Mild hawkish pressure",
+      "z_score": 1.457,
+      "raw_value": 3.2,
+      "raw_unit": "% YoY",
+      "weight": 0.15,
+      "polarity": 1,
+      "data_date": "2026-04-01",
+      "staleness_days": 194,
+      "confidence": "HIGH",
+      "interpretation": "Wage growth above long-run average",
+      "history": [
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        100.0,
+        99.3,
+        99.8,
+        94.6,
+        94.2,
+        93.6,
+        80.4,
+        74.3
+      ]
+    },
+    "employment": {
+      "value": 41.6,
+      "zone": "neutral",
+      "zone_label": "Balanced",
+      "z_score": -0.502,
+      "raw_value": 1.63,
+      "raw_unit": "% YoY",
+      "weight": 0.15,
+      "polarity": 1,
+      "data_date": "2026-09-30",
+      "staleness_days": 12,
+      "confidence": "HIGH",
+      "interpretation": "Labour market near historical average",
+      "history": [
+        55.1,
+        47.6,
+        47.6,
+        53.1,
+        54.2,
+        43.2,
+        39.9,
+        28.9,
+        29.9,
+        41.8,
+        42.3,
+        41.6
+      ]
+    },
+    "spending": {
+      "value": 68.7,
+      "zone": "warm",
+      "zone_label": "Mild hawkish pressure",
+      "z_score": 1.12,
+      "raw_value": 6.84,
+      "raw_unit": "% YoY",
+      "weight": 0.1,
+      "polarity": 1,
+      "data_date": "2026-09-30",
+      "staleness_days": 12,
+      "confidence": "HIGH",
+      "interpretation": "Consumer spending above trend",
+      "history": [
+        50.3,
+        45.5,
+        42.4,
+        22.5,
+        52.7,
+        54.0,
+        59.9,
+        62.0,
+        60.1,
+        71.1,
+        64.6,
+        68.7
+      ]
+    },
+    "building_approvals": {
+      "value": 60.3,
+      "zone": "warm",
+      "zone_label": "Mild hawkish pressure",
+      "z_score": 0.619,
+      "raw_value": 10.35,
+      "raw_unit": "% YoY",
+      "weight": 0.05,
+      "polarity": 1,
+      "data_date": "2026-09-30",
+      "staleness_days": 12,
+      "confidence": "HIGH",
+      "interpretation": "Building approvals above trend",
+      "history": [
+        32.8,
+        45.6,
+        46.0,
+        62.2,
+        72.3,
+        73.5,
+        83.4,
+        77.2,
+        59.7,
+        68.4,
+        66.7,
+        60.3
+      ]
+    },
+    "housing": {
+      "value": 100.0,
+      "zone": "hot",
+      "zone_label": "Strong hawkish pressure",
+      "z_score": 3.457,
+      "raw_value": 9.4,
+      "raw_unit": "% YoY",
+      "weight": 0.15,
+      "polarity": 1,
+      "data_date": "2026-02-28",
+      "staleness_days": 226,
+      "confidence": "LOW",
+      "interpretation": "Housing prices well above trend",
+      "history": [
+        12.9,
+        12.7,
+        23.1,
+        44.0,
+        56.0,
+        53.6,
+        49.5,
+        47.8,
+        58.3,
+        84.0,
+        100.0,
+        100.0
+      ],
+      "data_source": "Cotality HVI",
+      "stale_display": "quarter_only"
+    },
+    "business_confidence": {
+      "value": 50.0,
+      "zone": "neutral",
+      "zone_label": "Balanced",
+      "z_score": 0.0,
+      "raw_value": 83.6,
+      "raw_unit": "%",
+      "weight": 0.05,
+      "polarity": 1,
+      "data_date": "2026-09-30",
+      "staleness_days": 12,
+      "confidence": "LOW",
+      "interpretation": "Capacity utilisation near long-run average",
+      "history": [
+        50.0
+      ],
+      "long_run_avg": 83.3,
+      "direction": "STEADY",
+      "data_source": "NAB Monthly Business Survey"
+    }
+  },
+  "weights": {
+    "inflation": 0.25,
+    "wages": 0.15,
+    "employment": 0.15,
+    "housing": 0.15,
+    "spending": 0.1,
+    "building_approvals": 0.05,
+    "business_confidence": 0.05,
+    "asx_futures": 0.1
+  },
+  "metadata": {
+    "window_years": 10,
+    "clamp_range": [
+      -3.0,
+      3.0
+    ],
+    "mapping": "linear",
+    "statistics": "robust (median/MAD)",
+    "indicators_available": 7,
+    "indicators_missing": []
+  },
+  "asx_futures": {
+    "current_rate": 4.6,
+    "next_meeting": "2026-11-03",
+    "implied_rate": 4.67,
+    "probabilities": {
+      "cut": 0.0,
+      "hold": 74.0,
+      "hike": 26.0
+    },
+    "direction": "hike",
+    "data_date": "2026-10-09",
+    "staleness_days": 3,
+    "meetings": [
+      {
+        "meeting_date": "2026-11-03",
+        "meeting_date_label": "3 Nov 2026",
+        "implied_rate": 4.67,
+        "change_bp": 6.5,
+        "probability_cut": 0.0,
+        "probability_hold": 74.0,
+        "probability_hike": 26.0
+      },
+      {
+        "meeting_date": "2026-12-01",
+        "meeting_date_label": "1 Dec 2026",
+        "implied_rate": 4.71,
+        "change_bp": 10.5,
+        "probability_cut": 0.0,
+        "probability_hold": 58.0,
+        "probability_hike": 42.0
+      },
+      {
+        "meeting_date": "2027-02-02",
+        "meeting_date_label": "2 Feb 2027",
+        "implied_rate": 4.76,
+        "change_bp": 16.5,
+        "probability_cut": 0.0,
+        "probability_hold": 34.0,
+        "probability_hike": 66.0
+      },
+      {
+        "meeting_date": "2027-03-02",
+        "meeting_date_label": "2 Mar 2027",
+        "implied_rate": 4.79,
+        "change_bp": 19.5,
+        "probability_cut": 0.0,
+        "probability_hold": 22.0,
+        "probability_hike": 78.0
+      }
+    ]
+  }
+}
