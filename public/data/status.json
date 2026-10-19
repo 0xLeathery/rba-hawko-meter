@@ -1,14 +1,14 @@
 {
-  "generated_at": "2026-10-16T06:47:34.844177Z",
+  "generated_at": "2026-10-19T02:33:36.139192Z",
   "pipeline_version": "1.0.0",
   "overall": {
-    "hawk_score": 69.3,
+    "hawk_score": 68.2,
     "zone": "warm",
     "zone_label": "Mild hawkish pressure",
     "verdict": "Economic indicators suggest moderate tightening pressure",
     "confidence": "LOW",
     "previous_hawk_score": 69.3,
-    "hawk_score_delta": 0.0
+    "hawk_score_delta": -1.1
   },
   "gauges": {
     "inflation": {
@@ -21,7 +21,7 @@
       "weight": 0.25,
       "polarity": 1,
       "data_date": "2026-04-01",
-      "staleness_days": 198,
+      "staleness_days": 201,
       "confidence": "HIGH",
       "interpretation": "Inflation above long-run average",
       "history": [
@@ -52,7 +52,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-04-01",
-      "staleness_days": 198,
+      "staleness_days": 201,
       "confidence": "HIGH",
       "interpretation": "Wage growth above long-run average",
       "history": [
@@ -74,35 +74,35 @@
       "delta_direction": "unchanged"
     },
     "employment": {
-      "value": 41.6,
-      "zone": "neutral",
-      "zone_label": "Balanced",
-      "z_score": -0.502,
-      "raw_value": 1.63,
+      "value": 35.3,
+      "zone": "cool",
+      "zone_label": "Mild dovish pressure",
+      "z_score": -0.882,
+      "raw_value": 1.15,
       "raw_unit": "% YoY",
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": 16,
+      "staleness_days": 19,
       "confidence": "HIGH",
-      "interpretation": "Labour market near historical average",
+      "interpretation": "Labour market looser than historical average",
       "history": [
         55.1,
-        47.6,
-        47.6,
-        53.1,
+        47.7,
+        47.5,
+        53.2,
         54.2,
-        43.2,
-        39.9,
-        28.9,
+        43.3,
+        39.8,
+        29.2,
         29.9,
         41.8,
-        42.3,
-        41.6
+        42.2,
+        35.3
       ],
       "previous_value": 41.6,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      "delta": -6.3,
+      "delta_direction": "down"
     },
     "spending": {
       "value": 68.7,
@@ -114,7 +114,7 @@
       "weight": 0.1,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": 16,
+      "staleness_days": 19,
       "confidence": "HIGH",
       "interpretation": "Consumer spending above trend",
       "history": [
@@ -145,7 +145,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": 16,
+      "staleness_days": 19,
       "confidence": "HIGH",
       "interpretation": "Building approvals above trend",
       "history": [
@@ -176,7 +176,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-02-28",
-      "staleness_days": 230,
+      "staleness_days": 233,
       "confidence": "LOW",
       "interpretation": "Housing prices well above trend",
       "history": [
@@ -209,7 +209,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": 16,
+      "staleness_days": 19,
       "confidence": "LOW",
       "interpretation": "Capacity utilisation near long-run average",
       "history": [
@@ -255,7 +255,7 @@
     },
     "direction": "hold",
     "data_date": "2026-10-16",
-    "staleness_days": 0,
+    "staleness_days": 3,
     "meetings": [
       {
         "meeting_date": "2026-11-03",
