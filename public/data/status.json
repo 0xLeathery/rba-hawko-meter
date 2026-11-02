@@ -1,31 +1,30 @@
 {
-  "generated_at": "2026-10-30T06:37:10.700702Z",
+  "generated_at": "2026-11-02T02:19:57.051482Z",
   "pipeline_version": "1.0.0",
   "overall": {
-    "hawk_score": 68.2,
+    "hawk_score": 67.1,
     "zone": "warm",
     "zone_label": "Mild hawkish pressure",
     "verdict": "Economic indicators suggest moderate tightening pressure",
     "confidence": "LOW",
     "previous_hawk_score": 68.2,
-    "hawk_score_delta": 0.0
+    "hawk_score_delta": -1.1
   },
   "gauges": {
     "inflation": {
-      "value": 70.3,
+      "value": 68.1,
       "zone": "warm",
       "zone_label": "Mild hawkish pressure",
-      "z_score": 1.219,
-      "raw_value": 3.94,
+      "z_score": 1.084,
+      "raw_value": 3.92,
       "raw_unit": "% YoY",
       "weight": 0.25,
       "polarity": 1,
-      "data_date": "2026-04-01",
-      "staleness_days": 212,
+      "data_date": "2026-07-01",
+      "staleness_days": 124,
       "confidence": "HIGH",
       "interpretation": "Inflation above long-run average",
       "history": [
-        100.0,
         96.7,
         85.0,
         86.4,
@@ -36,11 +35,12 @@
         68.6,
         71.6,
         74.6,
-        70.3
+        70.3,
+        68.1
       ],
       "previous_value": 70.3,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      "delta": -2.2,
+      "delta_direction": "down"
     },
     "wages": {
       "value": 74.3,
@@ -52,7 +52,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-04-01",
-      "staleness_days": 212,
+      "staleness_days": 215,
       "confidence": "HIGH",
       "interpretation": "Wage growth above long-run average",
       "history": [
@@ -83,7 +83,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": 30,
+      "staleness_days": 33,
       "confidence": "HIGH",
       "interpretation": "Labour market looser than historical average",
       "history": [
@@ -114,7 +114,7 @@
       "weight": 0.1,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": 30,
+      "staleness_days": 33,
       "confidence": "HIGH",
       "interpretation": "Consumer spending above trend",
       "history": [
@@ -136,18 +136,18 @@
       "delta_direction": "unchanged"
     },
     "building_approvals": {
-      "value": 60.3,
-      "zone": "warm",
-      "zone_label": "Mild hawkish pressure",
-      "z_score": 0.619,
-      "raw_value": 10.35,
+      "value": 51.5,
+      "zone": "neutral",
+      "zone_label": "Balanced",
+      "z_score": 0.09,
+      "raw_value": -1.5,
       "raw_unit": "% YoY",
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": 30,
+      "staleness_days": 33,
       "confidence": "HIGH",
-      "interpretation": "Building approvals above trend",
+      "interpretation": "Building approvals near trend",
       "history": [
         32.8,
         45.6,
@@ -156,15 +156,15 @@
         72.3,
         73.5,
         83.4,
-        77.2,
+        77.4,
         59.7,
-        68.4,
-        66.7,
-        60.3
+        68.5,
+        66.8,
+        51.5
       ],
       "previous_value": 60.3,
-      "delta": 0.0,
-      "delta_direction": "unchanged"
+      "delta": -8.8,
+      "delta_direction": "down"
     },
     "housing": {
       "value": 100.0,
@@ -176,7 +176,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-02-28",
-      "staleness_days": 244,
+      "staleness_days": 247,
       "confidence": "LOW",
       "interpretation": "Housing prices well above trend",
       "history": [
@@ -208,8 +208,8 @@
       "raw_unit": "%",
       "weight": 0.05,
       "polarity": 1,
-      "data_date": "2026-09-30",
-      "staleness_days": 30,
+      "data_date": "2026-12-31",
+      "staleness_days": -59,
       "confidence": "LOW",
       "interpretation": "Capacity utilisation near long-run average",
       "history": [
@@ -255,7 +255,7 @@
     },
     "direction": "hike",
     "data_date": "2026-10-30",
-    "staleness_days": 0,
+    "staleness_days": 3,
     "meetings": [
       {
         "meeting_date": "2026-11-03",
