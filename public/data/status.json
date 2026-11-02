@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-02T02:19:57.051482Z",
+  "generated_at": "2026-11-02T06:40:48.864107Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 67.1,
@@ -250,21 +250,21 @@
     "implied_rate": 4.78,
     "probabilities": {
       "cut": 0.0,
-      "hold": 30.0,
-      "hike": 70.0
+      "hold": 28.0,
+      "hike": 72.0
     },
     "direction": "hike",
-    "data_date": "2026-10-30",
-    "staleness_days": 3,
+    "data_date": "2026-11-02",
+    "staleness_days": 0,
     "meetings": [
       {
         "meeting_date": "2026-11-03",
         "meeting_date_label": "3 Nov 2026",
         "implied_rate": 4.78,
-        "change_bp": 17.5,
+        "change_bp": 18.0,
         "probability_cut": 0.0,
-        "probability_hold": 30.0,
-        "probability_hike": 70.0
+        "probability_hold": 28.0,
+        "probability_hike": 72.0
       },
       {
         "meeting_date": "2026-12-01",
@@ -278,8 +278,8 @@
       {
         "meeting_date": "2027-02-02",
         "meeting_date_label": "2 Feb 2027",
-        "implied_rate": 4.89,
-        "change_bp": 29.0,
+        "implied_rate": 4.91,
+        "change_bp": 30.5,
         "probability_cut": 0.0,
         "probability_hold": 0.0,
         "probability_hike": 100.0
@@ -287,8 +287,8 @@
       {
         "meeting_date": "2027-03-02",
         "meeting_date_label": "2 Mar 2027",
-        "implied_rate": 4.92,
-        "change_bp": 31.5,
+        "implied_rate": 4.93,
+        "change_bp": 33.5,
         "probability_cut": 0.0,
         "probability_hold": 0.0,
         "probability_hike": 100.0
