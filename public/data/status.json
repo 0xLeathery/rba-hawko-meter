@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-13T06:32:56.914249Z",
+  "generated_at": "2026-11-16T02:21:24.366707Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 67.1,
@@ -21,7 +21,7 @@
       "weight": 0.25,
       "polarity": 1,
       "data_date": "2026-07-01",
-      "staleness_days": 135,
+      "staleness_days": 138,
       "confidence": "HIGH",
       "interpretation": "Inflation above long-run average",
       "history": [
@@ -52,7 +52,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-04-01",
-      "staleness_days": 226,
+      "staleness_days": 229,
       "confidence": "HIGH",
       "interpretation": "Wage growth above long-run average",
       "history": [
@@ -83,7 +83,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": 44,
+      "staleness_days": 47,
       "confidence": "HIGH",
       "interpretation": "Labour market looser than historical average",
       "history": [
@@ -114,7 +114,7 @@
       "weight": 0.1,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": 44,
+      "staleness_days": 47,
       "confidence": "HIGH",
       "interpretation": "Consumer spending above trend",
       "history": [
@@ -131,9 +131,9 @@
         64.6,
         68.3
       ],
-      "previous_value": 68.7,
-      "delta": -0.4,
-      "delta_direction": "down"
+      "previous_value": 68.3,
+      "delta": 0.0,
+      "delta_direction": "unchanged"
     },
     "building_approvals": {
       "value": 51.5,
@@ -145,7 +145,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": 44,
+      "staleness_days": 47,
       "confidence": "HIGH",
       "interpretation": "Building approvals near trend",
       "history": [
@@ -176,7 +176,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-02-28",
-      "staleness_days": 258,
+      "staleness_days": 261,
       "confidence": "LOW",
       "interpretation": "Housing prices well above trend",
       "history": [
@@ -209,7 +209,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-12-31",
-      "staleness_days": -48,
+      "staleness_days": -45,
       "confidence": "LOW",
       "interpretation": "Capacity utilisation near long-run average",
       "history": [
@@ -255,7 +255,7 @@
     },
     "direction": "hold",
     "data_date": "2026-11-13",
-    "staleness_days": 0,
+    "staleness_days": 3,
     "meetings": [
       {
         "meeting_date": "2026-12-01",
