@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-16T02:21:24.366707Z",
+  "generated_at": "2026-11-16T06:49:56.130395Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 67.1,
@@ -254,8 +254,8 @@
       "hike": 0.0
     },
     "direction": "hold",
-    "data_date": "2026-11-13",
-    "staleness_days": 3,
+    "data_date": "2026-11-16",
+    "staleness_days": 0,
     "meetings": [
       {
         "meeting_date": "2026-12-01",
@@ -269,8 +269,8 @@
       {
         "meeting_date": "2027-02-02",
         "meeting_date_label": "2 Feb 2027",
-        "implied_rate": 4.89,
-        "change_bp": 4.5,
+        "implied_rate": 4.9,
+        "change_bp": 5.0,
         "probability_cut": 0.0,
         "probability_hold": 100.0,
         "probability_hike": 0.0
@@ -279,10 +279,10 @@
         "meeting_date": "2027-03-02",
         "meeting_date_label": "2 Mar 2027",
         "implied_rate": 4.92,
-        "change_bp": 6.5,
+        "change_bp": 7.0,
         "probability_cut": 0.0,
-        "probability_hold": 74.0,
-        "probability_hike": 26.0
+        "probability_hold": 72.0,
+        "probability_hike": 28.0
       },
       {
         "meeting_date": "2027-04-06",
