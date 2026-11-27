@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-26T06:35:56.065402Z",
+  "generated_at": "2026-11-27T06:37:01.081519Z",
   "pipeline_version": "1.0.0",
   "overall": {
     "hawk_score": 65.9,
@@ -21,7 +21,7 @@
       "weight": 0.25,
       "polarity": 1,
       "data_date": "2026-07-01",
-      "staleness_days": 148,
+      "staleness_days": 149,
       "confidence": "HIGH",
       "interpretation": "Inflation above long-run average",
       "history": [
@@ -52,7 +52,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-07-01",
-      "staleness_days": 148,
+      "staleness_days": 149,
       "confidence": "HIGH",
       "interpretation": "Wage growth above long-run average",
       "history": [
@@ -83,7 +83,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-12-31",
-      "staleness_days": -35,
+      "staleness_days": -34,
       "confidence": "HIGH",
       "interpretation": "Labour market looser than historical average",
       "history": [
@@ -114,7 +114,7 @@
       "weight": 0.1,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": 57,
+      "staleness_days": 58,
       "confidence": "HIGH",
       "interpretation": "Consumer spending above trend",
       "history": [
@@ -145,7 +145,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-09-30",
-      "staleness_days": 57,
+      "staleness_days": 58,
       "confidence": "HIGH",
       "interpretation": "Building approvals near trend",
       "history": [
@@ -176,7 +176,7 @@
       "weight": 0.15,
       "polarity": 1,
       "data_date": "2026-02-28",
-      "staleness_days": 271,
+      "staleness_days": 272,
       "confidence": "LOW",
       "interpretation": "Housing prices well above trend",
       "history": [
@@ -209,7 +209,7 @@
       "weight": 0.05,
       "polarity": 1,
       "data_date": "2026-12-31",
-      "staleness_days": -35,
+      "staleness_days": -34,
       "confidence": "LOW",
       "interpretation": "Capacity utilisation near long-run average",
       "history": [
@@ -254,7 +254,7 @@
       "hike": 0.0
     },
     "direction": "hold",
-    "data_date": "2026-11-26",
+    "data_date": "2026-11-27",
     "staleness_days": 0,
     "meetings": [
       {
